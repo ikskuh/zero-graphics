@@ -93,12 +93,7 @@ pub fn main() anyerror!void {
     var screen_width: u15 = 0;
     var screen_height: u15 = 0;
 
-    const texture_handle = try renderer.createTexture(2, 2, &[2 * 2 * 4]u8{
-        0xFF, 0x00, 0x00, 0xFF,
-        0x00, 0xFF, 0x00, 0xFF,
-        0x00, 0x00, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF,
-    });
+    const texture_handle = try renderer.createTexture(128, 128, @embedFile("cat.rgba"));
 
     main_loop: while (true) {
         var event: c.SDL_Event = undefined;
@@ -159,10 +154,10 @@ pub fn main() anyerror!void {
             try renderer.drawLine(34, 98, 65, 98, white);
 
             try renderer.fillTexturedRectangle(
-                (screen_width - 256) / 2,
-                (screen_height - 256) / 2,
-                256,
-                256,
+                (screen_width - texture_handle.width) / 2,
+                (screen_height - texture_handle.height) / 2,
+                texture_handle.width,
+                texture_handle.height,
                 texture_handle,
                 null,
             );
@@ -222,6 +217,8 @@ pub fn main() anyerror!void {
             try writer.writeAll(buffer);
 
             try buffered_writer.flush();
+
+            log.info("screenshot written to screenshot.tga", .{});
         }
 
         c.SDL_GL_SwapWindow(window);
