@@ -85,7 +85,7 @@ pub fn main() anyerror!void {
     var renderer = try Renderer.init(std.heap.c_allocator);
     defer renderer.deinit();
 
-    var first_frame = true;
+    var take_screenshot = false;
 
     var screen_width: u15 = 0;
     var screen_height: u15 = 0;
@@ -98,6 +98,7 @@ pub fn main() anyerror!void {
                 c.SDL_WINDOWEVENT => {
                     log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                 },
+                c.SDL_FINGERDOWN => take_screenshot = true,
                 else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, @intCast(c_int, event.type))}),
             }
         }
@@ -113,8 +114,6 @@ pub fn main() anyerror!void {
 
                 screen_width = @intCast(u15, width);
                 screen_height = @intCast(u15, height);
-
-                first_frame = true;
             }
         }
 
@@ -166,8 +165,8 @@ pub fn main() anyerror!void {
             renderer.render(screen_width, screen_height);
         }
 
-        if (first_frame) {
-            first_frame = false;
+        if (take_screenshot) {
+            take_screenshot = false;
 
             var buffer = try std.heap.c_allocator.alloc(u8, 4 * @as(usize, screen_width) * @as(usize, screen_height));
             defer std.heap.c_allocator.free(buffer);
