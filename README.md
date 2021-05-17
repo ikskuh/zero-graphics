@@ -38,12 +38,12 @@ zig build -Dbackend=desktop_sdl2 run
 
 ```sh
 # Web variant
-zig build -Dbackend=wasm install
+zig build -Dbackend=wasm -Drelease-small install
 python3 -m http.server --directory www/
 # Now visit http://127.0.0.1:8000/index.htm
 ```
 
 ```sh
 # Android (doesn't work at all yet)
-zig build -Dbackend=android run
+zig build -Dbackend=android install
 ```
