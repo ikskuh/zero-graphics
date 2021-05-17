@@ -1,0 +1,9 @@
+<ifreund> zig will still try to link all libc libc it knows about, since our builtin.link_libc is just a bool
+<ifreund> see the switch here https://github.com/ziglang/zig/blob/5414bd48edd460ae8667c811e13aa9b5d9fab919/src/target.zig#L378
+<ifreund> which then gets passed to the linker here: https://github.com/ziglang/zig/blob/826179bff40fdbd8c3b11138897fcfbb3367def8/src/link/Elf.zig#L1658
+<ifreund> *all the libc libs
+<ikskuh> erm
+<ikskuh> that is wrong :D
+<ikskuh> there is no pthread on android
+<ikskuh> no rt and no util
+<ifreund> ikskuh: sounds like the fix is as simple as adding android to that switch then :)
