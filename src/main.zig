@@ -7,8 +7,9 @@ const logger = std.log.scoped(.demo);
 const gles = @import("gl_es_2v0.zig");
 
 const backend = switch (build_options.render_backend) {
-    .desktop_sdl2 => @import("sdl.zig"),
-    .wasm => @import("wasm.zig"),
+    .desktop_sdl2 => @import("backend/sdl.zig"),
+    .wasm => @import("backend/wasm.zig"),
+    .android => @import("backend/android.zig"),
 };
 
 pub usingnamespace backend;
