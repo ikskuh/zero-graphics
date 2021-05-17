@@ -1,107 +1,40 @@
 const std = @import("std");
 const build_options = @import("build_options");
-const c = @cImport({
-    @cInclude("SDL.h");
-});
-const gles = @import("gl_es_2v0.zig");
-const log = std.log.scoped(.demo);
 
+const logger = std.log.scoped(.demo);
 // opengl docs can be found here:
 // https://www.khronos.org/registry/OpenGL-Refpages/es2.0/
+const gles = @import("gl_es_2v0.zig");
 
-pub const main = switch (build_options.render_backend) {
-    .desktop_sdl2 => sdlMain,
+const backend = switch (build_options.render_backend) {
+    .desktop_sdl2 => @import("sdl.zig"),
+    .wasm => @import("wasm.zig"),
 };
 
-pub const getGlEntryPoint = switch (build_options.render_backend) {
-    .desktop_sdl2 => sdlLoadOpenGlFunction,
-};
+pub usingnamespace backend;
 
-// Desktop entry point
-fn sdlMain() anyerror!void {
-    _ = c.SDL_Init(c.SDL_INIT_EVERYTHING);
-    defer _ = c.SDL_Quit();
-
-    _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_MINOR_VERSION, 0);
-
-    _ = c.SDL_GL_SetAttribute(.SDL_GL_DOUBLEBUFFER, 1);
-    //    _ = c.SDL_GL_SetAttribute(.SDL_GL_DEPTH_SIZE, 24);
-    _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES);
-
-    if (std.builtin.mode == .Debug) {
-        _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_FLAGS, c.SDL_GL_CONTEXT_DEBUG_FLAG);
-    }
-
-    const window = c.SDL_CreateWindow(
-        "OpenGL ES 2.0 - Zig Demo",
-        c.SDL_WINDOWPOS_CENTERED,
-        c.SDL_WINDOWPOS_CENTERED,
-        640,
-        480,
-        c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI | c.SDL_WINDOW_MAXIMIZED | c.SDL_WINDOW_FULLSCREEN_DESKTOP,
-    ) orelse sdlPanic();
-    defer c.SDL_DestroyWindow(window);
-
-    const gl_context = c.SDL_GL_CreateContext(window) orelse sdlPanic();
-    defer c.SDL_GL_DeleteContext(gl_context);
-
-    {
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        c.SDL_GL_GetDrawableSize(window, &width, &height);
-        log.info("Render resolution:  {}×{}", .{ width, height });
-
-        c.SDL_GetWindowSize(window, &width, &height);
-        log.info("Virtual resolution: {}×{}", .{ width, height });
-    }
-
-    var app: Application = undefined;
-    try app.init();
-    defer app.deinit();
-
-    while (true) {
-        var event: c.SDL_Event = undefined;
-        while (c.SDL_PollEvent(&event) != 0) {
-            switch (event.type) {
-                c.SDL_QUIT => return,
-                c.SDL_WINDOWEVENT => {
-                    if (event.window.event == c.SDL_WINDOWEVENT_SIZE_CHANGED) {
-                        var width: c_int = undefined;
-                        var height: c_int = undefined;
-
-                        c.SDL_GL_GetDrawableSize(window, &width, &height);
-
-                        try app.resize(@intCast(u15, width), @intCast(u15, height));
-                    }
-                    log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
-                },
-                else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, @intCast(c_int, event.type))}),
-            }
-        }
-
-        const still_running = try app.update();
-        if (still_running == false)
-            break;
-        c.SDL_GL_SwapWindow(window);
-    }
+comptime {
+    _ = backend;
+    _ = backend.loadOpenGlFunction;
 }
 
-const Application = struct {
+pub const Application = struct {
     screen_width: u15,
     screen_height: u15,
     renderer: Renderer,
     texture_handle: *const Renderer.Texture,
+    allocator: *std.mem.Allocator,
 
-    fn init(app: *Application) !void {
+    pub fn init(app: *Application, allocator: *std.mem.Allocator) !void {
         app.* = Application{
+            .allocator = allocator,
             .screen_width = 0,
             .screen_height = 0,
             .texture_handle = undefined,
             .renderer = undefined,
         };
 
-        try gles.load({}, sdlLoadOpenGlFunction);
+        try gles.load({}, loadOpenGlFunction);
 
         const RequestedExtensions = struct {
             KHR_debug: bool,
@@ -110,12 +43,14 @@ const Application = struct {
         const available_extensions = blk: {
             var exts = std.mem.zeroes(RequestedExtensions);
 
-            const extension_list = std.mem.span(gles.getString(gles.EXTENSIONS)) orelse break :blk exts;
-            var iterator = std.mem.split(extension_list, " ");
-            while (iterator.next()) |extension| {
-                inline for (std.meta.fields(RequestedExtensions)) |fld| {
-                    if (std.mem.eql(u8, extension, "GL_" ++ fld.name)) {
-                        @field(exts, fld.name) = true;
+            if (std.builtin.cpu.arch != .wasm32) {
+                const extension_list = std.mem.span(gles.getString(gles.EXTENSIONS)) orelse break :blk exts;
+                var iterator = std.mem.split(extension_list, " ");
+                while (iterator.next()) |extension| {
+                    inline for (std.meta.fields(RequestedExtensions)) |fld| {
+                        if (std.mem.eql(u8, extension, "GL_" ++ fld.name)) {
+                            @field(exts, fld.name) = true;
+                        }
                     }
                 }
             }
@@ -123,45 +58,44 @@ const Application = struct {
             break :blk exts;
         };
 
-        {
-            log.info("SDL Video Driver:     {s}", .{std.mem.span(c.SDL_GetCurrentVideoDriver())});
-            log.info("OpenGL Version:       {s}", .{std.mem.span(gles.getString(gles.VERSION))});
-            log.info("OpenGL Vendor:        {s}", .{std.mem.span(gles.getString(gles.VENDOR))});
-            log.info("OpenGL Renderer:      {s}", .{std.mem.span(gles.getString(gles.RENDERER))});
-            log.info("OpenGL GLSL:          {s}", .{std.mem.span(gles.getString(gles.SHADING_LANGUAGE_VERSION))});
+        //{
+        //    logger.info("OpenGL Version:       {s}", .{std.mem.span(gles.getString(gles.VERSION))});
+        //    logger.info("OpenGL Vendor:        {s}", .{std.mem.span(gles.getString(gles.VENDOR))});
+        //    logger.info("OpenGL Renderer:      {s}", .{std.mem.span(gles.getString(gles.RENDERER))});
+        //    logger.info("OpenGL GLSL:          {s}", .{std.mem.span(gles.getString(gles.SHADING_LANGUAGE_VERSION))});
 
-            log.info("Available extensions: {}", .{available_extensions});
-        }
+        //    logger.info("Available extensions: {}", .{available_extensions});
+        //}
 
         // If possible, install the debug callback in debug builds
         if (std.builtin.mode == .Debug and available_extensions.KHR_debug) {
             const debug = gles.GL_KHR_debug;
-            try debug.load({}, sdlLoadOpenGlFunction);
+            try debug.load({}, loadOpenGlFunction);
 
             debug.debugMessageCallbackKHR(glesDebugProc, null);
             gles.enable(debug.DEBUG_OUTPUT_KHR);
         }
 
-        app.renderer = try Renderer.init(std.heap.c_allocator);
+        app.renderer = try Renderer.init(app.allocator);
         errdefer app.renderer.deinit();
 
         app.texture_handle = try app.renderer.createTexture(128, 128, @embedFile("cat.rgba"));
     }
 
-    fn deinit(app: *Application) void {
+    pub fn deinit(app: *Application) void {
         app.renderer.deinit();
         app.* = undefined;
     }
 
-    fn resize(app: *Application, width: u15, height: u15) !void {
+    pub fn resize(app: *Application, width: u15, height: u15) !void {
         if (width != app.screen_width or height != app.screen_height) {
-            log.info("screen resized to resolution: {}×{}", .{ width, height });
+            logger.info("screen resized to resolution: {}×{}", .{ width, height });
             app.screen_width = @intCast(u15, width);
             app.screen_height = @intCast(u15, height);
         }
     }
 
-    fn update(app: *Application) !bool {
+    pub fn update(app: *Application) !bool {
         var take_screenshot = false;
 
         const renderer = &app.renderer;
@@ -217,46 +151,48 @@ const Application = struct {
             renderer.render(app.screen_width, app.screen_height);
         }
 
-        if (take_screenshot) {
-            take_screenshot = false;
+        if (std.builtin.os.tag != .freestanding) {
+            if (take_screenshot) {
+                take_screenshot = false;
 
-            var buffer = try std.heap.c_allocator.alloc(u8, 4 * @as(usize, app.screen_width) * @as(usize, app.screen_height));
-            defer std.heap.c_allocator.free(buffer);
+                var buffer = try app.allocator.alloc(u8, 4 * @as(usize, app.screen_width) * @as(usize, app.screen_height));
+                defer app.allocator.free(buffer);
 
-            gles.pixelStorei(gles.PACK_ALIGNMENT, 1);
-            gles.readPixels(0, 0, app.screen_width, app.screen_height, gles.RGBA, gles.UNSIGNED_BYTE, buffer.ptr);
+                gles.pixelStorei(gles.PACK_ALIGNMENT, 1);
+                gles.readPixels(0, 0, app.screen_width, app.screen_height, gles.RGBA, gles.UNSIGNED_BYTE, buffer.ptr);
 
-            var file = try std.fs.cwd().createFile("screenshot.tga", .{});
-            defer file.close();
+                var file = try std.fs.cwd().createFile("screenshot.tga", .{});
+                defer file.close();
 
-            var buffered_writer = std.io.bufferedWriter(file.writer());
+                var buffered_writer = std.io.bufferedWriter(file.writer());
 
-            var writer = buffered_writer.writer();
+                var writer = buffered_writer.writer();
 
-            const image_id = "Hello, TGA!";
+                const image_id = "Hello, TGA!";
 
-            try writer.writeIntLittle(u8, @intCast(u8, image_id.len));
-            try writer.writeIntLittle(u8, 0); // color map type = no color map
-            try writer.writeIntLittle(u8, 2); // image type = uncompressed true-color image
-            // color map spec
-            try writer.writeIntLittle(u16, 0); // first index
-            try writer.writeIntLittle(u16, 0); // length
-            try writer.writeIntLittle(u8, 0); // number of bits per pixel
-            // image spec
-            try writer.writeIntLittle(u16, 0); // x origin
-            try writer.writeIntLittle(u16, 0); // y origin
-            try writer.writeIntLittle(u16, app.screen_width); // width
-            try writer.writeIntLittle(u16, app.screen_height); // height
-            try writer.writeIntLittle(u8, 32); // bits per pixel
-            try writer.writeIntLittle(u8, 8); // 0…3 => alpha channel depth = 8, 4…7 => direction=bottom left
+                try writer.writeIntLittle(u8, @intCast(u8, image_id.len));
+                try writer.writeIntLittle(u8, 0); // color map type = no color map
+                try writer.writeIntLittle(u8, 2); // image type = uncompressed true-color image
+                // color map spec
+                try writer.writeIntLittle(u16, 0); // first index
+                try writer.writeIntLittle(u16, 0); // length
+                try writer.writeIntLittle(u8, 0); // number of bits per pixel
+                // image spec
+                try writer.writeIntLittle(u16, 0); // x origin
+                try writer.writeIntLittle(u16, 0); // y origin
+                try writer.writeIntLittle(u16, app.screen_width); // width
+                try writer.writeIntLittle(u16, app.screen_height); // height
+                try writer.writeIntLittle(u8, 32); // bits per pixel
+                try writer.writeIntLittle(u8, 8); // 0…3 => alpha channel depth = 8, 4…7 => direction=bottom left
 
-            try writer.writeAll(image_id);
-            try writer.writeAll(""); // color map data \o/
-            try writer.writeAll(buffer);
+                try writer.writeAll(image_id);
+                try writer.writeAll(""); // color map data \o/
+                try writer.writeAll(buffer);
 
-            try buffered_writer.flush();
+                try buffered_writer.flush();
 
-            log.info("screenshot written to screenshot.tga", .{});
+                logger.info("screenshot written to screenshot.tga", .{});
+            }
         }
 
         return true;
@@ -708,14 +644,6 @@ const Color = struct {
     a: u8 = 0xFF,
 };
 
-fn sdlPanic() noreturn {
-    @panic(std.mem.span(c.SDL_GetError()));
-}
-
-fn sdlLoadOpenGlFunction(ctx: void, function: [:0]const u8) ?*c_void {
-    return c.SDL_GL_GetProcAddress(function.ptr);
-}
-
 fn glesDebugProc(
     source: gles.GLenum,
     msg_type: gles.GLenum,
@@ -756,10 +684,10 @@ fn glesDebugProc(
     var fmt_arg = .{ source_name, type_name, message };
 
     switch (severity) {
-        debug.DEBUG_SEVERITY_HIGH_KHR => log.emerg(fmt_string, fmt_arg),
-        debug.DEBUG_SEVERITY_MEDIUM_KHR => log.err(fmt_string, fmt_arg),
-        debug.DEBUG_SEVERITY_LOW_KHR => log.warn(fmt_string, fmt_arg),
-        debug.DEBUG_SEVERITY_NOTIFICATION_KHR => log.info(fmt_string, fmt_arg),
-        else => log.emerg("encountered invalid log severity: {}", .{severity}),
+        debug.DEBUG_SEVERITY_HIGH_KHR => logger.emerg(fmt_string, fmt_arg),
+        debug.DEBUG_SEVERITY_MEDIUM_KHR => logger.err(fmt_string, fmt_arg),
+        debug.DEBUG_SEVERITY_LOW_KHR => logger.warn(fmt_string, fmt_arg),
+        debug.DEBUG_SEVERITY_NOTIFICATION_KHR => logger.info(fmt_string, fmt_arg),
+        else => logger.emerg("encountered invalid log severity: {}", .{severity}),
     }
 }

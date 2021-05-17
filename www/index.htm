@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset=" utf-8">
+    <title>OpenGL ES 2.0 - Zig Demo</title>
+
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #444;
+            color: #98ffb1;
+        }
+    </style>
+
+    <script type="module" defer="true">
+        import getEnv from "./binding.js";
+
+        const canvas_element = document.getElementById("render-canvas");
+        var globalInstance;
+
+        let env = {
+            ...getEnv(canvas_element, () => globalInstance),
+        };
+
+        fetch("gles2-zig.wasm")
+            .then((response) => response.arrayBuffer())
+            .then((bytes) => WebAssembly.instantiate(bytes, { env }))
+            .then((results) => results.instance)
+            .then((instance) => {
+                globalInstance = instance;
+                let res = instance.exports.app_init();
+                console.log("app_init returned ", res);
+                res = instance.exports.app_update();
+                console.log("app_update returned ", res);
+            });
+    </script>
+</head>
+
+<body>
+    <h1>OpenGL ES 2.0 - Zig Demo</h1>
+    <canvas id="render-canvas" width="640" height="480" tabindex="1">
+    </canvas>
+</body>
+
+</html>
