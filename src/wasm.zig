@@ -12,6 +12,8 @@ extern fn wasm_getScreenW() u32;
 extern fn wasm_getScreenH() u32;
 extern fn now_f64() f64;
 
+pub const log_level = .info;
+
 var app_instance: root.Application = undefined;
 var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
 

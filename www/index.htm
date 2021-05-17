@@ -13,6 +13,16 @@
             background: #444;
             color: #98ffb1;
         }
+
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+
+        }
     </style>
 
     <script type="module" defer="true">
@@ -32,17 +42,35 @@
             .then((instance) => {
                 globalInstance = instance;
                 let res = instance.exports.app_init();
-                console.log("app_init returned ", res);
-                res = instance.exports.app_update();
-                console.log("app_update returned ", res);
+                if (res == 0) {
+                    // run the update loop until the app dies
+                    function update() {
+                        canvas_element.width = canvas_element.clientWidth;
+                        canvas_element.height = canvas_element.clientHeight;
+
+                        let res = instance.exports.app_update();
+                        if (res == 0) {
+                            requestAnimationFrame(update);
+                        } else {
+                            console.log("app_update returned ", res);
+                        }
+                    }
+
+                    requestAnimationFrame(update);
+                }
+                else {
+                    console.log("app_init returned ", res);
+                }
+
+
             });
     </script>
 </head>
 
 <body>
-    <h1>OpenGL ES 2.0 - Zig Demo</h1>
-    <canvas id="render-canvas" width="640" height="480" tabindex="1">
+    <canvas id="render-canvas" tabindex="1">
     </canvas>
+    <h1>OpenGL ES 2.0 - Zig Demo</h1>
 </body>
 
 </html>

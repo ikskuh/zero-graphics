@@ -294,18 +294,16 @@ const Renderer = struct {
         \\precision mediump float;
         \\varying vec4 fColor;
         \\varying vec2 fUV;
-        \\uniform float uTextureEnable;
         \\uniform sampler2D uTexture;
         \\void main()
         \\{
-        \\   vec4 base_color = mix(vec4(1), texture2D(uTexture, fUV), uTextureEnable);
+        \\   vec4 base_color = texture2D(uTexture, fUV);
         \\   gl_FragColor = fColor * base_color;
         \\}
     ;
 
     shader_program: gles.GLuint,
     screen_size_location: gles.GLint,
-    texture_enable_location: gles.GLint,
     texture_location: gles.GLint,
 
     vertex_buffer: gles.GLuint,
@@ -320,6 +318,8 @@ const Renderer = struct {
 
     allocator: *std.mem.Allocator,
     textures: TextureList,
+
+    white_texture: *const Texture,
 
     pub fn init(allocator: *std.mem.Allocator) InitError!Self {
         const shader_program = blk: {
@@ -369,10 +369,9 @@ const Renderer = struct {
         gles.vertexAttribPointer(color_attribute_location, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @byteOffsetOf(Vertex, "r")));
         gles.vertexAttribPointer(uv_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @byteOffsetOf(Vertex, "u")));
 
-        return Self{
+        var self = Self{
             .shader_program = shader_program,
             .screen_size_location = gles.getUniformLocation(shader_program, "uScreenSize"),
-            .texture_enable_location = gles.getUniformLocation(shader_program, "uTextureEnable"),
             .texture_location = gles.getUniformLocation(shader_program, "uTexture"),
             .vertices = std.ArrayList(Vertex).init(allocator),
             .vertex_buffer = vertex_buffer,
@@ -382,7 +381,12 @@ const Renderer = struct {
             .allocator = allocator,
             .textures = .{},
             .draw_calls = std.ArrayList(DrawCall).init(allocator),
+            .white_texture = undefined,
         };
+
+        self.white_texture = try self.createTexture(2, 2, &([1]u8{0xFF} ** 16));
+
+        return self;
     }
 
     pub fn deinit(self: *Self) void {
@@ -490,13 +494,9 @@ const Renderer = struct {
 
         gles.activeTexture(gles.TEXTURE0);
         for (self.draw_calls.items) |draw_call| {
-            if (draw_call.texture) |tex_ptr| {
-                gles.bindTexture(gles.TEXTURE_2D, tex_ptr.handle);
-                gles.uniform1f(self.texture_enable_location, 1);
-            } else {
-                gles.bindTexture(gles.TEXTURE_2D, 0);
-                gles.uniform1f(self.texture_enable_location, 0);
-            }
+            const tex_handle = draw_call.texture orelse self.white_texture;
+
+            gles.bindTexture(gles.TEXTURE_2D, tex_handle.handle);
 
             gles.drawArrays(
                 gles.TRIANGLES,

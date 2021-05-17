@@ -1,5 +1,5 @@
 // Platform ENV
-export default function getPlatformEnv(canvas_element, getInstance) {
+export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
     const getMemory = () => getInstance().exports.memory;
     const utf8decoder = new TextDecoder();
     const readCharStr = (ptr, len) =>
@@ -39,11 +39,10 @@ export default function getPlatformEnv(canvas_element, getInstance) {
     const glUniformLocations = [null];
 
     let log_string = "";
-    let running = true;
 
     return {
         wasm_quit() {
-            running = false;
+            stop_fn();
         },
         wasm_log_write: (ptr, len) => {
             log_string += utf8decoder.decode(
@@ -56,10 +55,10 @@ export default function getPlatformEnv(canvas_element, getInstance) {
         },
 
         wasm_getScreenW() {
-            return gl.drawingBufferWidth;
+            return gl.drawingBufferWidth; // canvas_element.clientWidth; //
         },
         wasm_getScreenH() {
-            return gl.drawingBufferHeight;
+            return gl.drawingBufferHeight; // canvas_element.clientHeight; // 
         },
 
         now_f64() {
