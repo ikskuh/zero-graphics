@@ -15,7 +15,11 @@ extern fn now_f64() f64;
 pub const log_level = .info;
 
 var app_instance: root.Application = undefined;
-var gpa: std.heap.GeneralPurposeAllocator(.{}) = undefined;
+
+var global_arena: std.heap.ArenaAllocator = undefined;
+var gpa: std.heap.GeneralPurposeAllocator(.{
+    .safety = false,
+}) = undefined;
 
 const WriteError = error{};
 const LogWriter = std.io.Writer(void, WriteError, writeLog);
@@ -56,7 +60,10 @@ pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace) noreturn {
 }
 
 export fn app_init() u32 {
-    gpa = .{};
+    global_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    gpa = .{
+        .backing_allocator = &global_arena.allocator,
+    };
 
     app_instance.init(&gpa.allocator) catch return 1;
 
@@ -76,7 +83,9 @@ export fn app_update() u32 {
 
 export fn app_deinit() u32 {
     app_instance.deinit();
-    _ = gpa.deinit();
+    // _ = gpa.deinit();
+    global_arena.deinit();
+
     return 0;
 }
 

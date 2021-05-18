@@ -82,6 +82,6 @@ fn sdlPanic() noreturn {
 }
 
 pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*c_void {
-    log.debug("getting entry point for '{s}'", .{function});
+    // log.debug("getting entry point for '{s}'", .{function});
     return c.SDL_GL_GetProcAddress(function.ptr);
 }

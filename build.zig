@@ -89,6 +89,7 @@ pub fn build(b: *std.build.Builder) void {
                     .os_tag = .freestanding,
                 });
                 app.setOutputDir("www");
+                app.single_threaded = true;
             },
             .android => unreachable,
         }
