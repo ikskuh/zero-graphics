@@ -93,7 +93,7 @@ pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
     inline for (std.meta.declarations(WebGL)) |decl| {
         const entry_point = "gl" ++ [_]u8{std.ascii.toUpper(decl.name[0])} ++ decl.name[1..];
         if (std.mem.eql(u8, entry_point, function)) {
-            return @field(WebGL, decl.name);
+            return @as(*const c_void, @field(WebGL, decl.name));
         }
     }
     return null;
