@@ -72,6 +72,11 @@ pub fn build(b: *std.build.Builder) void {
         for (app.libraries) |lib| {
             lib.addBuildOption(RenderBackend, "render_backend", backend);
             lib.addLibPath("dummy-libs");
+
+            lib.addPackage(std.build.Pkg{
+                .name = "android",
+                .path = "ZigAndroidTemplate/src/android-support.zig",
+            });
         }
 
         b.getInstallStep().dependOn(app.final_step);

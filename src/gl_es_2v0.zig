@@ -1007,7 +1007,7 @@ pub const GL_KHR_debug = struct {
         return (function_pointers.glGetPointervKHR orelse @panic("glGetPointervKHR was not bound."))(_pname, _params);
     }
 
-    pub fn load(load_ctx: anytype, get_proc_address: fn (@TypeOf(load_ctx), [:0]const u8) ?*c_void) !void {
+    pub fn load(load_ctx: anytype, get_proc_address: fn (@TypeOf(load_ctx), [:0]const u8) ?*const c_void) !void {
         var success = true;
         if (get_proc_address(load_ctx, "glDebugMessageControlKHR")) |proc| {
             function_pointers.glDebugMessageControlKHR = @ptrCast(?function_signatures.glDebugMessageControlKHR, proc);
@@ -1081,7 +1081,7 @@ pub const GL_KHR_debug = struct {
 };
 
 // Loader API:
-pub fn load(load_ctx: anytype, get_proc_address: fn (@TypeOf(load_ctx), [:0]const u8) ?*c_void) !void {
+pub fn load(load_ctx: anytype, get_proc_address: fn (@TypeOf(load_ctx), [:0]const u8) ?*const c_void) !void {
     var success = true;
     if (get_proc_address(load_ctx, "glActiveTexture")) |proc| {
         function_pointers.glActiveTexture = @ptrCast(?function_signatures.glActiveTexture, proc);

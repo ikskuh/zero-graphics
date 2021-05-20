@@ -12,6 +12,8 @@ const backend = switch (build_options.render_backend) {
     .android => @import("backend/android.zig"),
 };
 
+pub const android_app_name = "zig-gles2-demo";
+
 pub usingnamespace backend;
 
 comptime {
