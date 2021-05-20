@@ -39,6 +39,7 @@ pub fn build(b: *std.build.Builder) void {
                 .password = "123456",
                 .alias = "development_key",
             },
+            .host_tools = android_app.hostTools(b, "ZigAndroidTemplate/"),
         };
 
         const make_keystore = android_app.initKeystore(b, android_config, .{});
@@ -47,25 +48,45 @@ pub fn build(b: *std.build.Builder) void {
         const app_config = android_app.AppConfig{
             .app_name = "zig-gles2-demo",
             .display_name = "Zig OpenGL ES 2.0 Demo",
-            .package_name = "net.random_projects.zig-gles2-demo",
+            .package_name = "net.random_projects.zig_gles2_demo",
             .resource_directory = "zig-cache/app-resources",
         };
+
+        const apk_file = "zig-out/demo.apk";
 
         const app = android_app.createApp(
             b,
             android_config,
-            "zig-out/demo.apk",
+            apk_file,
             "src/main.zig",
             app_config,
             mode,
-            .{},
+            .{
+                .aarch64 = true,
+                .arm = false,
+                .x86_64 = false,
+                .x86 = false,
+            },
         );
 
         for (app.libraries) |lib| {
             lib.addBuildOption(RenderBackend, "render_backend", backend);
+            lib.addLibPath("dummy-libs");
         }
 
         b.getInstallStep().dependOn(app.final_step);
+
+        const push = android_app.installApp(b, android_config, apk_file);
+        push.dependOn(app.final_step);
+
+        const run = android_app.startApp(b, android_config, app_config);
+        run.dependOn(push);
+
+        const push_step = b.step("push", "Push the app to the default ADB target");
+        push_step.dependOn(push);
+
+        const run_step = b.step("run", "Runs the app on the default ADB target");
+        run_step.dependOn(run);
     } else {
         const app = switch (backend.outputType()) {
             .exe => b.addExecutable("gles2-zig", "src/main.zig"),

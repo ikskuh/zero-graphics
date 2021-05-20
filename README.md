@@ -38,7 +38,7 @@ zig build -Dbackend=desktop_sdl2 run
 
 ```sh
 # Web variant
-zig build -Dbackend=wasm -Drelease-small install
+zig build -Dbackend=wasm install
 python3 -m http.server --directory www/
 # Now visit http://127.0.0.1:8000/index.htm
 ```
