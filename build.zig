@@ -1,5 +1,5 @@
 const std = @import("std");
-const android_app = @import("ZigAndroidTemplate/android-app.zig");
+const android_sdk = @import("ZigAndroidTemplate/Sdk.zig");
 
 const OutputType = enum {
     exe,
@@ -21,7 +21,7 @@ const RenderBackend = enum {
     }
 };
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
     const backend = b.option(
         RenderBackend,
@@ -30,22 +30,24 @@ pub fn build(b: *std.build.Builder) void {
     ) orelse .desktop_sdl2;
 
     if (backend == .android) {
-        const android_config = android_app.Config{
-            .sdk_root = "/home/felix/projects/uncategorized/android-hass/android-sdk",
-            .ndk_root = "/home/felix/projects/uncategorized/android-hass/android-sdk/ndk/21.1.6352462",
-            .build_tools = "/home/felix/projects/uncategorized/android-hass/android-sdk/build-tools/28.0.3",
-            .key_store = android_app.KeyStore{
-                .file = "zig-cache/key.store",
-                .password = "123456",
-                .alias = "development_key",
-            },
-            .host_tools = android_app.hostTools(b, "ZigAndroidTemplate/"),
+        // TODO: Move this into a file!
+        const key_store = android_sdk.KeyStore{
+            .file = "zig-cache/key.store",
+            .password = "123456",
+            .alias = "development_key",
         };
 
-        const make_keystore = android_app.initKeystore(b, android_config, .{});
-        b.step("keystore", "Initializes a fresh keystore.").dependOn(make_keystore);
+        const sdk = try android_sdk.init(
+            b,
+            "ZigAndroidTemplate",
+            null,
+            .{},
+        );
 
-        const app_config = android_app.AppConfig{
+        const make_keystore = sdk.initKeystore(key_store, .{});
+        b.step("init-keystore", "Initializes a fresh debug keystore.").dependOn(make_keystore);
+
+        const app_config = android_sdk.AppConfig{
             .app_name = "zig-gles2-demo",
             .display_name = "Zig OpenGL ES 2.0 Demo",
             .package_name = "net.random_projects.zig_gles2_demo",
@@ -54,9 +56,7 @@ pub fn build(b: *std.build.Builder) void {
 
         const apk_file = "zig-out/demo.apk";
 
-        const app = android_app.createApp(
-            b,
-            android_config,
+        const app = sdk.createApp(
             apk_file,
             "src/main.zig",
             app_config,
@@ -67,6 +67,7 @@ pub fn build(b: *std.build.Builder) void {
                 .x86_64 = false,
                 .x86 = false,
             },
+            key_store,
         );
 
         for (app.libraries) |lib| {
@@ -81,10 +82,10 @@ pub fn build(b: *std.build.Builder) void {
 
         b.getInstallStep().dependOn(app.final_step);
 
-        const push = android_app.installApp(b, android_config, apk_file);
+        const push = sdk.installApp(apk_file);
         push.dependOn(app.final_step);
 
-        const run = android_app.startApp(b, android_config, app_config);
+        const run = sdk.startApp(app_config);
         run.dependOn(push);
 
         const push_step = b.step("push", "Push the app to the default ADB target");
