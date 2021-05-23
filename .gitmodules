@@ -1,3 +1,9 @@
 [submodule "ZigAndroidTemplate"]
-	path = ZigAndroidTemplate
+	path = vendor/ZigAndroidTemplate
+	url = https://github.com/MasterQ32/ZigAndroidTemplate
+[submodule "vendor/apple_pie"]
+	path = vendor/apple_pie
+	url = https://github.com/LuukDeGram/apple_pie
+[submodule "vendor/ZigAndroidTemplate"]
+	path = vendor/ZigAndroidTemplate
 	url = https://github.com/MasterQ32/ZigAndroidTemplate

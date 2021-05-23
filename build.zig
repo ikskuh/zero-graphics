@@ -1,5 +1,5 @@
 const std = @import("std");
-const android_sdk = @import("ZigAndroidTemplate/Sdk.zig");
+const android_sdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
 
 const OutputType = enum {
     exe,
@@ -46,7 +46,7 @@ pub fn build(b: *std.build.Builder) !void {
 
         const sdk = try android_sdk.init(
             b,
-            "ZigAndroidTemplate",
+            "vendor/ZigAndroidTemplate",
             null,
             .{},
         );
@@ -138,6 +138,19 @@ pub fn build(b: *std.build.Builder) !void {
 
                 const run_step = b.step("run", "Run the app");
                 run_step.dependOn(&run_cmd.step);
+            },
+            .wasm => {
+                const server = b.addExecutable("http-server", "tools/http-server.zig");
+                server.addPackage(std.build.Pkg{
+                    .name = "apple_pie",
+                    .path = "vendor/apple_pie/src/apple_pie.zig",
+                });
+
+                const serve = server.run();
+
+                const run_step = b.step("run", "Serves the wasm app");
+
+                run_step.dependOn(&serve.step);
             },
             else => {},
         }
