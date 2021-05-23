@@ -61,19 +61,32 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 
 ## Building / Running
 
+### Desktop PC
+
+Requires `SDL2` to be installed.
+
 ```sh
-# Desktop variant
 zig build -Dbackend=desktop_sdl2 run
 ```
 
-```sh
-# Web variant
-zig build -Dbackend=wasm install
-python3 -m http.server --directory www/
-# Now visit http://127.0.0.1:8000/index.htm
-```
+A window should open with the application in fullscreen.
+
+### Web/Wasm version
+
+Includes a teeny tiny web server for debugging.
 
 ```sh
-# Android (doesn't work at all yet)
-zig build -Dbackend=android install
+zig build -Dbackend=wasm install run
 ```
+
+Now visit http://127.0.0.1:8000/index.htm to see the demo.
+
+### Android
+
+Connect your phone first and install both a JDK as well as the Android SDK with NDK included.
+
+```sh
+zig build -Dbackend=android run
+```
+
+The app should now be installed and started on your phone.
