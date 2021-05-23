@@ -12,7 +12,7 @@ pub fn main() !void {
     try file_server.init(allocator, .{ .dir_path = "www" });
     defer file_server.deinit();
 
-    std.log.info("Application is now served at http://127.0.0.1:8000/", .{});
+    std.log.info("Application is now served at http://127.0.0.1:8000/index.htm", .{});
 
     try http.listenAndServe(
         allocator,

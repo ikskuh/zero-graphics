@@ -15,7 +15,7 @@ const RenderBackend = enum {
     fn outputType(self: RenderBackend) OutputType {
         return switch (self) {
             .desktop_sdl2 => OutputType.exe,
-            .wasm => OutputType.static_lib,
+            .wasm => OutputType.dynamic_lib,
             .android => OutputType.dynamic_lib,
         };
     }
@@ -108,7 +108,6 @@ pub fn build(b: *std.build.Builder) !void {
         app.addPackage(zero_graphics);
         app.addBuildOption(RenderBackend, "render_backend", backend);
         app.setBuildMode(mode);
-        app.install();
 
         switch (backend) {
             .desktop_sdl2 => {
@@ -122,11 +121,15 @@ pub fn build(b: *std.build.Builder) !void {
                     .cpu_arch = .wasm32,
                     .os_tag = .freestanding,
                 });
-                app.setOutputDir("www");
+
+                app.override_dest_dir = .{ .Custom = "../www" };
+
                 app.single_threaded = true;
             },
             .android => unreachable,
         }
+
+        app.install();
 
         switch (backend) {
             .desktop_sdl2 => {

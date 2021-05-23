@@ -6,6 +6,7 @@ const gles = @import("../gl_es_2v0.zig");
 extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*c_void;
 
 extern fn wasm_quit() void;
+extern fn wasm_panic(ptr: [*]const u8, len: usize) void;
 extern fn wasm_log_write(ptr: [*]const u8, len: usize) void;
 extern fn wasm_log_flush() void;
 extern fn wasm_getScreenW() u32;
@@ -55,7 +56,8 @@ pub fn log(
 
 /// Overwrite default panic handler
 pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace) noreturn {
-    std.log.crit("panic: {s}", .{msg});
+    // std.log.crit("panic: {s}", .{msg});
+    wasm_panic(msg.ptr, msg.len);
     unreachable;
 }
 
@@ -101,7 +103,6 @@ pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
 
 fn unknownOpenGlFunction() void {
     @panic("tried to use unknown opengl function!");
-    // @panic(std.fmt.bufPrint(&msg, "Could not find OpenGL entry point {s}", .{function}) catch unreachable);
 }
 
 const GLuint = gles.GLuint;

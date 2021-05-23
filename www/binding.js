@@ -44,6 +44,12 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         wasm_quit() {
             stop_fn();
         },
+        wasm_panic: (ptr, len) => {
+            let msg = utf8decoder.decode(
+                new Uint8Array(getMemory().buffer, ptr, len)
+            );
+            throw Error(msg);
+        },
         wasm_log_write: (ptr, len) => {
             log_string += utf8decoder.decode(
                 new Uint8Array(getMemory().buffer, ptr, len)

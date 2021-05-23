@@ -38,7 +38,7 @@
             ...getEnv(canvas_element, () => globalInstance),
         };
 
-        fetch("gles2-zig.o")
+        fetch("gles2-zig.wasm")
             .then((response) => response.arrayBuffer())
             .then((bytes) => WebAssembly.instantiate(bytes, { env }))
             .then((results) => results.instance)
