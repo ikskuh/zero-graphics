@@ -6,6 +6,35 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 ## Project status
 Very *work in progress*. Right now it's more a proof of concept than everything else
 
+## Project Goals
+
+### Basic Framework
+- [ ] Support the following platforms
+  - [x] Wasm
+  - [x] Linux Desktop
+  - [ ] Windows Desktop (not tested, but should work via SDL2)
+  - [x] Android
+- [x] Create an OpenGL ES 2.0 context
+- [ ] Provide input events
+  - [ ] Single pointer motion (finger or mouse)
+  - [ ] Single click event (finger, mouse)
+  - [ ] Text input for keyboard (utf-8 encoded)
+- [ ] Provide window events
+  - [ ] Resize
+  - [ ] Close
+- [ ] Provide access to the underlying backend
+- [ ] Allow creation of single-file applications
+  - [ ] Single executable for easy distribution
+  - [ ] Embedded resources
+
+### 2D Rendering library
+- [ ] Pixel perfect drawing of
+  - [x] Lines
+  - [x] Rectangles
+  - [x] Images
+- [ ] TTF font rendering via [`stb_ttf`](https://github.com/nothings/stb)
+- [ ] Image loading via [`stb_image`](https://github.com/nothings/stb)
+
 ## Features
 
 - Support for desktop linux
@@ -13,6 +42,7 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 - Browser support via Wasm
 - *coming soon:* Android support
 - Pixel perfect 2D rendering
+
 
 ## Dependencies
 

@@ -2,3 +2,4 @@ zig-cache/
 zig-out/
 *.tga
 .build_config/
+hackzig/

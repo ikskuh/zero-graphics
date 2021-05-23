@@ -63,8 +63,8 @@ pub fn build(b: *std.build.Builder) !void {
             mode,
             .{
                 .aarch64 = true,
-                .arm = false,
-                .x86_64 = false,
+                .arm = true,
+                .x86_64 = true,
                 .x86 = false,
             },
             key_store,
@@ -72,12 +72,6 @@ pub fn build(b: *std.build.Builder) !void {
 
         for (app.libraries) |lib| {
             lib.addBuildOption(RenderBackend, "render_backend", backend);
-            lib.addLibPath("dummy-libs");
-
-            lib.addPackage(std.build.Pkg{
-                .name = "android",
-                .path = "ZigAndroidTemplate/src/android-support.zig",
-            });
         }
 
         b.getInstallStep().dependOn(app.final_step);
