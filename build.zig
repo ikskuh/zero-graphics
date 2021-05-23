@@ -29,6 +29,13 @@ pub fn build(b: *std.build.Builder) !void {
         "Selects the compile target for the application.",
     ) orelse .desktop_sdl2;
 
+    const root_src = "examples/demo-application.zig";
+
+    var zero_graphics = std.build.Pkg{
+        .name = "zero-graphics",
+        .path = "src/zero-graphics.zig",
+    };
+
     if (backend == .android) {
         // TODO: Move this into a file!
         const key_store = android_sdk.KeyStore{
@@ -44,6 +51,10 @@ pub fn build(b: *std.build.Builder) !void {
             .{},
         );
 
+        zero_graphics.dependencies = &[_]std.build.Pkg{
+            sdk.android_package,
+        };
+
         const make_keystore = sdk.initKeystore(key_store, .{});
         b.step("init-keystore", "Initializes a fresh debug keystore.").dependOn(make_keystore);
 
@@ -58,7 +69,7 @@ pub fn build(b: *std.build.Builder) !void {
 
         const app = sdk.createApp(
             apk_file,
-            "src/main.zig",
+            root_src,
             app_config,
             mode,
             .{
@@ -72,6 +83,7 @@ pub fn build(b: *std.build.Builder) !void {
 
         for (app.libraries) |lib| {
             lib.addBuildOption(RenderBackend, "render_backend", backend);
+            lib.addPackage(zero_graphics);
         }
 
         b.getInstallStep().dependOn(app.final_step);
@@ -89,10 +101,11 @@ pub fn build(b: *std.build.Builder) !void {
         run_step.dependOn(run);
     } else {
         const app = switch (backend.outputType()) {
-            .exe => b.addExecutable("gles2-zig", "src/main.zig"),
-            .static_lib => b.addStaticLibrary("gles2-zig", "src/main.zig"),
-            .dynamic_lib => b.addSharedLibrary("gles2-zig", "src/main.zig", .unversioned),
+            .exe => b.addExecutable("gles2-zig", root_src),
+            .static_lib => b.addStaticLibrary("gles2-zig", root_src),
+            .dynamic_lib => b.addSharedLibrary("gles2-zig", root_src, .unversioned),
         };
+        app.addPackage(zero_graphics);
         app.addBuildOption(RenderBackend, "render_backend", backend);
         app.setBuildMode(mode);
         app.install();

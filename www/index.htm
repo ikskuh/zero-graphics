@@ -25,6 +25,7 @@
             padding: 2px;
 
         }
+
     </style>
 
     <script type="module" defer="true">
@@ -37,7 +38,7 @@
             ...getEnv(canvas_element, () => globalInstance),
         };
 
-        fetch("gles2-zig.wasm")
+        fetch("gles2-zig.o")
             .then((response) => response.arrayBuffer())
             .then((bytes) => WebAssembly.instantiate(bytes, { env }))
             .then((results) => results.instance)
