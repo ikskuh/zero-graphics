@@ -21,6 +21,18 @@ const RenderBackend = enum {
     }
 };
 
+fn initApp(app: *std.build.LibExeObjStep) void {
+    const cflags = [_][]const u8{
+        "-std=c99",
+        "-fno-sanitize=undefined",
+    };
+
+    app.linkLibC();
+    app.addCSourceFile("src/rendering/stb_image.c", &cflags);
+    app.addCSourceFile("src/rendering/stb_truetype.c", &cflags);
+    app.addIncludeDir("vendor/stb");
+}
+
 pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
     const backend = b.option(
@@ -84,6 +96,7 @@ pub fn build(b: *std.build.Builder) !void {
         for (app.libraries) |lib| {
             lib.addBuildOption(RenderBackend, "render_backend", backend);
             lib.addPackage(zero_graphics);
+            initApp(lib);
         }
 
         b.getInstallStep().dependOn(app.final_step);
@@ -108,6 +121,7 @@ pub fn build(b: *std.build.Builder) !void {
         app.addPackage(zero_graphics);
         app.addBuildOption(RenderBackend, "render_backend", backend);
         app.setBuildMode(mode);
+        initApp(app);
 
         switch (backend) {
             .desktop_sdl2 => {

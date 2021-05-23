@@ -395,7 +395,6 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
                 zigbytes[zigidx] = b;
                 zigidx += 1;
             }
-
         },
     };
 }

@@ -14,7 +14,7 @@ pub usingnamespace zero_graphics.EntryPoint(switch (build_options.render_backend
     .android => .android,
 });
 
-const Renderer = zero_graphics.render2d.Renderer;
+const Renderer = zero_graphics.Renderer2D;
 
 /// export this application struct to provide
 /// zero-graphics with a main entry point.
@@ -108,8 +108,8 @@ pub const Application = struct {
 
         // render scene
         {
-            const red = zero_graphics.render2d.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
-            const white = zero_graphics.render2d.Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF };
+            const red = Renderer.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
+            const white = Renderer.Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF };
 
             renderer.reset();
 

@@ -18,4 +18,4 @@ pub fn EntryPoint(comptime backend: Backend) type {
     };
 }
 
-pub const render2d = @import("rendering/graphics-2d.zig");
+pub const Renderer2D = @import("rendering/Renderer2D.zig");
