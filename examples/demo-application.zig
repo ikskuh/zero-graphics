@@ -30,6 +30,7 @@ pub const Application = struct {
     renderer: Renderer,
     texture_handle: *const Renderer.Texture,
     allocator: *std.mem.Allocator,
+    font: *const Renderer.Font,
 
     pub fn init(app: *Application, allocator: *std.mem.Allocator) !void {
         app.* = Application{
@@ -38,6 +39,7 @@ pub const Application = struct {
             .screen_height = 0,
             .texture_handle = undefined,
             .renderer = undefined,
+            .font = undefined,
         };
 
         try gles.load({}, loadOpenGlFunction);
@@ -86,6 +88,7 @@ pub const Application = struct {
         errdefer app.renderer.deinit();
 
         app.texture_handle = try app.renderer.createTexture(128, 128, @embedFile("cat.rgba"));
+        app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
     }
 
     pub fn deinit(app: *Application) void {
@@ -142,6 +145,17 @@ pub const Application = struct {
                 app.texture_handle.height,
                 app.texture_handle,
                 null,
+            );
+
+            const string = "Hello World, hello Ziguanas!";
+            const string_size = renderer.measureString(app.font, string);
+
+            try renderer.drawString(
+                app.font,
+                string,
+                (app.screen_width - string_size.width) / 2,
+                (app.screen_height + app.texture_handle.height) / 2,
+                Renderer.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
             );
         }
 

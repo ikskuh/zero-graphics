@@ -1,14 +1,27 @@
 const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
 
+const c = @cImport({
+    @cInclude("stb_truetype.h");
+});
+
 const Self = @This();
 
 const TextureList = std.TailQueue(Texture);
 const TextureItem = std.TailQueue(Texture).Node;
 
+const FontList = std.TailQueue(Font);
+const FontItem = std.TailQueue(Font).Node;
+
 const CollectError = error{OutOfMemory};
 const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
+const CreateFontError = error{ OutOfMemory, InvalidFontFile };
 const InitError = error{ OutOfMemory, GraphicsApiFailure };
+
+pub const Size = struct {
+    width: u15,
+    height: u15,
+};
 
 const vertexSource =
     \\attribute vec2 vPosition;
@@ -53,6 +66,7 @@ draw_calls: std.ArrayList(DrawCall),
 
 allocator: *std.mem.Allocator,
 textures: TextureList,
+fonts: FontList,
 
 white_texture: *const Texture,
 
@@ -115,6 +129,7 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
         .uv_attribute_location = uv_attribute_location,
         .allocator = allocator,
         .textures = .{},
+        .fonts = .{},
         .draw_calls = std.ArrayList(DrawCall).init(allocator),
         .white_texture = undefined,
     };
@@ -125,6 +140,11 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
 }
 
 pub fn deinit(self: *Self) void {
+    // Fonts must be destroyed before textures
+    // as fonts store textures internally
+    while (self.fonts.first) |font| {
+        self.destroyFontInternal(font);
+    }
     while (self.textures.first) |tex| {
         self.destroyTextureInternal(tex);
     }
@@ -140,6 +160,9 @@ pub fn deinit(self: *Self) void {
 /// whichever happens first.
 /// If `initial_data` is given, the data is encoded as BGRA pixels.
 pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]const u8) !*const Texture {
+    const tex_node = try self.allocator.create(TextureItem);
+    errdefer self.allocator.destroy(tex_node);
+
     var id: gles.GLuint = undefined;
     gles.genTextures(1, &id);
     if (id == 0)
@@ -155,7 +178,6 @@ pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]cons
     gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MIN_FILTER, gles.LINEAR);
     gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MAG_FILTER, gles.LINEAR);
 
-    const tex_node = try self.allocator.create(TextureItem);
     tex_node.* = .{
         .data = Texture{
             .handle = id,
@@ -201,6 +223,269 @@ pub fn updateTexture(self: *Self, texture: *Texture, data: []const u8) void {
     std.debug.assert(data.len == 4 * @as(usize, texture.width) * @as(usize, texture.height));
     gles.bindTexture(gles.TEXTURE_2D, texture.handle);
     gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, width, height, 0, gles.RGBA, gles.UNSIGNED_BYTE, data.ptr);
+}
+
+/// Creates a new font that can be rendered with 
+pub fn createFont(self: *Self, ttf_bytes: []const u8, pixel_size: u15) CreateFontError!*const Font {
+    var info = std.mem.zeroes(c.stbtt_fontinfo);
+    info.userdata = self.allocator;
+
+    const offset = c.stbtt_GetFontOffsetForIndex(ttf_bytes.ptr, 0);
+    if (c.stbtt_InitFont(&info, ttf_bytes.ptr, offset) == 0)
+        return error.InvalidFontFile;
+
+    var ascent: c_int = undefined;
+    var descent: c_int = undefined;
+    var line_gap: c_int = undefined;
+    c.stbtt_GetFontVMetrics(&info, &ascent, &descent, &line_gap);
+
+    var font = try self.allocator.create(FontItem);
+    errdefer self.allocator.destroy(font);
+
+    font.* = .{
+        .data = Font{
+            .refcount = 1,
+            .font = info,
+            .allocator = self.allocator,
+            .arena = std.heap.ArenaAllocator.init(self.allocator),
+            .glyphs = std.AutoHashMap(u24, Glyph).init(self.allocator),
+            .font_size = pixel_size,
+            .ascent = @intCast(i16, ascent),
+            .descent = @intCast(i16, descent),
+            .line_gap = @intCast(i16, line_gap),
+            .scale = c.stbtt_ScaleForPixelHeight(&info, @intToFloat(f32, pixel_size)),
+        },
+    };
+
+    self.fonts.append(font);
+
+    return &font.data;
+}
+
+fn makeFontMut(ptr: *const Font) *Font {
+    return @intToPtr(*Font, @ptrToInt(ptr));
+}
+
+/// Destroys a texture and releases all of its memory.
+/// The texture passed here must be created with `createTexture`.
+pub fn destroyFont(self: *Self, font: *const Font) void {
+    // we can do this as texture handles are only given out via `createTexture` which
+    // returns a immutable reference.
+    const mut_font = makeFontMut(texture);
+    const node = @fieldParentPtr(FontItem, "data", mut_font);
+    destroyTextureInternal(self, node);
+}
+
+fn destroyFontInternal(self: *Self, node: *FontItem) void {
+    node.data.refcount -= 1;
+    if (node.data.refcount > 0)
+        return;
+
+    self.fonts.remove(node);
+
+    var iter = node.data.glyphs.iterator();
+    while (iter.next()) |glyph| {
+        self.destroyTexture(glyph.value.texture);
+    }
+
+    node.data.glyphs.deinit();
+    node.data.arena.deinit();
+
+    node.* = undefined;
+
+    self.allocator.destroy(node);
+}
+
+fn getGlyph(self: *Self, font: *Font, codepoint: u24) !Glyph {
+    var gop = try font.glyphs.getOrPut(codepoint);
+    if (!gop.found_existing) {
+        var ix0: c_int = undefined;
+        var iy0: c_int = undefined;
+        var ix1: c_int = undefined;
+        var iy1: c_int = undefined;
+
+        c.stbtt_GetCodepointBitmapBox(
+            &font.font,
+            codepoint,
+            font.scale,
+            font.scale,
+            &ix0,
+            &iy0,
+            &ix1,
+            &iy1,
+        );
+        std.debug.assert(ix0 <= ix1);
+        std.debug.assert(iy0 <= iy1);
+
+        const width: u15 = @intCast(u15, ix1 - ix0);
+        const height: u15 = @intCast(u15, iy1 - iy0);
+
+        const bitmap = try font.arena.allocator.alloc(u8, @as(usize, width) * height);
+        errdefer font.arena.allocator.free(bitmap);
+
+        c.stbtt_MakeCodepointBitmap(
+            &font.font,
+            bitmap.ptr,
+            @intCast(c_int, width),
+            @intCast(c_int, height),
+            @intCast(c_int, width), // stride
+            font.scale,
+            font.scale,
+            codepoint,
+        );
+
+        var advance_width: c_int = undefined;
+        var left_side_bearing: c_int = undefined;
+        c.stbtt_GetCodepointHMetrics(&font.font, codepoint, &advance_width, &left_side_bearing);
+
+        const texture_data = try self.allocator.alloc(u8, 4 * @as(usize, width) * height);
+        defer self.allocator.free(texture_data);
+
+        for (bitmap) |a, i| {
+            const o = 4 * i;
+            texture_data[o + 0] = 0xFF;
+            texture_data[o + 1] = 0xFF;
+            texture_data[o + 2] = 0xFF;
+            texture_data[o + 3] = a;
+        }
+
+        var texture = try self.createTexture(width, height, texture_data);
+        errdefer self.destroyTexture(texture);
+
+        // std.debug.print("{d} ({},{}) ({},{}) {}×{} {} {}\n", .{
+        //     scale,
+        //     ix0,
+        //     iy0,
+        //     ix1,
+        //     iy1,
+        //     width,
+        //     height,
+        //     advance_width,
+        //     left_side_bearing,
+        // });
+
+        var glyph = Glyph{
+            .texture = texture,
+            .pixels = bitmap,
+            .width = width,
+            .height = height,
+            .advance_width = @intCast(i16, advance_width),
+            .left_side_bearing = @intCast(i16, left_side_bearing),
+            .offset_y = @intCast(i16, iy0),
+        };
+
+        gop.entry.value = glyph;
+    }
+    return gop.entry.value;
+}
+
+fn scaleInt(ival: isize, scale: f32) i16 {
+    return @intCast(i16, @floatToInt(isize, std.math.round(@intToFloat(f32, ival) * scale)));
+}
+
+pub fn measureString(self: *Self, font: *const Font, text: []const u8) Size {
+    const font_mut = makeFontMut(font);
+
+    var utf8 = std.unicode.Utf8Iterator{
+        .bytes = text,
+        .i = 0,
+    };
+
+    var dx: i16 = 0;
+    var dy: i16 = scaleInt(font_mut.ascent, font_mut.scale);
+
+    var max_dx: i16 = 0;
+
+    var previous_codepoint: ?u24 = null;
+    while (utf8.nextCodepoint()) |codepoint| {
+        if (codepoint == '\n') {
+            dx = 0;
+            dy += scaleInt(font_mut.ascent - font_mut.descent + font_mut.line_gap, font_mut.scale);
+            previous_codepoint = null;
+            continue;
+        }
+
+        const glyph = self.getGlyph(font_mut, codepoint) catch continue;
+
+        if (previous_codepoint) |prev| {
+            dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&font_mut.font, prev, codepoint));
+        }
+        previous_codepoint = codepoint;
+
+        max_dx = std.math.max(max_dx, scaleInt(dx + glyph.left_side_bearing, font_mut.scale) + @intCast(i16, glyph.width));
+
+        dx += glyph.advance_width;
+    }
+    dy += scaleInt(-font_mut.descent + font_mut.line_gap, font_mut.scale);
+
+    return Size{
+        .width = @intCast(u15, max_dx),
+        .height = @intCast(u15, dy),
+    };
+}
+
+pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) !void {
+    const font_mut = makeFontMut(font);
+
+    var utf8 = std.unicode.Utf8Iterator{
+        .bytes = text,
+        .i = 0,
+    };
+
+    var dx: i16 = 0;
+    var dy: i16 = scaleInt(font_mut.ascent, font_mut.scale);
+
+    var previous_codepoint: ?u24 = null;
+    while (utf8.nextCodepoint()) |codepoint| {
+        if (codepoint == '\n') {
+            dx = 0;
+            dy += scaleInt(font_mut.ascent - font_mut.descent + font_mut.line_gap, font_mut.scale);
+            previous_codepoint = null;
+            continue;
+        }
+
+        const glyph = self.getGlyph(font_mut, codepoint) catch continue;
+
+        if (previous_codepoint) |prev| {
+            dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&font_mut.font, prev, codepoint));
+        }
+        previous_codepoint = codepoint;
+
+        const off_x = x + scaleInt(dx + glyph.left_side_bearing, font_mut.scale);
+        const off_y = y + glyph.offset_y + dy;
+
+        try self.fillTexturedRectangle(
+            off_x,
+            off_y,
+            glyph.width,
+            glyph.height,
+            glyph.texture,
+            color,
+        );
+        // {
+
+        //     var py: u15 = 0;
+        //     while (py < glyph.height) : (py += 1) {
+        //         var px: u15 = 0;
+        //         while (px < glyph.width) : (px += 1) {
+        //             const alpha = glyph.getAlpha(px, py);
+
+        //             if (target_buffer.pixel(off_x + px, off_y + py)) |pixel| {
+        //                 const dest = pixel.*;
+        //                 const source = Color{
+        //                     .r = color.r,
+        //                     .g = color.g,
+        //                     .b = color.b,
+        //                     .a = alpha,
+        //                 };
+        //                 pixel.* = Color.alphaBlend(dest, source, source.a);
+        //             }
+        //         }
+        //     }
+        // }
+
+        dx += glyph.advance_width;
+    }
 }
 
 /// Resets the state of the renderer and prepares a fresh new frame.
@@ -444,3 +729,79 @@ const DrawCall = struct {
     count: usize,
     texture: ?*const Texture,
 };
+
+pub const Font = struct {
+
+    /// private reference counter.
+    /// This is required as texture references are held in the internal draw 
+    /// queue when passing them into a draw command and will be released after
+    /// the `render()` call
+    refcount: usize,
+
+    font: c.stbtt_fontinfo,
+    allocator: *std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
+    glyphs: std.AutoHashMap(u24, Glyph),
+
+    font_size: u15,
+
+    ascent: i16,
+    descent: i16,
+    line_gap: i16,
+
+    /// Scale of `advance_width` and `left_side_bearing`
+    scale: f32,
+};
+
+// get the bbox of the bitmap centered around the glyph origin; so the
+// bitmap width is ix1-ix0, height is iy1-iy0, and location to place
+// the bitmap top left is (leftSideBearing*scale,iy0).
+// (Note that the bitmap uses y-increases-down, but the shape uses
+// y-increases-up, so CodepointBitmapBox and CodepointBox are inverted.)
+
+pub const Glyph = struct {
+    /// row-major grayscale pixels of the target map
+    pixels: []u8,
+
+    /// width of the image in pixels
+    width: u15,
+
+    /// height of the image in pixels
+    height: u15,
+
+    /// offset to the base line
+    offset_y: i16,
+
+    /// advanceWidth is the offset from the current horizontal position to the next horizontal position
+    /// these are expressed in unscaled coordinates
+    advance_width: i16,
+
+    /// leftSideBearing is the offset from the current horizontal position to the left edge of the character
+    left_side_bearing: i16,
+
+    texture: *const Texture,
+
+    fn getAlpha(self: Glyph, x: u15, y: u15) u8 {
+        if (x >= self.width or y >= self.height)
+            return 0;
+
+        return self.pixels[@as(usize, std.math.absCast(y)) * self.width + @as(usize, std.math.absCast(x))];
+    }
+};
+
+export fn zerog_renderer2d_alloc(user_data: ?*c_void, size: usize) ?*c_void {
+    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
+
+    const buffer = allocator.allocAdvanced(u8, 16, size + 16, .exact) catch return null;
+    std.mem.writeIntNative(usize, buffer[0..@sizeOf(usize)], buffer.len);
+    return buffer.ptr + 16;
+}
+
+export fn zerog_renderer2d_free(user_data: ?*c_void, ptr: ?*c_void) void {
+    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
+
+    const actual_buffer = @ptrCast([*]u8, ptr orelse return) - 16;
+    const len = std.mem.readIntNative(usize, actual_buffer[0..@sizeOf(usize)]);
+
+    allocator.free(actual_buffer[0..len]);
+}
