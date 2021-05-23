@@ -10,6 +10,7 @@ pub const Renderer = struct {
         y: f32,
         u: f32,
         v: f32,
+
         // color of the vertex:
         r: u8,
         g: u8,

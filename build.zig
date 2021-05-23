@@ -151,6 +151,8 @@ pub fn build(b: *std.build.Builder) !void {
 
                 const serve = server.run();
 
+                serve.step.dependOn(&app.step);
+
                 const run_step = b.step("run", "Serves the wasm app");
 
                 run_step.dependOn(&serve.step);

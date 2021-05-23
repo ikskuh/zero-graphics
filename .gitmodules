@@ -7,3 +7,6 @@
 [submodule "vendor/ZigAndroidTemplate"]
 	path = vendor/ZigAndroidTemplate
 	url = https://github.com/MasterQ32/ZigAndroidTemplate
+[submodule "vendor/stb"]
+	path = vendor/stb
+	url = https://github.com/nothings/stb

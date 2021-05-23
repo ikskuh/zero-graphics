@@ -381,5 +381,21 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         scissor(x, y, width, height) {
             gl.scissor(x, y, width, height);
         },
+        getStringJs(name) {
+            let inst = getInstance();
+            let str = gl.getParameter(name);
+
+            const encoder = new TextEncoder();
+            const encoded = encoder.encode(str);
+            let ptr = inst.exports.getString_alloc(encoded.length);
+
+            const zigbytes = new Uint8Array(getMemory().buffer, ptr, encoded.length);
+            let zigidx = 0;
+            for (const b of encoded) {
+                zigbytes[zigidx] = b;
+                zigidx += 1;
+            }
+
+        },
     };
 }

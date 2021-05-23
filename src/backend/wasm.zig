@@ -294,8 +294,25 @@ const WebGL = struct {
     fn getShaderSource(_shader: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _source: [*c]GLchar) callconv(.C) void {
         @panic("glGetShaderSource not implemented yet!");
     }
-    fn getString(_name: GLenum) callconv(.C) ?[*:0]const GLubyte {
-        @panic("glGetString not implemented yet!");
+
+    pub extern fn getStringJs(name: GLenum) void;
+    fn getString(name: GLenum) callconv(.C) ?[*:0]const GLubyte {
+        const String = struct {
+            var memory: ?[:0]u8 = null;
+
+            export fn getString_alloc(size: u32) [*]u8 {
+                if (memory) |old| {
+                    gpa.allocator.free(old);
+                    memory = null;
+                }
+                memory = gpa.allocator.allocSentinel(u8, size, 0) catch @panic("out of memory!");
+                return memory.?.ptr;
+            }
+        };
+
+        getStringJs(name);
+
+        return String.memory.?.ptr;
     }
     fn getTexParameterfv(_target: GLenum, _pname: GLenum, _params: [*c]GLfloat) callconv(.C) void {
         @panic("glGetTexParameterfv not implemented yet!");
