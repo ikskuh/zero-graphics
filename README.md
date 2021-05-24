@@ -6,6 +6,8 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 ## Project status
 Very *work in progress*. Right now it's more a proof of concept than everything else
 
+![Preview screenshot in FireFox](https://mq32.de/public/7207fdc86224d69a7af0e8289c6b7a687c757cf8.png)
+
 ## Project Goals
 
 ### Basic Framework

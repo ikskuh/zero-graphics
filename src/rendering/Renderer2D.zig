@@ -23,6 +23,13 @@ pub const Size = struct {
     height: u15,
 };
 
+pub const Rectangle = struct {
+    x: i16,
+    y: i16,
+    width: u15,
+    height: u15,
+};
+
 const vertexSource =
     \\attribute vec2 vPosition;
     \\attribute vec4 vColor;
@@ -225,12 +232,15 @@ pub fn updateTexture(self: *Self, texture: *Texture, data: []const u8) void {
     gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, width, height, 0, gles.RGBA, gles.UNSIGNED_BYTE, data.ptr);
 }
 
-/// Creates a new font that can be rendered with 
+/// Creates a new font from `ttf_bytes`. The bytes passed must be a valid TTF
 pub fn createFont(self: *Self, ttf_bytes: []const u8, pixel_size: u15) CreateFontError!*const Font {
     var info = std.mem.zeroes(c.stbtt_fontinfo);
     info.userdata = self.allocator;
 
     const offset = c.stbtt_GetFontOffsetForIndex(ttf_bytes.ptr, 0);
+    if (offset < 0)
+        return error.InvalidFontFile;
+
     if (c.stbtt_InitFont(&info, ttf_bytes.ptr, offset) == 0)
         return error.InvalidFontFile;
 
@@ -266,10 +276,10 @@ fn makeFontMut(ptr: *const Font) *Font {
     return @intToPtr(*Font, @ptrToInt(ptr));
 }
 
-/// Destroys a texture and releases all of its memory.
-/// The texture passed here must be created with `createTexture`.
+/// Destroys a font and releases all of its memory.
+/// The font passed here must be created with `createFont`.
 pub fn destroyFont(self: *Self, font: *const Font) void {
-    // we can do this as texture handles are only given out via `createTexture` which
+    // we can do this as texture handles are only given out via `createFont` which
     // returns a immutable reference.
     const mut_font = makeFontMut(texture);
     const node = @fieldParentPtr(FontItem, "data", mut_font);
@@ -450,7 +460,10 @@ const GlyphIterator = struct {
     };
 };
 
-pub fn measureString(self: *Self, font: *const Font, text: []const u8) Size {
+/// Measures the extends of the given `text` when rendered with `font`.
+/// Returns the size and relative offset the string will take up on the screen.
+/// Returned values are in pixels.
+pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle {
     var max_dx: i16 = 0;
     var max_dy: i16 = 0;
 
@@ -465,12 +478,16 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Size {
         max_dy = std.math.max(max_dy, glyph.y + glyph.height);
     }
 
-    return Size{
+    return Rectangle{
+        .x = min_dx,
+        .y = min_dy,
         .width = @intCast(u15, max_dx - min_dx),
         .height = @intCast(u15, max_dy - min_dy),
     };
 }
 
+/// Draws the given `text` to local (`x`,`y`) with `color` applied.
+/// The final size of the string can be computed with `measureString()`.
 pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) !void {
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
@@ -521,7 +538,6 @@ pub fn render(self: Self, width: u15, height: u15) void {
             @intCast(gles.GLsizei, draw_call.count),
         );
     }
-    gles.bindTexture(gles.TEXTURE_2D, 0);
 }
 
 /// Appends a set of triangles to the renderer with the given `texture`. 
