@@ -33,9 +33,12 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 - [ ] Pixel perfect drawing of
   - [x] Lines
   - [x] Rectangles
-  - [x] Images
-- [ ] TTF font rendering via [`stb_ttf`](https://github.com/nothings/stb)
+  - [ ] Images
+    - [x] Basic "copy full texture to rectangle"
+    - [ ] Copy portion of texture ("atlas rendering")
+- [x] TTF font rendering via [`stb_ttf`](https://github.com/nothings/stb)
 - [ ] Image loading via [`stb_image`](https://github.com/nothings/stb)
+- [ ] Stack based/nested scissoring
 
 ## Features
 

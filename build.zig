@@ -27,7 +27,6 @@ fn initApp(app: *std.build.LibExeObjStep) void {
         "-fno-sanitize=undefined",
     };
 
-    // app.linkLibC();
     // app.addCSourceFile("src/rendering/stb_image.c", &cflags);
     app.addCSourceFile("src/rendering/stb_truetype.c", &cflags);
     app.addIncludeDir("vendor/stb");
@@ -86,9 +85,10 @@ pub fn build(b: *std.build.Builder) !void {
             mode,
             .{
                 .aarch64 = true,
-                .arm = true,
                 .x86_64 = true,
-                .x86 = false,
+                // 32 bit targets are currently broken
+                .arm = false, // see https://github.com/ziglang/zig/issues/8885
+                .x86 = false, // not issued yet
             },
             key_store,
         );
@@ -131,13 +131,12 @@ pub fn build(b: *std.build.Builder) !void {
                 app.linkSystemLibrary("sdl2");
             },
             .wasm => {
+                // No libc on wasm!
                 app.setTarget(std.zig.CrossTarget{
                     .cpu_arch = .wasm32,
                     .os_tag = .freestanding,
                 });
-
                 app.override_dest_dir = .{ .Custom = "../www" };
-
                 app.single_threaded = true;
             },
             .android => unreachable,
