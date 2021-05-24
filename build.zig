@@ -27,7 +27,6 @@ fn initApp(app: *std.build.LibExeObjStep) void {
         "-fno-sanitize=undefined",
     };
 
-    app.addCSourceFile("src/rendering/stb_image.c", &cflags);
     app.addCSourceFile("src/rendering/stb_truetype.c", &cflags);
     app.addIncludeDir("vendor/stb");
 }
@@ -42,9 +41,17 @@ pub fn build(b: *std.build.Builder) !void {
 
     const root_src = "examples/demo-application.zig";
 
+    const zigimg = std.build.Pkg{
+        .name = "zigimg",
+        .path = "vendor/zigimg/zigimg.zig",
+    };
+
     var zero_graphics = std.build.Pkg{
         .name = "zero-graphics",
         .path = "src/zero-graphics.zig",
+        .dependencies = &[_]std.build.Pkg{
+            zigimg,
+        },
     };
 
     if (backend == .android) {
@@ -63,7 +70,7 @@ pub fn build(b: *std.build.Builder) !void {
         );
 
         zero_graphics.dependencies = &[_]std.build.Pkg{
-            sdk.android_package,
+            zigimg, sdk.android_package,
         };
 
         const make_keystore = sdk.initKeystore(key_store, .{});
@@ -135,6 +142,7 @@ pub fn build(b: *std.build.Builder) !void {
                 app.setTarget(std.zig.CrossTarget{
                     .cpu_arch = .wasm32,
                     .os_tag = .freestanding,
+                    .abi = .musl,
                 });
                 app.override_dest_dir = .{ .Custom = "../www" };
                 app.single_threaded = true;
