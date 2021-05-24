@@ -20,6 +20,8 @@ pub fn EntryPoint(comptime backend: Backend) type {
 
 pub const Renderer2D = @import("rendering/Renderer2D.zig");
 
+pub const Input = @import("Input.zig");
+
 export fn zerog_panic(msg: [*:0]const u8) noreturn {
     @panic(std.mem.span(msg));
 }

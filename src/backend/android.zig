@@ -3,6 +3,7 @@ const wasm = std.log.scoped(.sdl);
 const root = @import("root");
 const gles = @import("../gl_es_2v0.zig");
 const logger = std.log.scoped(.sdl);
+const zerog = @import("../zero-graphics.zig");
 
 const android = @import("android");
 

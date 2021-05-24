@@ -31,8 +31,9 @@ pub const Application = struct {
     texture_handle: *const Renderer.Texture,
     allocator: *std.mem.Allocator,
     font: *const Renderer.Font,
+    input: *zero_graphics.Input,
 
-    pub fn init(app: *Application, allocator: *std.mem.Allocator) !void {
+    pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
         app.* = Application{
             .allocator = allocator,
             .screen_width = 0,
@@ -40,6 +41,7 @@ pub const Application = struct {
             .texture_handle = undefined,
             .renderer = undefined,
             .font = undefined,
+            .input = input,
         };
 
         try gles.load({}, loadOpenGlFunction);
@@ -108,6 +110,13 @@ pub const Application = struct {
     pub fn update(app: *Application) !bool {
         var take_screenshot = false;
 
+        while (app.input.pollEvent()) |event| {
+            switch (event) {
+                .quit => return false,
+                else => logger.info("unhandled event: {}", .{event}),
+            }
+        }
+
         const renderer = &app.renderer;
 
         // render scene
@@ -158,6 +167,18 @@ pub const Application = struct {
                 (app.screen_height + app.texture_handle.height) / 2,
                 Renderer.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
             );
+
+            const mouse = app.input.pointer_location;
+
+            if (mouse.x >= 0 and mouse.y >= 0) {
+                try renderer.drawRectangle(
+                    mouse.x - 10,
+                    mouse.y - 10,
+                    21,
+                    21,
+                    red,
+                );
+            }
         }
 
         {

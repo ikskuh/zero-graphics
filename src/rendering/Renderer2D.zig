@@ -201,43 +201,10 @@ pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]cons
     return &tex_node.data;
 }
 
-// fn spngWrapper(error_code: c_int) !void {
-//     if (error_code == 0)
-//         return;
-//     std.log.err("spng failure: {s}", .{std.mem.span(c.spng_strerror(error_code))});
-//     return LoadTextureError.InvalidImageData;
-// }
-
 /// Loads a texture from the given `image_data`. It should contain the file data as it would
 /// be on disk, encoded as PNG. Other file formats might be supported,
 /// but only PNG has official support.
 pub fn loadTexture(self: *Self, image_data: []const u8) LoadTextureError!*const Texture {
-    // const ctx = c.spng_ctx_new(0) orelse return error.OutOfMemory;
-    // defer c.spng_ctx_free(ctx);
-
-    // const image_format = c.SPNG_FMT_RGBA8;
-
-    // try spngWrapper(c.spng_set_image_limits(ctx, std.math.maxInt(u15), std.math.maxInt(u15)));
-    // try spngWrapper(c.spng_set_png_buffer(ctx, image_data.ptr, image_data.len));
-
-    // var ihdr = std.mem.zeroes(c.spng_ihdr);
-    // try spngWrapper(c.spng_get_ihdr(ctx, &ihdr));
-
-    // var image_size: usize = undefined;
-    // try spngWrapper(c.spng_decoded_image_size(ctx, image_format, &image_size));
-
-    // const buffer = try self.allocator.alloc(u8, image_size);
-    // defer self.allocator.free(buffer);
-
-    // try spngWrapper(c.spng_decode_image(ctx, buffer.ptr, buffer.len, image_format, 0));
-
-    // std.log.info("size: {} {}, {}", .{ ihdr.width, ihdr.height, image_size });
-
-    // return try self.createTexture(
-    //     @intCast(u15, ihdr.width),
-    //     @intCast(u15, ihdr.height),
-    //     buffer[0 .. 4 * @as(usize, ihdr.width) * @as(usize, ihdr.height)],
-    // );
     var image = zigimg.image.Image.fromMemory(self.allocator, image_data) catch return LoadTextureError.InvalidImageData;
     defer image.deinit();
 
