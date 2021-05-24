@@ -383,108 +383,105 @@ fn scaleInt(ival: isize, scale: f32) i16 {
     return @intCast(i16, @floatToInt(isize, std.math.round(@intToFloat(f32, ival) * scale)));
 }
 
-pub fn measureString(self: *Self, font: *const Font, text: []const u8) Size {
-    const font_mut = makeFontMut(font);
+const GlyphIterator = struct {
+    renderer: *Self,
+    font: *Font,
+    codepoint_src: std.unicode.Utf8Iterator,
 
-    var utf8 = std.unicode.Utf8Iterator{
-        .bytes = text,
-        .i = 0,
-    };
+    dx: i16,
+    dy: i16,
 
-    var dx: i16 = 0;
-    var dy: i16 = scaleInt(font_mut.ascent, font_mut.scale);
+    previous_codepoint: ?u21 = null,
 
-    var max_dx: i16 = 0;
+    pub fn init(renderer: *Self, font: *Font, text: []const u8) GlyphIterator {
+        return GlyphIterator{
+            .renderer = renderer,
+            .font = font,
+            .codepoint_src = std.unicode.Utf8Iterator{
+                .bytes = text,
+                .i = 0,
+            },
 
-    var previous_codepoint: ?u24 = null;
-    while (utf8.nextCodepoint()) |codepoint| {
-        if (codepoint == '\n') {
-            dx = 0;
-            dy += scaleInt(font_mut.ascent - font_mut.descent + font_mut.line_gap, font_mut.scale);
-            previous_codepoint = null;
-            continue;
-        }
-
-        const glyph = self.getGlyph(font_mut, codepoint) catch continue;
-
-        if (previous_codepoint) |prev| {
-            dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&font_mut.font, prev, codepoint));
-        }
-        previous_codepoint = codepoint;
-
-        max_dx = std.math.max(max_dx, scaleInt(dx + glyph.left_side_bearing, font_mut.scale) + @intCast(i16, glyph.width));
-
-        dx += glyph.advance_width;
+            .dx = 0,
+            .dy = scaleInt(font.ascent, font.scale),
+        };
     }
-    dy += scaleInt(-font_mut.descent + font_mut.line_gap, font_mut.scale);
+
+    pub fn next(self: *GlyphIterator) ?GlyphCmd {
+        while (true) {
+            const codepoint = self.codepoint_src.nextCodepoint() orelse return null;
+            if (codepoint == '\n') {
+                self.dx = 0;
+                self.dy += scaleInt(self.font.ascent - self.font.descent + self.font.line_gap, self.font.scale);
+                self.previous_codepoint = null;
+                continue;
+            }
+
+            const glyph = self.renderer.getGlyph(self.font, codepoint) catch continue;
+
+            if (self.previous_codepoint) |prev| {
+                self.dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&self.font.font, prev, codepoint));
+            }
+            self.previous_codepoint = codepoint;
+
+            const off_x = scaleInt(self.dx + glyph.left_side_bearing, self.font.scale);
+            const off_y = glyph.offset_y + self.dy;
+
+            self.dx += glyph.advance_width;
+
+            return GlyphCmd{
+                .codepoint = codepoint,
+                .x = off_x,
+                .y = off_y,
+                .width = glyph.width,
+                .height = glyph.height,
+                .texture = glyph.texture,
+            };
+        }
+    }
+
+    const GlyphCmd = struct {
+        codepoint: u21,
+        texture: *const Texture,
+        x: i16,
+        y: i16,
+        width: u15,
+        height: u15,
+    };
+};
+
+pub fn measureString(self: *Self, font: *const Font, text: []const u8) Size {
+    var max_dx: i16 = 0;
+    var max_dy: i16 = 0;
+
+    var min_dx: i16 = 0;
+    var min_dy: i16 = 0;
+
+    var iterator = GlyphIterator.init(self, makeFontMut(font), text);
+    while (iterator.next()) |glyph| {
+        min_dx = std.math.min(min_dx, glyph.x);
+        min_dy = std.math.min(min_dy, glyph.y);
+        max_dx = std.math.max(max_dx, glyph.x + glyph.width);
+        max_dy = std.math.max(max_dy, glyph.y + glyph.height);
+    }
 
     return Size{
-        .width = @intCast(u15, max_dx),
-        .height = @intCast(u15, dy),
+        .width = @intCast(u15, max_dx - min_dx),
+        .height = @intCast(u15, max_dy - min_dy),
     };
 }
 
 pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) !void {
-    const font_mut = makeFontMut(font);
-
-    var utf8 = std.unicode.Utf8Iterator{
-        .bytes = text,
-        .i = 0,
-    };
-
-    var dx: i16 = 0;
-    var dy: i16 = scaleInt(font_mut.ascent, font_mut.scale);
-
-    var previous_codepoint: ?u24 = null;
-    while (utf8.nextCodepoint()) |codepoint| {
-        if (codepoint == '\n') {
-            dx = 0;
-            dy += scaleInt(font_mut.ascent - font_mut.descent + font_mut.line_gap, font_mut.scale);
-            previous_codepoint = null;
-            continue;
-        }
-
-        const glyph = self.getGlyph(font_mut, codepoint) catch continue;
-
-        if (previous_codepoint) |prev| {
-            dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&font_mut.font, prev, codepoint));
-        }
-        previous_codepoint = codepoint;
-
-        const off_x = x + scaleInt(dx + glyph.left_side_bearing, font_mut.scale);
-        const off_y = y + glyph.offset_y + dy;
-
+    var iterator = GlyphIterator.init(self, makeFontMut(font), text);
+    while (iterator.next()) |glyph| {
         try self.fillTexturedRectangle(
-            off_x,
-            off_y,
+            x + glyph.x,
+            y + glyph.y,
             glyph.width,
             glyph.height,
             glyph.texture,
             color,
         );
-        // {
-
-        //     var py: u15 = 0;
-        //     while (py < glyph.height) : (py += 1) {
-        //         var px: u15 = 0;
-        //         while (px < glyph.width) : (px += 1) {
-        //             const alpha = glyph.getAlpha(px, py);
-
-        //             if (target_buffer.pixel(off_x + px, off_y + py)) |pixel| {
-        //                 const dest = pixel.*;
-        //                 const source = Color{
-        //                     .r = color.r,
-        //                     .g = color.g,
-        //                     .b = color.b,
-        //                     .a = alpha,
-        //                 };
-        //                 pixel.* = Color.alphaBlend(dest, source, source.a);
-        //             }
-        //         }
-        //     }
-        // }
-
-        dx += glyph.advance_width;
     }
 }
 
