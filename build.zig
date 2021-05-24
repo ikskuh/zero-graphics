@@ -27,7 +27,7 @@ fn initApp(app: *std.build.LibExeObjStep) void {
         "-fno-sanitize=undefined",
     };
 
-    // app.addCSourceFile("src/rendering/stb_image.c", &cflags);
+    app.addCSourceFile("src/rendering/stb_image.c", &cflags);
     app.addCSourceFile("src/rendering/stb_truetype.c", &cflags);
     app.addIncludeDir("vendor/stb");
 }

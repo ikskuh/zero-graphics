@@ -3,6 +3,7 @@ const gles = @import("../gl_es_2v0.zig");
 
 const c = @cImport({
     @cInclude("stb_truetype.h");
+    @cInclude("stb_image.h");
 });
 
 const Self = @This();
@@ -15,6 +16,7 @@ const FontItem = std.TailQueue(Font).Node;
 
 const CollectError = error{OutOfMemory};
 const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
+const LoadTextureError = CreateTextureError || error{InvalidImageData};
 const CreateFontError = error{ OutOfMemory, InvalidFontFile };
 const InitError = error{ OutOfMemory, GraphicsApiFailure };
 
@@ -166,7 +168,7 @@ pub fn deinit(self: *Self) void {
 /// The texture is only valid as long as the renderer is valid *or* `destroyTexture` is called,
 /// whichever happens first.
 /// If `initial_data` is given, the data is encoded as BGRA pixels.
-pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]const u8) !*const Texture {
+pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]const u8) CreateTextureError!*const Texture {
     const tex_node = try self.allocator.create(TextureItem);
     errdefer self.allocator.destroy(tex_node);
 
@@ -195,6 +197,32 @@ pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]cons
     };
     self.textures.append(tex_node);
     return &tex_node.data;
+}
+
+/// Loads a texture from the given `image_data`. It should contain the file data as it would
+/// be on disk, for example encoded as JPEG, PNG, BMP or TGA. Other file formats might be supported,
+/// but only those four have official support.
+pub fn loadTexture(self: *Self, image_data: []const u8) LoadTextureError!*const Texture {
+    var c_width: c_int = undefined;
+    var c_height: c_int = undefined;
+    const image_buffer = c.stbi_load_from_memory(
+        image_data.ptr,
+        @intCast(c_int, image_data.len),
+        &c_width,
+        &c_height,
+        null,
+        4,
+    ) orelse return error.InvalidImageData;
+    defer c.free(image_buffer);
+
+    const width = @intCast(u15, c_width);
+    const height = @intCast(u15, c_height);
+
+    return try self.createTexture(
+        width,
+        height,
+        image_buffer[0 .. 4 * @as(usize, width) * height],
+    );
 }
 
 fn makeTextureMut(ptr: *const Texture) *Texture {

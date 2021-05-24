@@ -87,7 +87,8 @@ pub const Application = struct {
         app.renderer = try Renderer.init(app.allocator);
         errdefer app.renderer.deinit();
 
-        app.texture_handle = try app.renderer.createTexture(128, 128, @embedFile("cat.rgba"));
+        // app.texture_handle = try app.renderer.createTexture(128, 128, @embedFile("cat.rgba"));
+        app.texture_handle = try app.renderer.loadTexture(@embedFile("ziggy.png"));
         app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
     }
 
