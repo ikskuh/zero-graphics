@@ -2,6 +2,7 @@ const std = @import("std");
 const wasm = std.log.scoped(.sdl);
 const root = @import("root");
 const gles = @import("../gl_es_2v0.zig");
+const zerog = @import("../zero-graphics.zig");
 
 extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*c_void;
 

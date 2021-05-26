@@ -33,6 +33,8 @@ pub const Application = struct {
     font: *const Renderer.Font,
     input: *zero_graphics.Input,
 
+    ui: zero_graphics.UserInterface,
+
     pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
         app.* = Application{
             .allocator = allocator,
@@ -40,6 +42,7 @@ pub const Application = struct {
             .screen_height = 0,
             .texture_handle = undefined,
             .renderer = undefined,
+            .ui = undefined,
             .font = undefined,
             .input = input,
         };
@@ -92,9 +95,15 @@ pub const Application = struct {
         // app.texture_handle = try app.renderer.createTexture(128, 128, @embedFile("cat.rgba"));
         app.texture_handle = try app.renderer.loadTexture(@embedFile("ziggy.png"));
         app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
+
+        const ui_font = try app.renderer.createFont(@embedFile("FiraSans-Regular.ttf"), 16);
+
+        app.ui = zero_graphics.UserInterface.init(app.allocator, ui_font);
+        errdefer app.ui.deinit();
     }
 
     pub fn deinit(app: *Application) void {
+        app.ui.deinit();
         app.renderer.deinit();
         app.* = undefined;
     }
@@ -114,6 +123,19 @@ pub const Application = struct {
             switch (event) {
                 .quit => return false,
                 else => logger.info("unhandled event: {}", .{event}),
+            }
+        }
+
+        {
+            app.ui.begin();
+            defer app.ui.end();
+
+            var i: u15 = 0;
+            while (i < 3) : (i += 1) {
+                const clicked = try app.ui.button(.{ .x = (app.screen_width - 100) / 2, .y = 50 + 50 * i, .width = 100, .height = 40 }, "Click me!", .{ .id = i });
+                if (clicked) {
+                    logger.info("Button {} was clicked!", .{i});
+                }
             }
         }
 
@@ -167,6 +189,9 @@ pub const Application = struct {
                 (app.screen_height + app.texture_handle.height) / 2,
                 Renderer.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
             );
+
+            // Paint the UI to the screen
+            try app.ui.render(renderer);
 
             const mouse = app.input.pointer_location;
 

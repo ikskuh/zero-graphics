@@ -42,6 +42,8 @@ pub const AndroidApp = struct {
     app_ready: bool = false,
     application: root.Application,
 
+    zero_input: zerog.Input,
+
     /// This is the entry point which initializes a application
     /// that has stored its previous state.
     /// `stored_state` is that state, the memory is only valid for this function.
@@ -50,6 +52,7 @@ pub const AndroidApp = struct {
             .allocator = allocator,
             .activity = activity,
             .application = undefined,
+            .zero_input = zerog.Input.init(std.heap.c_allocator),
         };
     }
 
@@ -60,6 +63,7 @@ pub const AndroidApp = struct {
             .allocator = allocator,
             .activity = activity,
             .application = undefined,
+            .zero_input = zerog.Input.init(std.heap.c_allocator),
         };
     }
 
@@ -89,6 +93,7 @@ pub const AndroidApp = struct {
         if (self.config) |config| {
             android.AConfiguration_delete(config);
         }
+        self.zero_input.deinit();
         self.* = undefined;
     }
 
@@ -216,6 +221,19 @@ pub const AndroidApp = struct {
             var key_text = buf[0..len];
 
             std.log.scoped(.input).info("Pressed key: '{s}' U+{X}", .{ key_text, codepoint });
+
+            try self.zero_input.pushEvent(.{
+                .text_input = .{
+                    .text = key_text,
+                    .modifiers = .{
+                        // TODO: Implement this properly
+                        .alt = false,
+                        .ctrl = false,
+                        .shift = false,
+                        .super = false,
+                    },
+                },
+            });
         }
 
         return false;
@@ -372,7 +390,7 @@ pub const AndroidApp = struct {
                         // ready
                         self.egl_init = false;
 
-                        try self.application.init(std.heap.c_allocator);
+                        try self.application.init(std.heap.c_allocator, &self.zero_input);
 
                         self.app_ready = true;
                     }
