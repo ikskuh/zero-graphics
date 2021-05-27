@@ -8,9 +8,9 @@ const Rectangle = types.Rectangle;
 const Renderer = @import("rendering/Renderer2D.zig");
 
 pub const Theme = struct {
-    button_border: Renderer.Color,
-    button_background: Renderer.Color,
-    button_text: Renderer.Color,
+    button_border: types.Color,
+    button_background: types.Color,
+    button_text: types.Color,
 
     pub const default = Theme{
         .button_border = .{ .r = 0xCC, .g = 0xCC, .b = 0xCC },
@@ -52,21 +52,42 @@ const Widget = struct {
         };
     }
 
+    pub fn click(self: *Widget, pos: Point) void {
+        switch (self.control) {
+            .button => |*control| {
+                control.clicked = true;
+            },
+            .check_box => |*control| {
+                control.clicked = true;
+            },
+            .radio_button => |*control| {
+                control.clicked = true;
+            },
+            else => {},
+        }
+    }
+
+    const EmptyConfig = struct {};
+
     const Button = struct {
         pub const Config = struct {
-            text_color: ?Renderer.Color = null,
+            text_color: ?types.Color = null,
             font: ?*const Renderer.Font = null,
         };
         text: StringBuffer,
         config: Config,
+        clicked: bool,
     };
-    const Panel = struct {};
+    const Panel = struct {
+        config: EmptyConfig = .{},
+    };
     const TextBox = struct {
         text: StringBuffer,
+        config: EmptyConfig = .{},
     };
     const Label = struct {
         pub const Config = struct {
-            text_color: ?Renderer.Color = null,
+            text_color: ?types.Color = null,
             font: ?*const Renderer.Font = null,
             vertical_alignment: types.VerticalAlignment = .center,
             horizontal_alignment: types.HorzizontalAlignment = .left,
@@ -77,10 +98,13 @@ const Widget = struct {
     };
     const CheckBox = struct {
         is_checked: bool,
+        clicked: bool,
+        config: EmptyConfig = .{},
     };
     const RadioButton = struct {
         is_checked: bool,
-        group: u32, // buttons are grouped by this
+        clicked: bool,
+        config: EmptyConfig = .{},
     };
 };
 
@@ -92,6 +116,13 @@ const WidgetNode = std.TailQueue(Widget).Node;
 const UserInterface = @This();
 
 const ProcessingMode = enum { default, updating, building };
+
+const Icons = struct {
+    checkbox_unchecked: *const Renderer.Texture,
+    checkbox_checked: *const Renderer.Texture,
+    radiobutton_unchecked: *const Renderer.Texture,
+    radiobutton_checked: *const Renderer.Texture,
+};
 
 allocator: *std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
@@ -123,8 +154,40 @@ default_font: *const Renderer.Font,
 /// Current location of the mouse cursor or finger
 pointer_position: Point,
 
-pub fn init(allocator: *std.mem.Allocator, default_font: *const Renderer.Font) UserInterface {
+/// When the pointer is pressed, the widget is saved until the pointer
+/// is released. When the pointer is released over the previously pressed widget,
+/// we recognize this as a click.
+pressed_widget: ?*Widget = null,
+
+renderer: *Renderer,
+
+icons: Icons,
+
+pub fn init(allocator: *std.mem.Allocator, renderer: *Renderer) !UserInterface {
+    const default_font = try renderer.createFont(@embedFile("ui-data/FiraSans-Regular.ttf"), 16);
+    errdefer renderer.destroyFont(default_font);
+
+    var icons = Icons{
+        .checkbox_unchecked = undefined,
+        .checkbox_checked = undefined,
+        .radiobutton_unchecked = undefined,
+        .radiobutton_checked = undefined,
+    };
+
+    icons.checkbox_checked = try renderer.loadTexture(@embedFile("ui-data/checkbox-marked.png"));
+    errdefer renderer.destroyTexture(icons.checkbox_checked);
+
+    icons.checkbox_unchecked = try renderer.loadTexture(@embedFile("ui-data/checkbox-blank.png"));
+    errdefer renderer.destroyTexture(icons.checkbox_unchecked);
+
+    icons.radiobutton_checked = try renderer.loadTexture(@embedFile("ui-data/radiobox-marked.png"));
+    errdefer renderer.destroyTexture(icons.radiobutton_checked);
+
+    icons.radiobutton_unchecked = try renderer.loadTexture(@embedFile("ui-data/radiobox-blank.png"));
+    errdefer renderer.destroyTexture(icons.radiobutton_unchecked);
+
     return UserInterface{
+        .renderer = renderer,
         .default_font = default_font,
         .allocator = allocator,
         .arena = std.heap.ArenaAllocator.init(allocator),
@@ -132,10 +195,17 @@ pub fn init(allocator: *std.mem.Allocator, default_font: *const Renderer.Font) U
             .x = std.math.minInt(i16),
             .y = std.math.minInt(i16),
         },
+        .icons = icons,
     };
 }
 
 pub fn deinit(self: *UserInterface) void {
+    self.renderer.destroyTexture(self.icons.checkbox_checked);
+    self.renderer.destroyTexture(self.icons.checkbox_unchecked);
+    self.renderer.destroyTexture(self.icons.radiobutton_checked);
+    self.renderer.destroyTexture(self.icons.radiobutton_unchecked);
+    self.renderer.destroyFont(self.default_font);
+
     self.arena.deinit();
     self.* = undefined;
 }
@@ -254,29 +324,113 @@ pub const Builder = struct {
         self.* = undefined;
     }
 
+    pub fn panel(self: Self, rectangle: Rectangle, config: anytype) !void {
+        const widget = try self.ui.findOrAllocWidget(.panel, widgetId(config));
+        widget.bounds = rectangle;
+        const control = switch (widget.control) {
+            // fresh widget
+            .unset => blk: {
+                widget.control = .{
+                    .panel = .{ .config = .{} },
+                };
+                break :blk &widget.control.panel;
+            },
+            // already exists
+            .panel => |*btn| btn,
+            else => unreachable,
+        };
+
+        updateWidgetConfig(&control.config, config);
+    }
+
     pub fn button(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !bool {
         const widget = try self.ui.findOrAllocWidget(.button, widgetId(config));
         widget.bounds = rectangle;
-        switch (widget.control) {
+        const control = switch (widget.control) {
             // fresh widget
-            .unset => {
+            .unset => blk: {
                 widget.control = .{
                     .button = .{
                         .text = try StringBuffer.init(self.ui.allocator, text),
                         .config = .{},
+                        .clicked = false,
                     },
                 };
+                break :blk &widget.control.button;
             },
             // already exists
-            .button => |*btn| {
+            .button => |*btn| blk: {
                 try btn.text.set(self.ui.allocator, text);
+                break :blk btn;
             },
             else => unreachable,
-        }
+        };
 
-        updateWidgetConfig(&widget.control.button.config, config);
+        updateWidgetConfig(&control.config, config);
 
-        return false;
+        const clicked = control.clicked;
+        control.clicked = false;
+        return clicked;
+    }
+
+    pub fn checkBox(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) !bool {
+        const widget = try self.ui.findOrAllocWidget(.check_box, widgetId(config));
+        widget.bounds = rectangle;
+        const control = switch (widget.control) {
+            // fresh widget
+            .unset => blk: {
+                widget.control = .{
+                    .check_box = .{
+                        .config = .{},
+                        .is_checked = is_checked,
+                        .clicked = false,
+                    },
+                };
+                break :blk &widget.control.check_box;
+            },
+            // already exists
+            .check_box => |*btn| blk: {
+                btn.is_checked = is_checked;
+                break :blk btn;
+            },
+            else => unreachable,
+        };
+
+        updateWidgetConfig(&control.config, config);
+
+        const clicked = control.clicked;
+        control.clicked = false;
+        return clicked;
+    }
+
+    pub fn radioButton(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) !bool {
+        const widget = try self.ui.findOrAllocWidget(.radio_button, widgetId(config));
+        widget.bounds = rectangle;
+        const control = switch (widget.control) {
+            // fresh widget
+            .unset => blk: {
+                widget.control = .{
+                    .radio_button = .{
+                        .config = .{},
+                        .is_checked = is_checked,
+                        .clicked = false,
+                    },
+                };
+                break :blk &widget.control.radio_button;
+            },
+            // already exists
+            .radio_button => |*btn| blk: {
+                btn.is_checked = is_checked;
+                break :blk btn;
+            },
+            else => unreachable,
+        };
+
+        updateWidgetConfig(&control.config, config);
+
+        const clicked = control.clicked;
+        control.clicked = false;
+        return clicked;
     }
 
     pub fn label(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !void {
@@ -288,6 +442,7 @@ pub const Builder = struct {
                 widget.control = .{
                     .label = .{
                         .text = try StringBuffer.init(self.ui.allocator, text),
+                        .config = .{},
                     },
                 };
             },
@@ -310,6 +465,15 @@ pub fn processInput(self: *UserInterface) InputProcessor {
     };
 }
 
+fn widgetFromPosition(self: *UserInterface, point: Point) ?*Widget {
+    var iter = self.widgetIterator(.event_order);
+    while (iter.next()) |widget| {
+        if (widget.bounds.contains(point))
+            return widget;
+    }
+    return null;
+}
+
 pub const InputProcessor = struct {
     const Self = @This();
 
@@ -326,11 +490,17 @@ pub const InputProcessor = struct {
     }
 
     pub fn pointerDown(self: Self) void {
-        logger.info("not implemented yet: pointerDown", .{});
+        const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
+        self.ui.pressed_widget = clicked_widget;
     }
 
     pub fn pointerUp(self: Self) void {
-        logger.info("not implemented yet: pointerUp", .{});
+        const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse return;
+        const pressed_widget = self.ui.pressed_widget orelse return;
+
+        if (clicked_widget == pressed_widget) {
+            clicked_widget.click(self.ui.pointer_position);
+        }
     }
 
     pub fn enterText(self: Self, string: []const u8) !void {
@@ -338,7 +508,8 @@ pub const InputProcessor = struct {
     }
 };
 
-pub fn render(self: UserInterface, renderer: *Renderer) !void {
+pub fn render(self: UserInterface) !void {
+    const renderer = self.renderer;
     var iterator = self.widgetIterator(.draw_order);
     while (iterator.next()) |widget| {
         switch (widget.control) {
@@ -347,8 +518,8 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
             .unset => unreachable,
 
             .button => |control| {
-                try renderer.fillRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_background);
-                try renderer.drawRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_border);
+                try renderer.fillRectangle(widget.bounds, self.theme.button_background);
+                try renderer.drawRectangle(widget.bounds, self.theme.button_border);
                 const font = control.config.font orelse self.default_font;
                 const string_size = renderer.measureString(font, control.text.get());
                 try renderer.drawString(
@@ -361,8 +532,8 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
             },
 
             .panel => |control| {
-                try renderer.fillRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_background);
-                try renderer.drawRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_border);
+                try renderer.fillRectangle(widget.bounds, self.theme.button_background);
+                try renderer.drawRectangle(widget.bounds, self.theme.button_border);
             },
 
             .text_box => |control| {
@@ -388,10 +559,24 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
                 );
             },
             .check_box => |control| {
-                @panic("not implemented yet!");
+                try renderer.fillTexturedRectangle(
+                    widget.bounds,
+                    if (control.is_checked)
+                        self.icons.checkbox_checked
+                    else
+                        self.icons.checkbox_unchecked,
+                    types.Color.white,
+                );
             },
             .radio_button => |control| {
-                @panic("not implemented yet!");
+                try renderer.fillTexturedRectangle(
+                    widget.bounds,
+                    if (control.is_checked)
+                        self.icons.radiobutton_checked
+                    else
+                        self.icons.radiobutton_unchecked,
+                    types.Color.white,
+                );
             },
         }
     }
@@ -571,6 +756,10 @@ const StringBuffer = union(enum) {
                 }
             },
         }
+    }
+
+    pub fn format(self: StringBuffer, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("\"{s}\"", .{self.get()});
     }
 };
 

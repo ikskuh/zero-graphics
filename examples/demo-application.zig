@@ -35,6 +35,8 @@ pub const Application = struct {
 
     ui: zero_graphics.UserInterface,
 
+    gui_data: DemoGuiData = .{},
+
     pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
         app.* = Application{
             .allocator = allocator,
@@ -96,9 +98,7 @@ pub const Application = struct {
         app.texture_handle = try app.renderer.loadTexture(@embedFile("ziggy.png"));
         app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
-        const ui_font = try app.renderer.createFont(@embedFile("FiraSans-Regular.ttf"), 16);
-
-        app.ui = zero_graphics.UserInterface.init(app.allocator, ui_font);
+        app.ui = try zero_graphics.UserInterface.init(app.allocator, &app.renderer);
         errdefer app.ui.deinit();
     }
 
@@ -136,17 +136,86 @@ pub const Application = struct {
         {
             var ui = app.ui.construct();
 
-            var i: u15 = 0;
-            while (i < 3) : (i += 1) {
-                const rect = zero_graphics.Rectangle{
-                    .x = 200 + 50 * i,
-                    .y = 50 + 20 * i,
-                    .width = 100,
-                    .height = 40,
-                };
-                const clicked = try ui.button(rect, "Click me!", .{ .id = i });
-                if (clicked) {
-                    logger.info("Button {} was clicked!", .{i});
+            if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 30, .height = 30 }, app.gui_data.is_visible, .{}))
+                app.gui_data.is_visible = !app.gui_data.is_visible;
+
+            if (app.gui_data.is_visible) {
+                var fmt_buf: [64]u8 = undefined;
+
+                try ui.panel(zero_graphics.Rectangle{
+                    .x = 150,
+                    .y = 10,
+                    .width = 450,
+                    .height = 280,
+                }, .{});
+
+                for (app.gui_data.check_group) |*checked, i| {
+                    var rect = zero_graphics.Rectangle{
+                        .x = 160,
+                        .y = 20 + 40 * @intCast(u15, i),
+                        .height = 30,
+                        .width = 30,
+                    };
+                    if (try ui.checkBox(rect, checked.*, .{ .id = i }))
+                        checked.* = !checked.*;
+
+                    rect.x += 40;
+                    rect.width = 80;
+                    try ui.label(rect, try std.fmt.bufPrint(&fmt_buf, "CheckBox {}", .{i}), .{ .id = i });
+
+                    rect.x += 100;
+                    rect.width = 30;
+
+                    if (try ui.radioButton(rect, (app.gui_data.radio_group_1 == i), .{ .id = i }))
+                        app.gui_data.radio_group_1 = i;
+
+                    rect.x += 40;
+                    rect.width = 80;
+                    try ui.label(rect, try std.fmt.bufPrint(&fmt_buf, "RadioGroup 1.{}", .{i}), .{ .id = i });
+
+                    rect.x += 100;
+                    rect.width = 30;
+
+                    if (try ui.radioButton(rect, (app.gui_data.radio_group_2 == i), .{ .id = i }))
+                        app.gui_data.radio_group_2 = i;
+
+                    rect.x += 40;
+                    rect.width = 80;
+                    try ui.label(rect, try std.fmt.bufPrint(&fmt_buf, "RadioGroup 2.{}", .{i}), .{ .id = i });
+                }
+
+                //            radio_group_1
+                //radio_group_2
+                //check_group
+                {
+                    var i: u15 = 0;
+                    while (i < 3) : (i += 1) {
+                        const rect = zero_graphics.Rectangle{
+                            .x = 160 + 50 * i,
+                            .y = 200 + 20 * i,
+                            .width = 100,
+                            .height = 40,
+                        };
+                        const clicked = try ui.button(rect, "Click me!", .{
+                            .id = i,
+                            .text_color = if ((app.gui_data.last_button orelse 9999) == i)
+                                zero_graphics.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 }
+                            else
+                                zero_graphics.Color.white,
+                        });
+                        if (clicked) {
+                            if (app.gui_data.last_button) |btn| {
+                                if (btn == i) {
+                                    app.gui_data.last_button = null;
+                                } else {
+                                    app.gui_data.last_button = i;
+                                }
+                            } else {
+                                app.gui_data.last_button = i;
+                            }
+                            logger.info("Button {} was clicked!", .{i});
+                        }
+                    }
                 }
             }
 
@@ -157,38 +226,47 @@ pub const Application = struct {
 
         // render scene
         {
-            const red = Renderer.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
-            const white = Renderer.Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF };
+            const Rectangle = zero_graphics.Rectangle;
+
+            const red = zero_graphics.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
+            const white = zero_graphics.Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF };
 
             renderer.reset();
 
-            try renderer.fillRectangle(1, 1, 16, 16, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x80 });
-            try renderer.fillRectangle(9, 9, 16, 16, .{ .r = 0x00, .g = 0xFF, .b = 0x00, .a = 0x80 });
-            try renderer.fillRectangle(17, 17, 16, 16, .{ .r = 0x00, .g = 0x00, .b = 0xFF, .a = 0x80 });
+            try renderer.fillRectangle(Rectangle{ .x = 1, .y = 1, .width = 16, .height = 16 }, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x80 });
+            try renderer.fillRectangle(Rectangle{ .x = 9, .y = 9, .width = 16, .height = 16 }, .{ .r = 0x00, .g = 0xFF, .b = 0x00, .a = 0x80 });
+            try renderer.fillRectangle(Rectangle{ .x = 17, .y = 17, .width = 16, .height = 16 }, .{ .r = 0x00, .g = 0x00, .b = 0xFF, .a = 0x80 });
 
-            try renderer.fillRectangle(app.screen_width - 64 - 1, app.screen_height - 48 - 1, 64, 48, .{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x80 });
+            try renderer.fillRectangle(Rectangle{
+                .x = app.screen_width - 64 - 1,
+                .y = app.screen_height - 48 - 1,
+                .width = 64,
+                .height = 48,
+            }, .{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x80 });
 
-            try renderer.drawRectangle(1, 34, 32, 32, white);
+            try renderer.drawRectangle(Rectangle{ .x = 1, .y = 34, .width = 32, .height = 32 }, white);
 
             // diagonal
-            try renderer.fillRectangle(34, 34, 32, 32, red);
+            try renderer.fillRectangle(Rectangle{ .x = 34, .y = 34, .width = 32, .height = 32 }, red);
             try renderer.drawLine(34, 34, 65, 65, white);
 
             // vertical
-            try renderer.fillRectangle(1, 67, 32, 32, red);
+            try renderer.fillRectangle(Rectangle{ .x = 1, .y = 67, .width = 32, .height = 32 }, red);
             try renderer.drawLine(1, 67, 1, 98, white);
             try renderer.drawLine(32, 67, 32, 98, white);
 
             // horizontal
-            try renderer.fillRectangle(34, 67, 32, 32, red);
+            try renderer.fillRectangle(Rectangle{ .x = 34, .y = 67, .width = 32, .height = 32 }, red);
             try renderer.drawLine(34, 67, 65, 67, white);
             try renderer.drawLine(34, 98, 65, 98, white);
 
             try renderer.fillTexturedRectangle(
-                (app.screen_width - app.texture_handle.width) / 2,
-                (app.screen_height - app.texture_handle.height) / 2,
-                app.texture_handle.width,
-                app.texture_handle.height,
+                Rectangle{
+                    .x = (app.screen_width - app.texture_handle.width) / 2,
+                    .y = (app.screen_height - app.texture_handle.height) / 2,
+                    .width = app.texture_handle.width,
+                    .height = app.texture_handle.height,
+                },
                 app.texture_handle,
                 null,
             );
@@ -201,20 +279,23 @@ pub const Application = struct {
                 string,
                 (app.screen_width - string_size.width) / 2,
                 (app.screen_height + app.texture_handle.height) / 2,
-                Renderer.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
+                zero_graphics.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
             );
 
-            // Paint the UI to the screen
-            try app.ui.render(renderer);
+            // Paint the UI to the screen,
+            // will paint to `renderer`
+            try app.ui.render();
 
             const mouse = app.input.pointer_location;
 
             if (mouse.x >= 0 and mouse.y >= 0) {
                 try renderer.drawRectangle(
-                    mouse.x - 10,
-                    mouse.y - 10,
-                    21,
-                    21,
+                    Rectangle{
+                        .x = mouse.x - 10,
+                        .y = mouse.y - 10,
+                        .width = 21,
+                        .height = 21,
+                    },
                     red,
                 );
             }
@@ -279,6 +360,17 @@ pub const Application = struct {
 
         return true;
     }
+
+    const DemoGuiData = struct {
+        is_visible: bool = false,
+
+        last_button: ?usize = null,
+
+        radio_group_1: usize = 0,
+        radio_group_2: usize = 1,
+
+        check_group: [4]bool = .{ false, false, false, false },
+    };
 };
 
 fn glesDebugProc(

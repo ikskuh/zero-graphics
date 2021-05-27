@@ -10,6 +10,7 @@ const zigimg = @import("zigimg");
 
 const Self = @This();
 
+const Color = types.Color;
 const Rectangle = types.Rectangle;
 const Size = types.Size;
 
@@ -305,9 +306,9 @@ fn makeFontMut(ptr: *const Font) *Font {
 pub fn destroyFont(self: *Self, font: *const Font) void {
     // we can do this as texture handles are only given out via `createFont` which
     // returns a immutable reference.
-    const mut_font = makeFontMut(texture);
+    const mut_font = makeFontMut(font);
     const node = @fieldParentPtr(FontItem, "data", mut_font);
-    destroyTextureInternal(self, node);
+    destroyFontInternal(self, node);
 }
 
 fn destroyFontInternal(self: *Self, node: *FontItem) void {
@@ -518,10 +519,12 @@ pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
         try self.fillTexturedRectangle(
-            x + glyph.x,
-            y + glyph.y,
-            glyph.width,
-            glyph.height,
+            Rectangle{
+                .x = x + glyph.x,
+                .y = y + glyph.y,
+                .width = glyph.width,
+                .height = glyph.height,
+            },
             glyph.texture,
             color,
         );
@@ -651,11 +654,11 @@ pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const
 }
 
 /// Appends a filled, untextured quad.
-pub fn fillRectangle(self: *Self, x: i16, y: i16, width: u15, height: u15, color: Color) CollectError!void {
-    const tl = Vertex.init(x, y, color).offset(-1, -1);
-    const tr = Vertex.init(x + width - 1, y, color).offset(1, -1);
-    const bl = Vertex.init(x, y + height - 1, color).offset(-1, 1);
-    const br = Vertex.init(x + width - 1, y + height - 1, color).offset(1, 1);
+pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) CollectError!void {
+    const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1);
+    const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1);
+    const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color).offset(-1, 1);
+    const br = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y + rectangle.height - 1, color).offset(1, 1);
 
     try self.appendTriangles(null, &[_][3]Vertex{
         .{ tl, br, tr },
@@ -664,12 +667,12 @@ pub fn fillRectangle(self: *Self, x: i16, y: i16, width: u15, height: u15, color
 }
 
 /// Copies the given texture to the screen
-pub fn fillTexturedRectangle(self: *Self, x: i16, y: i16, width: u15, height: u15, texture: *const Texture, tint: ?Color) CollectError!void {
+pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const Texture, tint: ?Color) CollectError!void {
     const color = tint orelse Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0xFF };
-    const tl = Vertex.init(x, y, color).offset(-1, -1).withUV(0, 0);
-    const tr = Vertex.init(x + width - 1, y, color).offset(1, -1).withUV(1, 0);
-    const bl = Vertex.init(x, y + height - 1, color).offset(-1, 1).withUV(0, 1);
-    const br = Vertex.init(x + width - 1, y + height - 1, color).offset(1, 1).withUV(1, 1);
+    const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1).withUV(0, 0);
+    const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1).withUV(1, 0);
+    const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color).offset(-1, 1).withUV(0, 1);
+    const br = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y + rectangle.height - 1, color).offset(1, 1).withUV(1, 1);
 
     try self.appendTriangles(texture, &[_][3]Vertex{
         .{ tl, br, tr },
@@ -678,11 +681,11 @@ pub fn fillTexturedRectangle(self: *Self, x: i16, y: i16, width: u15, height: u1
 }
 
 /// Appends a rectangle with a 1 pixel wide outline
-pub fn drawRectangle(self: *Self, x: i16, y: i16, width: u15, height: u15, color: Color) CollectError!void {
-    const tl = Vertex.init(x, y, color);
-    const tr = Vertex.init(x + width - 1, y, color);
-    const bl = Vertex.init(x, y + height - 1, color);
-    const br = Vertex.init(x + width - 1, y + height - 1, color);
+pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) CollectError!void {
+    const tl = Vertex.init(rectangle.x, rectangle.y, color);
+    const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color);
+    const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color);
+    const br = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y + rectangle.height - 1, color);
 
     try self.appendTriangles(null, &[_][3]Vertex{
         // top
@@ -753,13 +756,6 @@ fn createAndCompileShader(shader_type: gles.GLenum, source: []const u8) !gles.GL
 
     return shader;
 }
-
-pub const Color = struct {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8 = 0xFF,
-};
 
 pub const Vertex = extern struct {
     // coordinates on the screen in pixels:
