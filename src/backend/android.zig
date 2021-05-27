@@ -5,6 +5,8 @@ const gles = @import("../gl_es_2v0.zig");
 const logger = std.log.scoped(.sdl);
 const zerog = @import("../zero-graphics.zig");
 
+const Point = zerog.Point;
+
 const android = @import("android");
 
 const EGLContext = android.egl.EGLContext;
@@ -325,6 +327,33 @@ pub const AndroidApp = struct {
                 android.AMotionEvent_getToolMinor(event, i),
                 android.AMotionEvent_getOrientation(event, i),
             });
+        }
+
+        if (cnt > 0) {
+            const x = android.AMotionEvent_getX(event, 0);
+            const y = android.AMotionEvent_getY(event, 0);
+            const point = Point{ .x = @floatToInt(i16, x), .y = @floatToInt(i16, y) };
+            switch (event_type) {
+                .AMOTION_EVENT_ACTION_DOWN => {
+                    try self.zero_input.pushEvent(.{
+                        .pointer_motion = point,
+                    });
+                    try self.zero_input.pushEvent(.{
+                        .pointer_press = .primary,
+                    });
+                },
+                .AMOTION_EVENT_ACTION_UP => {
+                    try self.zero_input.pushEvent(.{
+                        .pointer_release = .primary,
+                    });
+                },
+                .AMOTION_EVENT_ACTION_MOVE => {
+                    try self.zero_input.pushEvent(.{
+                        .pointer_motion = point,
+                    });
+                },
+                else => {},
+            }
         }
 
         return false;

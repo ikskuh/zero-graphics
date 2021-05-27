@@ -289,6 +289,8 @@ pub const Application = struct {
             const mouse = app.input.pointer_location;
 
             if (mouse.x >= 0 and mouse.y >= 0) {
+                try renderer.drawLine(0, mouse.y, app.screen_width, mouse.y, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x40 });
+                try renderer.drawLine(mouse.x, 0, mouse.x, app.screen_height, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x40 });
                 try renderer.drawRectangle(
                     Rectangle{
                         .x = mouse.x - 10,

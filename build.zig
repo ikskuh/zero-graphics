@@ -81,6 +81,7 @@ pub fn build(b: *std.build.Builder) !void {
             .display_name = "Zig OpenGL ES 2.0 Demo",
             .package_name = "net.random_projects.zig_gles2_demo",
             .resource_directory = "zig-cache/app-resources",
+            .fullscreen = true,
         };
 
         const apk_file = "zig-out/demo.apk";

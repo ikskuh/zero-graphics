@@ -17,6 +17,7 @@ extern fn now_f64() f64;
 pub const log_level = .info;
 
 var app_instance: root.Application = undefined;
+var input_handler: zerog.Input = undefined;
 
 var global_arena: std.heap.ArenaAllocator = undefined;
 var gpa: std.heap.GeneralPurposeAllocator(.{
@@ -68,7 +69,9 @@ export fn app_init() u32 {
         .backing_allocator = &global_arena.allocator,
     };
 
-    app_instance.init(&gpa.allocator) catch return 1;
+    input_handler = zerog.Input.init(&gpa.allocator);
+
+    app_instance.init(&gpa.allocator, &input_handler) catch return 1;
 
     app_instance.resize(@intCast(u15, wasm_getScreenW()), @intCast(u15, wasm_getScreenH())) catch return 2;
 
@@ -86,6 +89,7 @@ export fn app_update() u32 {
 
 export fn app_deinit() u32 {
     app_instance.deinit();
+    input_handler.deinit();
     // _ = gpa.deinit();
     global_arena.deinit();
 
