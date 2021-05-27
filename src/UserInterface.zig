@@ -66,6 +66,8 @@ const Widget = struct {
     };
     const Label = struct {
         pub const Config = struct {
+            text_color: ?Renderer.Color = null,
+            font: ?*const Renderer.Font = null,
             vertical_alignment: types.VerticalAlignment = .center,
             horizontal_alignment: types.HorzizontalAlignment = .left,
         };
@@ -187,26 +189,6 @@ fn findOrAllocWidget(self: *UserInterface, widget_type: WidgetType, id: WidgetID
     return &node.data;
 }
 
-/// Starts a UI pass and collects widgets.
-/// Widgets are then created with calls to `.button`, `.textBox`, ... until `.end()` is called.
-pub fn begin(self: *UserInterface) void {
-    // Moves all active widgets into the retained storage.
-    // Widgets will be pulled from there when reused, otherwise will be destroyed in `.end()`.
-    while (self.active_widgets.popFirst()) |node| {
-        self.retained_widgets.append(node);
-    }
-}
-
-/// Ends the current UI pass and stops collecting widgets.
-/// Will destroy all remaining widgets in `retained_widgets`
-/// that are left, as those must be recreated when used the next time.
-pub fn end(self: *UserInterface) void {
-    while (self.retained_widgets.popFirst()) |node| {
-        // TODO: Destroy widget data here!
-        self.freeWidgetNode(node);
-    }
-}
-
 /// Returns a unqiue identifier for each type.
 fn typeId(comptime T: type) usize {
     return comptime @ptrToInt(&struct {
@@ -234,24 +216,41 @@ fn updateWidgetConfig(dst_config: anytype, src_config: anytype) void {
     }
 }
 
-/// Begins construction of the widget tree.
+/// Starts a UI pass and collects widgets. The return value can be used to create new widgets.
 /// Call `finish()` on the returned builder to complete the construction.
-pub fn construct(self: *UserInterface) UserInterfaceBuilder {
+/// Widgets are then created with calls to `.button`, `.textBox`, ... until `.finish()` is called.
+pub fn construct(self: *UserInterface) Builder {
     std.debug.assert(self.mode == .default);
     self.mode = .building;
-    return UserInterfaceBuilder{
+
+    // Moves all active widgets into the retained storage.
+    // Widgets will be pulled from there when reused, otherwise will be destroyed in `.end()`.
+    while (self.active_widgets.popFirst()) |node| {
+        self.retained_widgets.append(node);
+    }
+
+    return Builder{
         .ui = self,
     };
 }
 
-pub const UserInterfaceBuilder = struct {
+pub const Builder = struct {
     const Self = @This();
 
     ui: *UserInterface,
 
+    /// Ends the UI construction pass and stops collecting widgets.
+    /// Will destroy all remaining widgets in `retained_widgets`
+    /// that are left, as those must be recreated when used the next time.
     pub fn finish(self: *Self) void {
         std.debug.assert(self.ui.mode == .building);
         self.ui.mode = .default;
+
+        while (self.ui.retained_widgets.popFirst()) |node| {
+            // TODO: Destroy widget data here!
+            self.ui.freeWidgetNode(node);
+        }
+
         self.* = undefined;
     }
 
@@ -263,14 +262,14 @@ pub const UserInterfaceBuilder = struct {
             .unset => {
                 widget.control = .{
                     .button = .{
-                        .text = try StringBuffer.init(self.allocator, text),
+                        .text = try StringBuffer.init(self.ui.allocator, text),
                         .config = .{},
                     },
                 };
             },
             // already exists
             .button => |*btn| {
-                try btn.text.set(self.allocator, text);
+                try btn.text.set(self.ui.allocator, text);
             },
             else => unreachable,
         }
@@ -288,13 +287,13 @@ pub const UserInterfaceBuilder = struct {
             .unset => {
                 widget.control = .{
                     .label = .{
-                        .text = try StringBuffer.init(self.allocator, text),
+                        .text = try StringBuffer.init(self.ui.allocator, text),
                     },
                 };
             },
             // already exists
             .label => |*lbl| {
-                try lbl.text.set(self.allocator, text);
+                try lbl.text.set(self.ui.allocator, text);
             },
             else => unreachable,
         }
@@ -304,7 +303,7 @@ pub const UserInterfaceBuilder = struct {
 };
 
 pub fn processInput(self: *UserInterface) InputProcessor {
-    std.debug.assert(self.mode == .updating);
+    std.debug.assert(self.mode == .default);
     self.mode = .updating;
     return InputProcessor{
         .ui = self,
@@ -312,6 +311,8 @@ pub fn processInput(self: *UserInterface) InputProcessor {
 }
 
 pub const InputProcessor = struct {
+    const Self = @This();
+
     ui: *UserInterface,
 
     pub fn finish(self: *Self) void {
@@ -358,6 +359,12 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
                     control.config.text_color orelse self.theme.button_text,
                 );
             },
+
+            .panel => |control| {
+                try renderer.fillRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_background);
+                try renderer.drawRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_border);
+            },
+
             .text_box => |control| {
                 @panic("not implemented yet!");
             },
@@ -392,14 +399,14 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
 
 const WidgetOrder = enum { draw_order, event_order };
 
-fn widgetIterator(self: *UserInterface, order: WidgetOrder) WidgetIterator {
+fn widgetIterator(self: UserInterface, order: WidgetOrder) WidgetIterator {
     return switch (order) {
         .draw_order => WidgetIterator{
-            .forward = true,
+            .order = .draw_order,
             .it = self.active_widgets.first,
         },
         .event_order => WidgetIterator{
-            .forward = false,
+            .order = .event_order,
             .it = self.active_widgets.last,
         },
     };
@@ -414,7 +421,7 @@ const WidgetIterator = struct {
             const result = self.it;
             if (result) |node| {
                 self.it = switch (self.order) {
-                    .render_order => node.next,
+                    .draw_order => node.next,
                     .event_order => node.prev,
                 };
 

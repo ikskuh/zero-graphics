@@ -119,18 +119,22 @@ pub const Application = struct {
     pub fn update(app: *Application) !bool {
         var take_screenshot = false;
 
-        while (app.input.pollEvent()) |event| {
-            switch (event) {
-                .quit => return false,
-                .pointer_motion => |pt| app.ui.setPointer(pt),
-                .pointer_press => |cursor| if (cursor == .primary) app.ui.pointerDown(),
-                .pointer_release => |cursor| if (cursor == .primary) app.ui.pointerUp(),
-                .text_input => |text| try app.ui.enterText(text.text),
+        {
+            var ui_input = app.ui.processInput();
+            while (app.input.pollEvent()) |event| {
+                switch (event) {
+                    .quit => return false,
+                    .pointer_motion => |pt| ui_input.setPointer(pt),
+                    .pointer_press => |cursor| if (cursor == .primary) ui_input.pointerDown(),
+                    .pointer_release => |cursor| if (cursor == .primary) ui_input.pointerUp(),
+                    .text_input => |text| try ui_input.enterText(text.text),
+                }
             }
+            ui_input.finish();
         }
 
         {
-            app.ui.begin();
+            var ui = app.ui.construct();
 
             var i: u15 = 0;
             while (i < 3) : (i += 1) {
@@ -140,13 +144,13 @@ pub const Application = struct {
                     .width = 100,
                     .height = 40,
                 };
-                const clicked = try app.ui.button(rect, "Click me!", .{ .id = i });
+                const clicked = try ui.button(rect, "Click me!", .{ .id = i });
                 if (clicked) {
                     logger.info("Button {} was clicked!", .{i});
                 }
             }
 
-            app.ui.end();
+            ui.finish();
         }
 
         const renderer = &app.renderer;
