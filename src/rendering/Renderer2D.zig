@@ -1,14 +1,17 @@
 const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
+const types = @import("../types.zig");
 
 const c = @cImport({
     @cInclude("stb_truetype.h");
-    // @cInclude("spng.h");
 });
 
 const zigimg = @import("zigimg");
 
 const Self = @This();
+
+const Rectangle = types.Rectangle;
+const Size = types.Size;
 
 const TextureList = std.TailQueue(Texture);
 const TextureItem = std.TailQueue(Texture).Node;
@@ -21,18 +24,6 @@ const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
 const LoadTextureError = CreateTextureError || error{InvalidImageData};
 const CreateFontError = error{ OutOfMemory, InvalidFontFile };
 const InitError = error{ OutOfMemory, GraphicsApiFailure };
-
-pub const Size = struct {
-    width: u15,
-    height: u15,
-};
-
-pub const Rectangle = struct {
-    x: i16,
-    y: i16,
-    width: u15,
-    height: u15,
-};
 
 const vertexSource =
     \\attribute vec2 vPosition;
@@ -455,7 +446,7 @@ const GlyphIterator = struct {
             const codepoint = self.codepoint_src.nextCodepoint() orelse return null;
             if (codepoint == '\n') {
                 self.dx = 0;
-                self.dy += scaleInt(self.font.ascent - self.font.descent + self.font.line_gap, self.font.scale);
+                self.dy += self.font.getLineHeight();
                 self.previous_codepoint = null;
                 continue;
             }
@@ -521,6 +512,8 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle
 
 /// Draws the given `text` to local (`x`,`y`) with `color` applied.
 /// The final size of the string can be computed with `measureString()`.
+/// This is a low-level function that does not do any kind of pre-computation. It will just render what it
+/// was given. If a more advanced rendering is required, use `drawText()` instead!
 pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) !void {
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
@@ -534,6 +527,65 @@ pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i
         );
     }
 }
+
+// TODO: Implement a proper `drawText()`
+// pub const DrawTextOptions = struct {
+//     color: Color,
+//     vertical_alignment: types.VerticalAlignment = .left,
+//     horizontal_alignment: types.HorzizontalAlignment = .top,
+//     max_width: ?u15 = null,
+//     max_height: ?u15 = null,
+// };
+
+// /// Draws the given `text` into `rectangle` using the layout configuration in `options`.
+// /// Text will only be drawn when full glyphs fit the area specified via `max_width` and `max_height`.
+// /// This function a lot more computation than two calls to `measureString()` and `drawString()`, so it should only
+// /// be used when proper text layouting is required.
+// pub fn drawText(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, options: DrawTextOptions) !void {
+//     var total_width: u15 = 0;
+//     var total_height: u15 = 0;
+//     var line_count: usize = 0;
+
+//     const line_height = font.getLineHeight();
+
+//     var lines_iter = std.mem.split(text, "\n");
+//     while (lines_iter.next()) |line| {
+//         if (options.max_height) |limit| {
+//             if (total_height + line_height > limit)
+//                 break;
+//         }
+//         total_width += self.measureString(font, line).width;
+//         total_height += line_height;
+//         line_count += 1;
+//     }
+
+//     const offset_x: i16 = switch (options.vertical_alignment) {
+//         .left => @as(i16, 0),
+//         .center => -@as(i16, total_width / 2),
+//         .right => -@as(i16, total_width),
+//     };
+//     const offset_y = switch (options.vertical_alignment) {
+//         .top => @as(i16, 0),
+//         .center => -@as(i16, total_height / 2),
+//         .bottom => -@as(i16, total_height),
+//     };
+
+//     var dy: u15 = 0;
+
+//     var i: usize = 0;
+//     lines_iter = td.mem.split(text, "\n");
+//     while (lines_iter.next()) |line| {
+//         i += 1;
+//         if (i >= line_count) // would draw outside max_height
+//             break;
+//         const width = self.measureString(font, line).width;
+
+//         const dx = switch(options.horizontal_alignment) {
+//             .left => @as(i16,0),
+//             .center => -@as(i16, total_width / 2),
+//         };
+//     }
+// }
 
 /// Resets the state of the renderer and prepares a fresh new frame.
 pub fn reset(self: *Self) void {
@@ -797,6 +849,11 @@ pub const Font = struct {
 
     /// Scale of `advance_width` and `left_side_bearing`
     scale: f32,
+
+    /// Returns the height of a single text line of this font
+    pub fn getLineHeight(self: Font) u15 {
+        return @intCast(u15, scaleInt(self.ascent - self.descent + self.line_gap, self.scale));
+    }
 };
 
 // get the bbox of the bitmap centered around the glyph origin; so the

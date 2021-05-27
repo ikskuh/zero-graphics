@@ -77,7 +77,7 @@ pub fn build(b: *std.build.Builder) !void {
         b.step("init-keystore", "Initializes a fresh debug keystore.").dependOn(make_keystore);
 
         const app_config = android_sdk.AppConfig{
-            .app_name = "zig-gles2-demo",
+            .app_name = "zerog-demo",
             .display_name = "Zig OpenGL ES 2.0 Demo",
             .package_name = "net.random_projects.zig_gles2_demo",
             .resource_directory = "zig-cache/app-resources",
@@ -121,9 +121,9 @@ pub fn build(b: *std.build.Builder) !void {
         run_step.dependOn(run);
     } else {
         const app = switch (backend.outputType()) {
-            .exe => b.addExecutable("gles2-zig", root_src),
-            .static_lib => b.addStaticLibrary("gles2-zig", root_src),
-            .dynamic_lib => b.addSharedLibrary("gles2-zig", root_src, .unversioned),
+            .exe => b.addExecutable("zerog-demo", root_src),
+            .static_lib => b.addStaticLibrary("zerog-demo", root_src),
+            .dynamic_lib => b.addSharedLibrary("zerog-demo", root_src, .unversioned),
         };
         app.addPackage(zero_graphics);
         app.addBuildOption(RenderBackend, "render_backend", backend);

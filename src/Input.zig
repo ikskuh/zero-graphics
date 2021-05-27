@@ -1,9 +1,8 @@
 const std = @import("std");
 
-pub const Location = struct {
-    x: i16,
-    y: i16,
-};
+const types = @import("types.zig");
+
+const Location = types.Point;
 
 pub const MouseButton = enum {
     primary,

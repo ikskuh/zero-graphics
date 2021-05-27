@@ -1,13 +1,11 @@
 const std = @import("std");
+const types = @import("types.zig");
+const logger = std.log.scoped(.user_interface);
+
+const Point = types.Point;
+const Rectangle = types.Rectangle;
 
 const Renderer = @import("rendering/Renderer2D.zig");
-
-pub const Rectangle = struct {
-    x: i16,
-    y: i16,
-    width: u15,
-    height: u15,
-};
 
 pub const Theme = struct {
     button_border: Renderer.Color,
@@ -24,18 +22,35 @@ pub const Theme = struct {
 const WidgetID = enum(u32) { _ };
 
 const Widget = struct {
+    // Control state:
     id: WidgetID,
     control: Control,
     bounds: Rectangle,
 
+    // Runtime state:
+    focused: bool = false,
+
     const Control = union(enum) {
         unset,
+        panel: Panel,
         button: Button,
         text_box: TextBox,
         label: Label,
         check_box: CheckBox,
         radio_button: RadioButton,
     };
+
+    pub fn isHitTestVisible(self: Widget) bool {
+        return switch (self.control) {
+            .unset => unreachable,
+            .panel => true,
+            .button => true,
+            .text_box => true,
+            .label => false,
+            .check_box => true,
+            .radio_button => true,
+        };
+    }
 
     const Button = struct {
         pub const Config = struct {
@@ -45,11 +60,18 @@ const Widget = struct {
         text: StringBuffer,
         config: Config,
     };
+    const Panel = struct {};
     const TextBox = struct {
         text: StringBuffer,
     };
     const Label = struct {
+        pub const Config = struct {
+            vertical_alignment: types.VerticalAlignment = .center,
+            horizontal_alignment: types.HorzizontalAlignment = .left,
+        };
+
         text: StringBuffer,
+        config: Config,
     };
     const CheckBox = struct {
         is_checked: bool,
@@ -67,8 +89,13 @@ const WidgetNode = std.TailQueue(Widget).Node;
 
 const UserInterface = @This();
 
+const ProcessingMode = enum { default, updating, building };
+
 allocator: *std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
+
+/// The current mode. This is used to interlock building and updating APIs
+mode: ProcessingMode = .default,
 
 /// Contains the sequence of widgets that were created between
 /// `.begin()` and `.end()`. All widgets in this list are active in
@@ -84,15 +111,25 @@ retained_widgets: WidgetList = .{},
 /// `WidgetNode.data` contains garbage and must be freshly initialized.
 free_widgets: WidgetList = .{},
 
+/// The theme that is used to render the UI.
+/// Contains all colors and sizes for widgets.
 theme: *const Theme = &Theme.default,
 
+/// The default font the renderer will use to render text in its widgets.
 default_font: *const Renderer.Font,
+
+/// Current location of the mouse cursor or finger
+pointer_position: Point,
 
 pub fn init(allocator: *std.mem.Allocator, default_font: *const Renderer.Font) UserInterface {
     return UserInterface{
         .default_font = default_font,
         .allocator = allocator,
         .arena = std.heap.ArenaAllocator.init(allocator),
+        .pointer_position = Point{
+            .x = std.math.minInt(i16),
+            .y = std.math.minInt(i16),
+        },
     };
 }
 
@@ -197,55 +234,112 @@ fn updateWidgetConfig(dst_config: anytype, src_config: anytype) void {
     }
 }
 
-pub fn button(self: *UserInterface, rectangle: Rectangle, text: []const u8, config: anytype) !bool {
-    const widget = try self.findOrAllocWidget(.button, widgetId(config));
-    widget.bounds = rectangle;
-    switch (widget.control) {
-        // fresh widget
-        .unset => {
-            widget.control = .{
-                .button = .{
-                    .text = try StringBuffer.init(self.allocator, text),
-                    .config = .{},
-                },
-            };
-        },
-        // already exists
-        .button => |*btn| {
-            try btn.text.set(self.allocator, text);
-        },
-        else => unreachable,
-    }
-
-    updateWidgetConfig(&widget.control.button.config, config);
-
-    return false;
+/// Begins construction of the widget tree.
+/// Call `finish()` on the returned builder to complete the construction.
+pub fn construct(self: *UserInterface) UserInterfaceBuilder {
+    std.debug.assert(self.mode == .default);
+    self.mode = .building;
+    return UserInterfaceBuilder{
+        .ui = self,
+    };
 }
 
-pub fn label(self: *UserInterface, rectangle: Rectangle, text: []const u8, config: anytype) !void {
-    const widget = try self.findOrAllocWidget(.label, widgetId(config));
-    widget.bounds = rectangle;
-    switch (widget.control) {
-        // fresh widget
-        .unset => {
-            widget.control = .{
-                .label = .{
-                    .text = try StringBuffer.init(self.allocator, text),
-                },
-            };
-        },
-        // already exists
-        .label => |*lbl| {
-            try lbl.text.set(self.allocator, text);
-        },
-        else => unreachable,
+pub const UserInterfaceBuilder = struct {
+    const Self = @This();
+
+    ui: *UserInterface,
+
+    pub fn finish(self: *Self) void {
+        std.debug.assert(self.ui.mode == .building);
+        self.ui.mode = .default;
+        self.* = undefined;
     }
+
+    pub fn button(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !bool {
+        const widget = try self.ui.findOrAllocWidget(.button, widgetId(config));
+        widget.bounds = rectangle;
+        switch (widget.control) {
+            // fresh widget
+            .unset => {
+                widget.control = .{
+                    .button = .{
+                        .text = try StringBuffer.init(self.allocator, text),
+                        .config = .{},
+                    },
+                };
+            },
+            // already exists
+            .button => |*btn| {
+                try btn.text.set(self.allocator, text);
+            },
+            else => unreachable,
+        }
+
+        updateWidgetConfig(&widget.control.button.config, config);
+
+        return false;
+    }
+
+    pub fn label(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !void {
+        const widget = try self.ui.findOrAllocWidget(.label, widgetId(config));
+        widget.bounds = rectangle;
+        switch (widget.control) {
+            // fresh widget
+            .unset => {
+                widget.control = .{
+                    .label = .{
+                        .text = try StringBuffer.init(self.allocator, text),
+                    },
+                };
+            },
+            // already exists
+            .label => |*lbl| {
+                try lbl.text.set(self.allocator, text);
+            },
+            else => unreachable,
+        }
+
+        updateWidgetConfig(&widget.control.label.config, config);
+    }
+};
+
+pub fn processInput(self: *UserInterface) InputProcessor {
+    std.debug.assert(self.mode == .updating);
+    self.mode = .updating;
+    return InputProcessor{
+        .ui = self,
+    };
 }
+
+pub const InputProcessor = struct {
+    ui: *UserInterface,
+
+    pub fn finish(self: *Self) void {
+        std.debug.assert(self.ui.mode == .updating);
+        self.ui.mode = .default;
+        self.* = undefined;
+    }
+
+    pub fn setPointer(self: Self, position: Point) void {
+        self.ui.pointer_position = position;
+    }
+
+    pub fn pointerDown(self: Self) void {
+        logger.info("not implemented yet: pointerDown", .{});
+    }
+
+    pub fn pointerUp(self: Self) void {
+        logger.info("not implemented yet: pointerUp", .{});
+    }
+
+    pub fn enterText(self: Self, string: []const u8) !void {
+        logger.info("not implemented yet: enterText", .{});
+    }
+};
 
 pub fn render(self: UserInterface, renderer: *Renderer) !void {
-    var iterator = self.active_widgets.first;
-    while (iterator) |node| : (iterator = node.next) {
-        const widget = &node.data;
+    var iterator = self.widgetIterator(.draw_order);
+    while (iterator.next()) |widget| {
         switch (widget.control) {
             // unset is only required for allocating fresh nodes and then initialize them properly in the
             // corresponding widget function
@@ -254,12 +348,13 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
             .button => |control| {
                 try renderer.fillRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_background);
                 try renderer.drawRectangle(widget.bounds.x, widget.bounds.y, widget.bounds.width, widget.bounds.height, self.theme.button_border);
-
+                const font = control.config.font orelse self.default_font;
+                const string_size = renderer.measureString(font, control.text.get());
                 try renderer.drawString(
-                    control.config.font orelse self.default_font,
+                    font,
                     control.text.get(),
-                    widget.bounds.x + 2,
-                    widget.bounds.y + 2,
+                    widget.bounds.x + 2 + (widget.bounds.width - 4 - string_size.width) / 2,
+                    widget.bounds.y + 2 + (widget.bounds.height - 4 - string_size.height) / 2,
                     control.config.text_color orelse self.theme.button_text,
                 );
             },
@@ -267,7 +362,23 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
                 @panic("not implemented yet!");
             },
             .label => |control| {
-                @panic("not implemented yet!");
+                const font = control.config.font orelse self.default_font;
+                const string_size = renderer.measureString(font, control.text.get());
+                try renderer.drawString(
+                    font,
+                    control.text.get(),
+                    widget.bounds.x + switch (control.config.horizontal_alignment) {
+                        .left => 0,
+                        .center => (widget.bounds.width - string_size.width) / 2,
+                        .right => widget.bounds.width - 4 - string_size.width,
+                    },
+                    widget.bounds.y + switch (control.config.vertical_alignment) {
+                        .top => 0,
+                        .center => (widget.bounds.height - string_size.height) / 2,
+                        .bottom => widget.bounds.height - string_size.height,
+                    },
+                    control.config.text_color orelse self.theme.button_text,
+                );
             },
             .check_box => |control| {
                 @panic("not implemented yet!");
@@ -278,6 +389,47 @@ pub fn render(self: UserInterface, renderer: *Renderer) !void {
         }
     }
 }
+
+const WidgetOrder = enum { draw_order, event_order };
+
+fn widgetIterator(self: *UserInterface, order: WidgetOrder) WidgetIterator {
+    return switch (order) {
+        .draw_order => WidgetIterator{
+            .forward = true,
+            .it = self.active_widgets.first,
+        },
+        .event_order => WidgetIterator{
+            .forward = false,
+            .it = self.active_widgets.last,
+        },
+    };
+}
+
+const WidgetIterator = struct {
+    order: WidgetOrder,
+    it: ?*WidgetNode,
+
+    pub fn next(self: *@This()) ?*Widget {
+        while (true) {
+            const result = self.it;
+            if (result) |node| {
+                self.it = switch (self.order) {
+                    .render_order => node.next,
+                    .event_order => node.prev,
+                };
+
+                if (self.order == .event_order) {
+                    // don't iterate over widgets that cannot receive events
+                    if (!node.data.isHitTestVisible())
+                        continue;
+                }
+                return &node.data;
+            } else {
+                return null;
+            }
+        }
+    }
+};
 
 fn getListLength(list: WidgetList) usize {
     var it = list.first;

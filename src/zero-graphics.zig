@@ -24,6 +24,8 @@ pub const Input = @import("Input.zig");
 
 pub const UserInterface = @import("UserInterface.zig");
 
+pub usingnamespace @import("types.zig");
+
 export fn zerog_panic(msg: [*:0]const u8) noreturn {
     @panic(std.mem.span(msg));
 }

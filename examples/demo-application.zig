@@ -122,21 +122,31 @@ pub const Application = struct {
         while (app.input.pollEvent()) |event| {
             switch (event) {
                 .quit => return false,
-                else => logger.info("unhandled event: {}", .{event}),
+                .pointer_motion => |pt| app.ui.setPointer(pt),
+                .pointer_press => |cursor| if (cursor == .primary) app.ui.pointerDown(),
+                .pointer_release => |cursor| if (cursor == .primary) app.ui.pointerUp(),
+                .text_input => |text| try app.ui.enterText(text.text),
             }
         }
 
         {
             app.ui.begin();
-            defer app.ui.end();
 
             var i: u15 = 0;
             while (i < 3) : (i += 1) {
-                const clicked = try app.ui.button(.{ .x = (app.screen_width - 100) / 2, .y = 50 + 50 * i, .width = 100, .height = 40 }, "Click me!", .{ .id = i });
+                const rect = zero_graphics.Rectangle{
+                    .x = 200 + 50 * i,
+                    .y = 50 + 20 * i,
+                    .width = 100,
+                    .height = 40,
+                };
+                const clicked = try app.ui.button(rect, "Click me!", .{ .id = i });
                 if (clicked) {
                     logger.info("Button {} was clicked!", .{i});
                 }
             }
+
+            app.ui.end();
         }
 
         const renderer = &app.renderer;
@@ -206,6 +216,7 @@ pub const Application = struct {
             }
         }
 
+        // OpenGL rendering
         {
             gles.viewport(0, 0, app.screen_width, app.screen_height);
 
