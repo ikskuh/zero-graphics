@@ -220,14 +220,30 @@ pub const Application = struct {
 
                 const CustomWidget = struct {
                     var startup_time: ?i64 = null;
+                    var mouse_in: bool = false;
+                    var mouse_down: bool = false;
 
                     pub fn update(self: zero_graphics.UserInterface.CustomWidget, event: zero_graphics.UserInterface.CustomWidget.Event) ?usize {
                         logger.info("custom widget received event: {}", .{event});
+                        switch (event) {
+                            .pointer_enter => mouse_in = true,
+                            .pointer_leave => mouse_in = false,
+                            .pointer_press => mouse_down = true,
+                            .pointer_release => mouse_down = false,
+                            .pointer_motion => {},
+                        }
                         return null;
                     }
 
                     pub fn draw(self: zero_graphics.UserInterface.CustomWidget, rectangle: zero_graphics.Rectangle, painter: *Renderer) Renderer.DrawError!void {
-                        try painter.fillRectangle(rectangle, .{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x10 });
+                        const Color = zero_graphics.Color;
+                        try painter.fillRectangle(rectangle, if (mouse_in)
+                            if (mouse_down)
+                                Color{ .r = 0xFF, .g = 0x80, .b = 0x80, .a = 0x30 }
+                            else
+                                Color{ .r = 0xFF, .g = 0x80, .b = 0x80, .a = 0x10 }
+                        else
+                            Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x10 });
 
                         startup_time = startup_time orelse std.time.milliTimestamp();
 

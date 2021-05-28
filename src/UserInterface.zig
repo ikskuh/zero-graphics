@@ -154,7 +154,8 @@ const Widget = struct {
     };
     const Custom = struct {
         pub const Event = union(enum) {
-            none,
+            pointer_enter,
+            pointer_leave,
             pointer_press: Point,
             pointer_release: Point,
             pointer_motion: Point,
@@ -220,6 +221,9 @@ pointer_position: Point,
 /// is released. When the pointer is released over the previously pressed widget,
 /// we recognize this as a click.
 pressed_widget: ?*Widget = null,
+
+/// The widget which is currently hovered by the pointer.
+hovered_widget: ?*Widget = null,
 
 renderer: *Renderer,
 
@@ -553,9 +557,20 @@ pub const InputProcessor = struct {
     pub fn setPointer(self: Self, position: Point) void {
         self.ui.pointer_position = position;
 
-        const hovered_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
+        const previous_hovered_widget = self.ui.hovered_widget;
+        self.ui.hovered_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
 
-        if (hovered_widget) |widget| {
+        var hacky_workaround: Widget = undefined; // this is a sentinel pointer
+
+        const prev = previous_hovered_widget orelse &hacky_workaround;
+        const now = self.ui.hovered_widget orelse &hacky_workaround;
+
+        if (previous_hovered_widget != self.ui.hovered_widget) {
+            if (previous_hovered_widget) |w| w.sendEvent(.pointer_leave);
+            if (self.ui.hovered_widget) |w| w.sendEvent(.pointer_enter);
+        }
+
+        if (self.ui.hovered_widget) |widget| {
             widget.sendEvent(.{ .pointer_motion = self.ui.pointer_position });
         }
     }
