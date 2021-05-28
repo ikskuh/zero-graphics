@@ -217,6 +217,56 @@ pub const Application = struct {
                         }
                     }
                 }
+
+                const CustomWidget = struct {
+                    var startup_time: ?i64 = null;
+
+                    pub fn update(self: zero_graphics.UserInterface.CustomWidget, event: zero_graphics.UserInterface.CustomWidget.Event) ?usize {
+                        logger.info("custom widget received event: {}", .{event});
+                        return null;
+                    }
+
+                    pub fn draw(self: zero_graphics.UserInterface.CustomWidget, rectangle: zero_graphics.Rectangle, painter: *Renderer) Renderer.DrawError!void {
+                        try painter.fillRectangle(rectangle, .{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x10 });
+
+                        startup_time = startup_time orelse std.time.milliTimestamp();
+
+                        var t = 0.001 * @intToFloat(f32, std.time.milliTimestamp() - startup_time.?);
+                        var points: [3][2]f32 = undefined;
+
+                        for (points) |*pt, i| {
+                            const offset = @intToFloat(f32, i);
+                            const mirror = std.math.sin((1.0 + 0.2 * offset) * t + offset);
+
+                            pt[0] = mirror * std.math.sin((0.1 * offset) * 0.4 * t + offset);
+                            pt[1] = mirror * std.math.cos((0.1 * offset) * 0.4 * t + offset);
+                        }
+
+                        var real_pt: [3]zero_graphics.Point = undefined;
+                        for (real_pt) |*dst, i| {
+                            const src = points[i];
+                            dst.* = .{
+                                .x = rectangle.x + @floatToInt(i16, (0.5 + 0.5 * src[0]) * @intToFloat(f32, rectangle.width)),
+                                .y = rectangle.y + @floatToInt(i16, (0.5 + 0.5 * src[1]) * @intToFloat(f32, rectangle.height)),
+                            };
+                        }
+                        var prev = real_pt[real_pt.len - 1];
+                        for (real_pt) |pt| {
+                            try painter.drawLine(
+                                pt.x,
+                                pt.y,
+                                prev.x,
+                                prev.y,
+                                zero_graphics.Color{ .r = 0xFF, .g = 0x00, .b = 0x80 },
+                            );
+                            prev = pt;
+                        }
+                    }
+                };
+                _ = try ui.custom(.{ .x = 370, .y = 200, .width = 80, .height = 80 }, null, .{
+                    .draw = CustomWidget.draw,
+                    .process_event = CustomWidget.update,
+                });
             }
 
             ui.finish();

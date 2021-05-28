@@ -7,6 +7,8 @@ const Rectangle = types.Rectangle;
 
 const Renderer = @import("rendering/Renderer2D.zig");
 
+pub const CustomWidget = Widget.Custom;
+
 pub const Theme = struct {
     button_border: types.Color,
     button_background: types.Color,
@@ -92,6 +94,14 @@ const Widget = struct {
         }
     }
 
+    pub fn sendEvent(self: *Widget, event: Custom.Event) void {
+        if (self.control == .custom) {
+            if (self.control.custom.config.process_event) |process_event| {
+                self.control.custom.result = process_event(self.control.custom, event) orelse self.control.custom.result;
+            }
+        }
+    }
+
     const EmptyConfig = struct {};
 
     const Clickable = struct {
@@ -143,11 +153,20 @@ const Widget = struct {
         config: EmptyConfig = .{},
     };
     const Custom = struct {
+        pub const Event = union(enum) {
+            none,
+            pointer_press: Point,
+            pointer_release: Point,
+            pointer_motion: Point,
+        };
         pub const Config = struct {
             hit_test_visible: bool = true,
-            draw: ?fn (Custom, Rectangle, *Renderer) Renderer.DrawError!void,
+            draw: ?fn (Custom, Rectangle, *Renderer) Renderer.DrawError!void = null,
+            process_event: ?fn (Custom, Event) ?usize = null,
         };
         config: Config = .{},
+        user_data: ?*c_void,
+        result: ?usize = null,
     };
 };
 
@@ -484,6 +503,23 @@ pub const Builder = struct {
         }
         updateWidgetConfig(&info.control.config, config);
     }
+
+    pub fn custom(self: Self, rectangle: Rectangle, user_data: ?*c_void, config: anytype) !?usize {
+        const info = try self.initOrUpdateWidget(.custom, rectangle, config);
+
+        if (info.needs_init) {
+            info.control.* = .{
+                .user_data = user_data,
+            };
+        } else {
+            info.control.user_data = user_data;
+        }
+        updateWidgetConfig(&info.control.config, config);
+
+        const result = info.control.result;
+        info.control.result = null;
+        return result;
+    }
 };
 
 pub fn processInput(self: *UserInterface) InputProcessor {
@@ -516,15 +552,31 @@ pub const InputProcessor = struct {
 
     pub fn setPointer(self: Self, position: Point) void {
         self.ui.pointer_position = position;
+
+        const hovered_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
+
+        if (hovered_widget) |widget| {
+            widget.sendEvent(.{ .pointer_motion = self.ui.pointer_position });
+        }
     }
 
     pub fn pointerDown(self: Self) void {
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
+
+        if (clicked_widget) |widget| {
+            widget.sendEvent(.{ .pointer_press = self.ui.pointer_position });
+        }
+
         self.ui.pressed_widget = clicked_widget;
     }
 
     pub fn pointerUp(self: Self) void {
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse return;
+
+        if (self.ui.pressed_widget) |widget| {
+            widget.sendEvent(.{ .pointer_release = self.ui.pointer_position });
+        }
+
         const pressed_widget = self.ui.pressed_widget orelse return;
 
         if (clicked_widget == pressed_widget) {
