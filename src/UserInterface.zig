@@ -32,13 +32,36 @@ const Widget = struct {
 
     const Control = union(enum) {
         unset,
+        image: Image,
         panel: Panel,
         button: Button,
         text_box: TextBox,
         label: Label,
         check_box: CheckBox,
         radio_button: RadioButton,
+        custom: Custom,
     };
+
+    fn deinit(self: *Widget) void {
+        switch (self.control) {
+            .unset => |*ctrl| {},
+            .panel => |*ctrl| {},
+            .button => |*ctrl| {
+                ctrl.text.deinit();
+            },
+            .text_box => |*ctrl| {
+                ctrl.text.deinit();
+            },
+            .label => |*ctrl| {
+                ctrl.text.deinit();
+            },
+            .check_box => |*ctrl| {},
+            .radio_button => |*ctrl| {},
+            .image => |*ctrl| {},
+            .custom => |*ctrl| {},
+        }
+        self.* = undefined;
+    }
 
     pub fn isHitTestVisible(self: Widget) bool {
         return switch (self.control) {
@@ -49,19 +72,21 @@ const Widget = struct {
             .label => false,
             .check_box => true,
             .radio_button => true,
+            .image => true,
+            .custom => |custom| custom.config.hit_test_visible,
         };
     }
 
     pub fn click(self: *Widget, pos: Point) void {
         switch (self.control) {
             .button => |*control| {
-                control.clicked = true;
+                control.clickable.clicked = true;
             },
             .check_box => |*control| {
-                control.clicked = true;
+                control.clickable.clicked = true;
             },
             .radio_button => |*control| {
-                control.clicked = true;
+                control.clickable.clicked = true;
             },
             else => {},
         }
@@ -69,17 +94,28 @@ const Widget = struct {
 
     const EmptyConfig = struct {};
 
+    const Clickable = struct {
+        clicked: bool = false,
+    };
+
     const Button = struct {
         pub const Config = struct {
             text_color: ?types.Color = null,
             font: ?*const Renderer.Font = null,
         };
         text: StringBuffer,
-        config: Config,
-        clicked: bool,
+        config: Config = .{},
+        clickable: Clickable = .{},
     };
     const Panel = struct {
         config: EmptyConfig = .{},
+    };
+    const Image = struct {
+        pub const Config = struct {
+            tint: ?types.Color = null,
+        };
+        image: *const Renderer.Texture,
+        config: Config = .{},
     };
     const TextBox = struct {
         text: StringBuffer,
@@ -94,21 +130,28 @@ const Widget = struct {
         };
 
         text: StringBuffer,
-        config: Config,
+        config: Config = .{},
     };
     const CheckBox = struct {
         is_checked: bool,
-        clicked: bool,
+        clickable: Clickable = .{},
         config: EmptyConfig = .{},
     };
     const RadioButton = struct {
         is_checked: bool,
-        clicked: bool,
+        clickable: Clickable = .{},
         config: EmptyConfig = .{},
+    };
+    const Custom = struct {
+        pub const Config = struct {
+            hit_test_visible: bool = true,
+            draw: ?fn (Custom, Rectangle, *Renderer) Renderer.DrawError!void,
+        };
+        config: Config = .{},
     };
 };
 
-const WidgetType = std.meta.TagType(Widget.Control);
+const ControlType = std.meta.TagType(Widget.Control);
 
 const WidgetList = std.TailQueue(Widget);
 const WidgetNode = std.TailQueue(Widget).Node;
@@ -200,6 +243,13 @@ pub fn init(allocator: *std.mem.Allocator, renderer: *Renderer) !UserInterface {
 }
 
 pub fn deinit(self: *UserInterface) void {
+    while (self.active_widgets.popFirst()) |node| {
+        node.data.deinit();
+    }
+    while (self.free_widgets.popFirst()) |node| {
+        node.data.deinit();
+    }
+
     self.renderer.destroyTexture(self.icons.checkbox_checked);
     self.renderer.destroyTexture(self.icons.checkbox_unchecked);
     self.renderer.destroyTexture(self.icons.radiobutton_checked);
@@ -232,7 +282,7 @@ fn freeWidgetNode(self: *UserInterface, node: *WidgetNode) void {
 
 /// Fetches a fitting widget from the `retained_widgets` list or creates a new node.
 /// On success, the widget is appended to the `active_widgets` list.
-fn findOrAllocWidget(self: *UserInterface, widget_type: WidgetType, id: WidgetID) !*Widget {
+fn findOrAllocWidget(self: *UserInterface, widget_type: ControlType, id: WidgetID) !*Widget {
     var it = self.retained_widgets.first;
     while (it) |node| : (it = node.next) {
         if (node.data.id == id) {
@@ -317,143 +367,122 @@ pub const Builder = struct {
         self.ui.mode = .default;
 
         while (self.ui.retained_widgets.popFirst()) |node| {
-            // TODO: Destroy widget data here!
+            node.data.deinit();
             self.ui.freeWidgetNode(node);
         }
 
         self.* = undefined;
     }
 
-    pub fn panel(self: Self, rectangle: Rectangle, config: anytype) !void {
-        const widget = try self.ui.findOrAllocWidget(.panel, widgetId(config));
-        widget.bounds = rectangle;
-        const control = switch (widget.control) {
-            // fresh widget
-            .unset => blk: {
-                widget.control = .{
-                    .panel = .{ .config = .{} },
-                };
-                break :blk &widget.control.panel;
-            },
-            // already exists
-            .panel => |*btn| btn,
-            else => unreachable,
-        };
+    fn InitOrUpdateWidget(comptime widget: ControlType) type {
+        return struct {
+            pub const Control = blk: {
+                inline for (std.meta.fields(Widget.Control)) |fld| {
+                    if (std.mem.eql(u8, fld.name, @tagName(widget)))
+                        break :blk fld.field_type;
+                }
+                @compileError("Unknown widget type:");
+            };
 
-        updateWidgetConfig(&control.config, config);
+            widget: *Widget,
+            control: *Control,
+            needs_init: bool,
+        };
     }
 
-    pub fn button(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !bool {
-        const widget = try self.ui.findOrAllocWidget(.button, widgetId(config));
+    fn initOrUpdateWidget(self: Self, comptime control_type: ControlType, rectangle: Rectangle, config: anytype) !InitOrUpdateWidget(control_type) {
+        const widget = try self.ui.findOrAllocWidget(control_type, widgetId(config));
         widget.bounds = rectangle;
+
+        const needs_init = (widget.control == .unset);
         const control = switch (widget.control) {
             // fresh widget
             .unset => blk: {
-                widget.control = .{
-                    .button = .{
-                        .text = try StringBuffer.init(self.ui.allocator, text),
-                        .config = .{},
-                        .clicked = false,
-                    },
-                };
-                break :blk &widget.control.button;
+                widget.control = @unionInit(Widget.Control, @tagName(control_type), undefined);
+                break :blk &@field(widget.control, @tagName(control_type));
             },
-            // already exists
-            .button => |*btn| blk: {
-                try btn.text.set(self.ui.allocator, text);
-                break :blk btn;
-            },
+            control_type => |*ctrl| ctrl,
             else => unreachable,
         };
 
-        updateWidgetConfig(&control.config, config);
+        return InitOrUpdateWidget(control_type){
+            .widget = widget,
+            .control = control,
+            .needs_init = needs_init,
+        };
+    }
 
-        const clicked = control.clicked;
-        control.clicked = false;
+    fn processClickable(clickable: *Widget.Clickable) bool {
+        const clicked = clickable.clicked;
+        clickable.clicked = false;
         return clicked;
+    }
+
+    pub fn panel(self: Self, rectangle: Rectangle, config: anytype) !void {
+        const info = try self.initOrUpdateWidget(.panel, rectangle, config);
+        if (info.needs_init) {
+            info.control.* = .{};
+        }
+        updateWidgetConfig(&info.control.config, config);
+    }
+
+    /// Creates a button at the provided position that will display `text` as 
+    pub fn button(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !bool {
+        const info = try self.initOrUpdateWidget(.button, rectangle, config);
+        if (info.needs_init) {
+            info.control.* = .{
+                .text = try StringBuffer.init(self.ui.allocator, text),
+            };
+        } else {
+            try info.control.text.set(self.ui.allocator, text);
+        }
+
+        updateWidgetConfig(&info.control.config, config);
+
+        return processClickable(&info.control.clickable);
     }
 
     pub fn checkBox(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) !bool {
-        const widget = try self.ui.findOrAllocWidget(.check_box, widgetId(config));
-        widget.bounds = rectangle;
-        const control = switch (widget.control) {
-            // fresh widget
-            .unset => blk: {
-                widget.control = .{
-                    .check_box = .{
-                        .config = .{},
-                        .is_checked = is_checked,
-                        .clicked = false,
-                    },
-                };
-                break :blk &widget.control.check_box;
-            },
-            // already exists
-            .check_box => |*btn| blk: {
-                btn.is_checked = is_checked;
-                break :blk btn;
-            },
-            else => unreachable,
-        };
+        const info = try self.initOrUpdateWidget(.check_box, rectangle, config);
+        if (info.needs_init) {
+            info.control.* = .{
+                .is_checked = is_checked,
+            };
+        } else {
+            info.control.is_checked = is_checked;
+        }
 
-        updateWidgetConfig(&control.config, config);
+        updateWidgetConfig(&info.control.config, config);
 
-        const clicked = control.clicked;
-        control.clicked = false;
-        return clicked;
+        return processClickable(&info.control.clickable);
     }
 
     pub fn radioButton(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) !bool {
-        const widget = try self.ui.findOrAllocWidget(.radio_button, widgetId(config));
-        widget.bounds = rectangle;
-        const control = switch (widget.control) {
-            // fresh widget
-            .unset => blk: {
-                widget.control = .{
-                    .radio_button = .{
-                        .config = .{},
-                        .is_checked = is_checked,
-                        .clicked = false,
-                    },
-                };
-                break :blk &widget.control.radio_button;
-            },
-            // already exists
-            .radio_button => |*btn| blk: {
-                btn.is_checked = is_checked;
-                break :blk btn;
-            },
-            else => unreachable,
-        };
+        const info = try self.initOrUpdateWidget(.radio_button, rectangle, config);
+        if (info.needs_init) {
+            info.control.* = .{
+                .is_checked = is_checked,
+            };
+        } else {
+            info.control.is_checked = is_checked;
+        }
 
-        updateWidgetConfig(&control.config, config);
+        updateWidgetConfig(&info.control.config, config);
 
-        const clicked = control.clicked;
-        control.clicked = false;
-        return clicked;
+        return processClickable(&info.control.clickable);
     }
 
     pub fn label(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !void {
-        const widget = try self.ui.findOrAllocWidget(.label, widgetId(config));
-        widget.bounds = rectangle;
-        switch (widget.control) {
-            // fresh widget
-            .unset => {
-                widget.control = .{
-                    .label = .{
-                        .text = try StringBuffer.init(self.ui.allocator, text),
-                        .config = .{},
-                    },
-                };
-            },
-            // already exists
-            .label => |*lbl| {
-                try lbl.text.set(self.ui.allocator, text);
-            },
-            else => unreachable,
-        }
+        const info = try self.initOrUpdateWidget(.label, rectangle, config);
 
-        updateWidgetConfig(&widget.control.label.config, config);
+        if (info.needs_init) {
+            info.control.* = .{
+                .text = try StringBuffer.init(self.ui.allocator, text),
+            };
+        } else {
+            try info.control.text.set(self.ui.allocator, text);
+        }
+        updateWidgetConfig(&info.control.config, config);
     }
 };
 
@@ -577,6 +606,18 @@ pub fn render(self: UserInterface) !void {
                         self.icons.radiobutton_unchecked,
                     types.Color.white,
                 );
+            },
+            .image => |control| {
+                try renderer.fillTexturedRectangle(
+                    widget.bounds,
+                    control.image,
+                    control.config.tint orelse types.Color.white,
+                );
+            },
+            .custom => |control| {
+                if (control.config.draw) |draw| {
+                    try draw(control, widget.bounds, renderer);
+                }
             },
         }
     }

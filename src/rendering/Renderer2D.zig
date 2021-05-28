@@ -20,38 +20,11 @@ const TextureItem = std.TailQueue(Texture).Node;
 const FontList = std.TailQueue(Font);
 const FontItem = std.TailQueue(Font).Node;
 
-const CollectError = error{OutOfMemory};
-const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
-const LoadTextureError = CreateTextureError || error{InvalidImageData};
-const CreateFontError = error{ OutOfMemory, InvalidFontFile };
-const InitError = error{ OutOfMemory, GraphicsApiFailure };
-
-const vertexSource =
-    \\attribute vec2 vPosition;
-    \\attribute vec4 vColor;
-    \\attribute vec2 vUV;
-    \\uniform ivec2 uScreenSize;
-    \\varying vec4 fColor;
-    \\varying vec2 fUV;
-    \\void main()
-    \\{
-    \\   vec2 virtual_position = (vPosition + 0.5) / vec2(uScreenSize);
-    \\   gl_Position = vec4(2.0 * virtual_position.x - 1.0, 1.0 - 2.0 * virtual_position.y, 0.0, 1.0);
-    \\   fColor = vColor;
-    \\   fUV = vUV;
-    \\}
-;
-const fragmentSource =
-    \\precision mediump float;
-    \\varying vec4 fColor;
-    \\varying vec2 fUV;
-    \\uniform sampler2D uTexture;
-    \\void main()
-    \\{
-    \\   vec4 base_color = texture2D(uTexture, fUV);
-    \\   gl_FragColor = fColor * base_color;
-    \\}
-;
+pub const DrawError = error{OutOfMemory};
+pub const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
+pub const LoadTextureError = CreateTextureError || error{InvalidImageData};
+pub const CreateFontError = error{ OutOfMemory, InvalidFontFile };
+pub const InitError = error{ OutOfMemory, GraphicsApiFailure };
 
 shader_program: gles.GLuint,
 screen_size_location: gles.GLint,
@@ -515,7 +488,7 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle
 /// The final size of the string can be computed with `measureString()`.
 /// This is a low-level function that does not do any kind of pre-computation. It will just render what it
 /// was given. If a more advanced rendering is required, use `drawText()` instead!
-pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) !void {
+pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) DrawError!void {
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
         try self.fillTexturedRectangle(
@@ -629,7 +602,7 @@ pub fn render(self: Self, width: u15, height: u15) void {
 }
 
 /// Appends a set of triangles to the renderer with the given `texture`. 
-pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const [3]Vertex) !void {
+pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const [3]Vertex) DrawError!void {
     const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1].texture != texture) blk: {
         const dc = try self.draw_calls.addOne();
         dc.* = DrawCall{
@@ -654,7 +627,7 @@ pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const
 }
 
 /// Appends a filled, untextured quad.
-pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) CollectError!void {
+pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!void {
     const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1);
     const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1);
     const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color).offset(-1, 1);
@@ -667,7 +640,7 @@ pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) CollectErr
 }
 
 /// Copies the given texture to the screen
-pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const Texture, tint: ?Color) CollectError!void {
+pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const Texture, tint: ?Color) DrawError!void {
     const color = tint orelse Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0xFF };
     const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1).withUV(0, 0);
     const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1).withUV(1, 0);
@@ -681,7 +654,7 @@ pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const 
 }
 
 /// Appends a rectangle with a 1 pixel wide outline
-pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) CollectError!void {
+pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!void {
     const tl = Vertex.init(rectangle.x, rectangle.y, color);
     const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color);
     const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color);
@@ -704,7 +677,7 @@ pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) CollectErr
 }
 
 /// Draws a single pixel wide line from (`x0`,`y0`) to (`x1`,`y1`)
-pub fn drawLine(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Color) CollectError!void {
+pub fn drawLine(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Color) DrawError!void {
     const p0 = Vertex.init(x0, y0, color);
     const p1 = Vertex.init(x1, y1, color);
 
@@ -904,3 +877,30 @@ export fn zerog_renderer2d_free(user_data: ?*c_void, ptr: ?*c_void) void {
 
     allocator.free(actual_buffer[0..len]);
 }
+
+const vertexSource =
+    \\attribute vec2 vPosition;
+    \\attribute vec4 vColor;
+    \\attribute vec2 vUV;
+    \\uniform ivec2 uScreenSize;
+    \\varying vec4 fColor;
+    \\varying vec2 fUV;
+    \\void main()
+    \\{
+    \\   vec2 virtual_position = (vPosition + 0.5) / vec2(uScreenSize);
+    \\   gl_Position = vec4(2.0 * virtual_position.x - 1.0, 1.0 - 2.0 * virtual_position.y, 0.0, 1.0);
+    \\   fColor = vColor;
+    \\   fUV = vUV;
+    \\}
+;
+const fragmentSource =
+    \\precision mediump float;
+    \\varying vec4 fColor;
+    \\varying vec2 fUV;
+    \\uniform sampler2D uTexture;
+    \\void main()
+    \\{
+    \\   vec4 base_color = texture2D(uTexture, fUV);
+    \\   gl_FragColor = fColor * base_color;
+    \\}
+;
