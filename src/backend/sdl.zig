@@ -37,15 +37,22 @@ pub fn main() !void {
     const gl_context = c.SDL_GL_CreateContext(window) orelse sdlPanic();
     defer c.SDL_GL_DeleteContext(gl_context);
 
-    {
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        c.SDL_GL_GetDrawableSize(window, &width, &height);
-        log.info("Render resolution:  {}×{}", .{ width, height });
+    const dpi_scale: f32 = blk: {
+        var drawbable_width: c_int = undefined;
+        var drawbable_height: c_int = undefined;
+        c.SDL_GL_GetDrawableSize(window, &drawbable_width, &drawbable_height);
+        log.info("Render resolution:  {}×{}", .{ drawbable_width, drawbable_height });
 
-        c.SDL_GetWindowSize(window, &width, &height);
-        log.info("Virtual resolution: {}×{}", .{ width, height });
-    }
+        var virtual_width: c_int = undefined;
+        var virtual_height: c_int = undefined;
+        c.SDL_GetWindowSize(window, &virtual_width, &virtual_height);
+        log.info("Virtual resolution: {}×{}", .{ virtual_width, virtual_height });
+
+        const scale_x = @intToFloat(f32, drawbable_width) / @intToFloat(f32, virtual_width);
+        const scale_y = @intToFloat(f32, drawbable_height) / @intToFloat(f32, virtual_height);
+        std.debug.assert(std.math.approxEqAbs(f32, scale_x, scale_y, 1e-3)); // assert uniform
+        break :blk scale_x;
+    };
 
     var input_queue = zerog.Input.init(std.heap.c_allocator);
     defer input_queue.deinit();
@@ -63,8 +70,8 @@ pub fn main() !void {
                 },
                 c.SDL_MOUSEMOTION => {
                     try input_queue.pushEvent(.{ .pointer_motion = .{
-                        .x = @intCast(i16, event.motion.x),
-                        .y = @intCast(i16, event.motion.y),
+                        .x = @floatToInt(i16, dpi_scale * @intToFloat(f32, event.motion.x)),
+                        .y = @floatToInt(i16, dpi_scale * @intToFloat(f32, event.motion.y)),
                     } });
                 },
                 c.SDL_MOUSEBUTTONDOWN => {
@@ -101,8 +108,9 @@ pub fn main() !void {
                         c.SDL_GL_GetDrawableSize(window, &width, &height);
 
                         try app.resize(@intCast(u15, width), @intCast(u15, height));
+                    } else {
+                        log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                     }
-                    log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                 },
                 else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, @intCast(c_int, event.type))}),
             }
