@@ -92,4 +92,7 @@ pub const Color = extern struct {
     pub const transparent = .{ .r = 0, .g = 0, .b = 0, .a = 0 };
     pub const black = Color{ .r = 0x00, .g = 0x00, .b = 0x00 };
     pub const white = Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF };
+    pub const red = Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
+    pub const lime = Color{ .r = 0x00, .g = 0xFF, .b = 0x00 };
+    pub const blue = Color{ .r = 0x00, .g = 0x00, .b = 0xFF };
 };
