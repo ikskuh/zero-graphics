@@ -112,6 +112,7 @@ pub fn main() !void {
                         log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                     }
                 },
+                
                 else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, @intCast(c_int, event.type))}),
             }
         }
