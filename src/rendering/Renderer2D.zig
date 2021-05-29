@@ -575,12 +575,12 @@ pub fn reset(self: *Self) void {
 }
 
 /// Renders the currently contained data to the screen.
-pub fn render(self: Self, width: u15, height: u15) void {
+pub fn render(self: Self, screen_size: Size) void {
     gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer);
     gles.bufferData(gles.ARRAY_BUFFER, @intCast(gles.GLsizeiptr, @sizeOf(Vertex) * self.vertices.items.len), self.vertices.items.ptr, gles.STATIC_DRAW);
 
     gles.useProgram(self.shader_program);
-    gles.uniform2i(self.screen_size_location, width, height);
+    gles.uniform2i(self.screen_size_location, screen_size.width, screen_size.height);
     gles.uniform1i(self.texture_location, 0);
 
     gles.enable(gles.BLEND);
@@ -637,6 +637,10 @@ pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!
         .{ tl, br, tr },
         .{ br, tl, bl },
     });
+}
+
+pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
+    try self.fillRectangle(Rectangle{ .x = x, .y = y, .width = 1, .height = 1 }, color);
 }
 
 /// Copies the given texture to the screen
