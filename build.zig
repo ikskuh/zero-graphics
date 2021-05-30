@@ -96,7 +96,7 @@ pub fn build(b: *std.build.Builder) !void {
                 .x86_64 = true,
                 // 32 bit targets are currently broken
                 .arm = false, // see https://github.com/ziglang/zig/issues/8885
-                .x86 = false, // not issued yet
+                .x86 = false, // see https://github.com/ziglang/zig/issues/7935
             },
             key_store,
         );

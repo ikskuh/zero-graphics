@@ -379,7 +379,7 @@ pub const Application = struct {
             gles.frontFace(gles.CCW);
             gles.cullFace(gles.BACK);
 
-            renderer.render(app.screen_width, app.screen_height);
+            renderer.render(zero_graphics.Size{ .width = app.screen_width, .height = app.screen_height });
         }
 
         if (std.builtin.os.tag != .freestanding) {
