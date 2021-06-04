@@ -3,21 +3,104 @@ const types = @import("types.zig");
 const logger = std.log.scoped(.user_interface);
 
 const Point = types.Point;
+const Size = types.Size;
 const Rectangle = types.Rectangle;
+const Color = types.Color;
 
 const Renderer = @import("rendering/Renderer2D.zig");
 
 pub const CustomWidget = Widget.Custom;
 
+pub const ButtonStyle = struct {
+    border: Color,
+    background: Color,
+    text_color: Color,
+};
+
+pub const BoxStyle = struct {
+    border: Color,
+    background: Color,
+};
+
+pub const LabelStyle = struct {
+    text_color: Color,
+};
+
+pub const ModalLayerStyle = struct {
+    fill_color: Color,
+};
+
+pub const ButtonTheme = struct {
+    icon_size: u15,
+    default: ButtonStyle,
+    clicked: ButtonStyle,
+    hovered: ButtonStyle,
+    disabled: ButtonStyle,
+};
+
 pub const Theme = struct {
-    button_border: types.Color,
-    button_background: types.Color,
-    button_text: types.Color,
+    fn rgb(comptime str: *const [6]u8) Color {
+        return Color{
+            .r = std.fmt.parseInt(u8, str[0..2], 16) catch unreachable,
+            .g = std.fmt.parseInt(u8, str[2..4], 16) catch unreachable,
+            .b = std.fmt.parseInt(u8, str[4..6], 16) catch unreachable,
+        };
+    }
+
+    fn rgba(comptime str: *const [6]u8, alpha: f32) Color {
+        var color = rgb(str);
+        color.a = @floatToInt(u8, 255.0 * alpha);
+        return color;
+    }
+
+    button: ButtonTheme,
+    panel: BoxStyle,
+    text_box: BoxStyle,
+    label: LabelStyle,
+    modal_layer: ModalLayerStyle,
 
     pub const default = Theme{
-        .button_border = .{ .r = 0xCC, .g = 0xCC, .b = 0xCC },
-        .button_background = .{ .r = 0x30, .g = 0x30, .b = 0x30 },
-        .button_text = .{ .r = 0xFF, .g = 0xFF, .b = 0xFF },
+        .button = ButtonTheme{
+            .icon_size = 24,
+            .default = ButtonStyle{
+                .border = rgb("cccccc"),
+                .background = rgb("303030"),
+                .text_color = Color.white,
+            },
+            .hovered = ButtonStyle{
+                .border = rgb("ffffff"),
+                .background = rgb("404040"),
+                .text_color = Color.white,
+            },
+            .clicked = ButtonStyle{
+                .border = rgb("ffffff"),
+                .background = rgb("202020"),
+                .text_color = Color.white,
+            },
+            .disabled = ButtonStyle{
+                .border = rgb("888888"),
+                .background = rgb("303030"),
+                .text_color = rgb("cccccc"),
+            },
+        },
+
+        .panel = BoxStyle{
+            .border = rgb("cccccc"),
+            .background = rgb("303030"),
+        },
+
+        .text_box = BoxStyle{
+            .border = rgb("cccccc"),
+            .background = rgb("303030"),
+        },
+
+        .label = LabelStyle{
+            .text_color = rgb("ffffff"),
+        },
+
+        .modal_layer = ModalLayerStyle{
+            .fill_color = rgba("808080", 0.25),
+        },
     };
 };
 
@@ -34,6 +117,7 @@ const Widget = struct {
 
     const Control = union(enum) {
         unset,
+        modal_layer: ModalLayer,
         image: Image,
         panel: Panel,
         button: Button,
@@ -61,6 +145,7 @@ const Widget = struct {
             .radio_button => |*ctrl| {},
             .image => |*ctrl| {},
             .custom => |*ctrl| {},
+            .modal_layer => {},
         }
         self.* = undefined;
     }
@@ -75,6 +160,7 @@ const Widget = struct {
             .check_box => true,
             .radio_button => true,
             .image => true,
+            .modal_layer => true,
             .custom => |custom| custom.config.hit_test_visible,
         };
     }
@@ -82,12 +168,21 @@ const Widget = struct {
     pub fn click(self: *Widget, pos: Point) void {
         switch (self.control) {
             .button => |*control| {
-                control.clickable.clicked = true;
+                if (control.config.enabled) {
+                    control.clickable.clicked = true;
+                }
             },
             .check_box => |*control| {
-                control.clickable.clicked = true;
+                if (control.config.enabled) {
+                    control.clickable.clicked = true;
+                }
             },
             .radio_button => |*control| {
+                if (control.config.enabled) {
+                    control.clickable.clicked = true;
+                }
+            },
+            .modal_layer => |*control| {
                 control.clickable.clicked = true;
             },
             else => {},
@@ -110,15 +205,40 @@ const Widget = struct {
 
     const Button = struct {
         pub const Config = struct {
+            const IconPosition = enum {
+                above_text,
+                below_text,
+                left,
+                right,
+            };
+
             text_color: ?types.Color = null,
             font: ?*const Renderer.Font = null,
+            icon_location: IconPosition = .left,
+            enabled: bool = true,
+            style: ?ButtonTheme = null,
         };
         text: StringBuffer,
+        icon: ?*const Renderer.Texture,
         config: Config = .{},
         clickable: Clickable = .{},
     };
+
+    const ModalLayer = struct {
+        const Config = struct {
+            style: ?ModalLayerStyle = null,
+        };
+
+        config: Config = .{},
+        clickable: Clickable = .{},
+    };
+
     const Panel = struct {
-        config: EmptyConfig = .{},
+        const Config = struct {
+            style: ?BoxStyle = null,
+        };
+
+        config: Config = .{},
     };
     const Image = struct {
         pub const Config = struct {
@@ -128,11 +248,16 @@ const Widget = struct {
         config: Config = .{},
     };
     const TextBox = struct {
+        const Config = struct {
+            style: ?BoxStyle = null,
+        };
+
         text: StringBuffer,
-        config: EmptyConfig = .{},
+        config: Config = .{},
     };
     const Label = struct {
         pub const Config = struct {
+            style: ?LabelStyle = null,
             text_color: ?types.Color = null,
             font: ?*const Renderer.Font = null,
             vertical_alignment: types.VerticalAlignment = .center,
@@ -143,14 +268,20 @@ const Widget = struct {
         config: Config = .{},
     };
     const CheckBox = struct {
+        const Config = struct {
+            enabled: bool = true,
+        };
         is_checked: bool,
         clickable: Clickable = .{},
-        config: EmptyConfig = .{},
+        config: Config = .{},
     };
     const RadioButton = struct {
+        const Config = struct {
+            enabled: bool = true,
+        };
         is_checked: bool,
         clickable: Clickable = .{},
-        config: EmptyConfig = .{},
+        config: Config = .{},
     };
     const Custom = struct {
         pub const Event = union(enum) {
@@ -164,8 +295,11 @@ const Widget = struct {
             hit_test_visible: bool = true,
             draw: ?fn (Custom, Rectangle, *Renderer) Renderer.DrawError!void = null,
             process_event: ?fn (Custom, Event) ?usize = null,
+            /// generic second user data to provide context information for the user data
+            context: ?*c_void = null,
         };
         config: Config = .{},
+        /// User data passed to the builder.custom call.
         user_data: ?*c_void,
         result: ?usize = null,
     };
@@ -270,7 +404,7 @@ pub fn deinit(self: *UserInterface) void {
         node.data.deinit();
     }
     while (self.free_widgets.popFirst()) |node| {
-        node.data.deinit();
+        // node.data.deinit();
     }
 
     self.renderer.destroyTexture(self.icons.checkbox_checked);
@@ -362,7 +496,7 @@ fn updateWidgetConfig(dst_config: anytype, src_config: anytype) void {
 /// Starts a UI pass and collects widgets. The return value can be used to create new widgets.
 /// Call `finish()` on the returned builder to complete the construction.
 /// Widgets are then created with calls to `.button`, `.textBox`, ... until `.finish()` is called.
-pub fn construct(self: *UserInterface) Builder {
+pub fn construct(self: *UserInterface, screen_size: Size) Builder {
     std.debug.assert(self.mode == .default);
     self.mode = .building;
 
@@ -374,13 +508,19 @@ pub fn construct(self: *UserInterface) Builder {
 
     return Builder{
         .ui = self,
+        .screen_size = screen_size,
     };
 }
 
 pub const Builder = struct {
     const Self = @This();
 
+    pub const Error = error{
+        OutOfMemory,
+    };
+
     ui: *UserInterface,
+    screen_size: Size,
 
     /// Ends the UI construction pass and stops collecting widgets.
     /// Will destroy all remaining widgets in `retained_widgets`
@@ -441,7 +581,7 @@ pub const Builder = struct {
         return clicked;
     }
 
-    pub fn panel(self: Self, rectangle: Rectangle, config: anytype) !void {
+    pub fn panel(self: Self, rectangle: Rectangle, config: anytype) Error!void {
         const info = try self.initOrUpdateWidget(.panel, rectangle, config);
         if (info.needs_init) {
             info.control.* = .{};
@@ -449,15 +589,10 @@ pub const Builder = struct {
         updateWidgetConfig(&info.control.config, config);
     }
 
-    /// Creates a button at the provided position that will display `text` as 
-    pub fn button(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !bool {
-        const info = try self.initOrUpdateWidget(.button, rectangle, config);
+    pub fn modalLayer(self: Self, config: anytype) Error!bool {
+        const info = try self.initOrUpdateWidget(.modal_layer, Rectangle.init(Point.zero, self.screen_size), config);
         if (info.needs_init) {
-            info.control.* = .{
-                .text = try StringBuffer.init(self.ui.allocator, text),
-            };
-        } else {
-            try info.control.text.set(self.ui.allocator, text);
+            info.control.* = .{};
         }
 
         updateWidgetConfig(&info.control.config, config);
@@ -465,7 +600,25 @@ pub const Builder = struct {
         return processClickable(&info.control.clickable);
     }
 
-    pub fn checkBox(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) !bool {
+    /// Creates a button at the provided position that will display `text` as 
+    pub fn button(self: Self, rectangle: Rectangle, text: ?[]const u8, icon: ?*const Renderer.Texture, config: anytype) Error!bool {
+        const info = try self.initOrUpdateWidget(.button, rectangle, config);
+        if (info.needs_init) {
+            info.control.* = .{
+                .text = try StringBuffer.init(self.ui.allocator, text orelse ""),
+                .icon = icon,
+            };
+        } else {
+            try info.control.text.set(self.ui.allocator, text orelse "");
+            info.control.icon = icon;
+        }
+
+        updateWidgetConfig(&info.control.config, config);
+
+        return processClickable(&info.control.clickable);
+    }
+
+    pub fn checkBox(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) Error!bool {
         const info = try self.initOrUpdateWidget(.check_box, rectangle, config);
         if (info.needs_init) {
             info.control.* = .{
@@ -480,7 +633,7 @@ pub const Builder = struct {
         return processClickable(&info.control.clickable);
     }
 
-    pub fn radioButton(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) !bool {
+    pub fn radioButton(self: Self, rectangle: Rectangle, is_checked: bool, config: anytype) Error!bool {
         const info = try self.initOrUpdateWidget(.radio_button, rectangle, config);
         if (info.needs_init) {
             info.control.* = .{
@@ -495,7 +648,7 @@ pub const Builder = struct {
         return processClickable(&info.control.clickable);
     }
 
-    pub fn label(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) !void {
+    pub fn label(self: Self, rectangle: Rectangle, text: []const u8, config: anytype) Error!void {
         const info = try self.initOrUpdateWidget(.label, rectangle, config);
 
         if (info.needs_init) {
@@ -508,7 +661,7 @@ pub const Builder = struct {
         updateWidgetConfig(&info.control.config, config);
     }
 
-    pub fn custom(self: Self, rectangle: Rectangle, user_data: ?*c_void, config: anytype) !?usize {
+    pub fn custom(self: Self, rectangle: Rectangle, user_data: ?*c_void, config: anytype) Error!?usize {
         const info = try self.initOrUpdateWidget(.custom, rectangle, config);
 
         if (info.needs_init) {
@@ -586,6 +739,8 @@ pub const InputProcessor = struct {
     }
 
     pub fn pointerUp(self: Self) void {
+        defer self.ui.pressed_widget = null;
+
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse return;
 
         if (self.ui.pressed_widget) |widget| {
@@ -608,34 +763,68 @@ pub fn render(self: UserInterface) !void {
     const renderer = self.renderer;
     var iterator = self.widgetIterator(.draw_order);
     while (iterator.next()) |widget| {
+        const is_hovered = (self.hovered_widget == widget);
+        const is_pressed = is_hovered and (self.pressed_widget == widget);
+
         switch (widget.control) {
             // unset is only required for allocating fresh nodes and then initialize them properly in the
             // corresponding widget function
             .unset => unreachable,
 
+            .modal_layer => |control| {
+                const style = control.config.style orelse self.theme.modal_layer;
+                try renderer.fillRectangle(widget.bounds, style.fill_color);
+            },
+
             .button => |control| {
-                try renderer.fillRectangle(widget.bounds, self.theme.button_background);
-                try renderer.drawRectangle(widget.bounds, self.theme.button_border);
-                const font = control.config.font orelse self.default_font;
-                const string_size = renderer.measureString(font, control.text.get());
-                try renderer.drawString(
-                    font,
-                    control.text.get(),
-                    widget.bounds.x + 2 + (widget.bounds.width - 4 - string_size.width) / 2,
-                    widget.bounds.y + 2 + (widget.bounds.height - 4 - string_size.height) / 2,
-                    control.config.text_color orelse self.theme.button_text,
-                );
+                const style = control.config.style orelse self.theme.button;
+
+                const style_info = if (!control.config.enabled)
+                    style.disabled
+                else if (is_pressed)
+                    style.clicked
+                else if (is_hovered)
+                    style.hovered
+                else
+                    style.default;
+
+                try renderer.fillRectangle(widget.bounds, style_info.background);
+                try renderer.drawRectangle(widget.bounds, style_info.border);
+
+                if (control.icon) |icon| {
+                    try renderer.fillTexturedRectangle(
+                        widget.bounds.centered(style.icon_size, style.icon_size),
+                        icon,
+                        Color.white,
+                    );
+                }
+
+                const text = control.text.get();
+                if (text.len > 0) {
+                    const font = control.config.font orelse self.default_font;
+                    const string_size = renderer.measureString(font, control.text.get());
+                    try renderer.drawString(
+                        font,
+                        control.text.get(),
+                        widget.bounds.x + @divTrunc((@as(i16, widget.bounds.width) - string_size.width), 2),
+                        widget.bounds.y + @divTrunc((@as(i16, widget.bounds.height) - string_size.height), 2),
+                        control.config.text_color orelse style_info.text_color,
+                    );
+                }
             },
 
             .panel => |control| {
-                try renderer.fillRectangle(widget.bounds, self.theme.button_background);
-                try renderer.drawRectangle(widget.bounds, self.theme.button_border);
+                const style = control.config.style orelse self.theme.panel;
+                try renderer.fillRectangle(widget.bounds, style.background);
+                try renderer.drawRectangle(widget.bounds, style.border);
             },
 
             .text_box => |control| {
                 @panic("not implemented yet!");
             },
             .label => |control| {
+                const style = control.config.style orelse self.theme.label;
+
                 const font = control.config.font orelse self.default_font;
                 const string_size = renderer.measureString(font, control.text.get());
                 try renderer.drawString(
@@ -651,7 +840,7 @@ pub fn render(self: UserInterface) !void {
                         .center => (widget.bounds.height - string_size.height) / 2,
                         .bottom => widget.bounds.height - string_size.height,
                     },
-                    control.config.text_color orelse self.theme.button_text,
+                    control.config.text_color orelse style.text_color,
                 );
             },
             .check_box => |control| {
@@ -661,7 +850,7 @@ pub fn render(self: UserInterface) !void {
                         self.icons.checkbox_checked
                     else
                         self.icons.checkbox_unchecked,
-                    types.Color.white,
+                    if (control.config.enabled) Color.white else Color.gray(0x80),
                 );
             },
             .radio_button => |control| {
@@ -671,7 +860,7 @@ pub fn render(self: UserInterface) !void {
                         self.icons.radiobutton_checked
                     else
                         self.icons.radiobutton_unchecked,
-                    types.Color.white,
+                    if (control.config.enabled) Color.white else Color.gray(0x80),
                 );
             },
             .image => |control| {

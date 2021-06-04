@@ -6,6 +6,11 @@ const c = @cImport({
     @cInclude("SDL.h");
 });
 
+const debug_window_mode = if (@hasDecl(root, "zerog_enable_window_mode"))
+    root.zerog_enable_window_mode
+else
+    false;
+
 // Desktop entry point
 pub fn main() !void {
     _ = c.SDL_Init(c.SDL_INIT_EVERYTHING);
@@ -22,13 +27,18 @@ pub fn main() !void {
         _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_FLAGS, c.SDL_GL_CONTEXT_DEBUG_FLAG);
     }
 
+    const window_flags = c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI | if (!debug_window_mode)
+        c.SDL_WINDOW_MAXIMIZED | c.SDL_WINDOW_FULLSCREEN_DESKTOP
+    else
+        0;
+
     const window = c.SDL_CreateWindow(
         "OpenGL ES 2.0 - Zig Demo",
         c.SDL_WINDOWPOS_CENTERED,
         c.SDL_WINDOWPOS_CENTERED,
-        640,
-        480,
-        c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI | c.SDL_WINDOW_MAXIMIZED | c.SDL_WINDOW_FULLSCREEN_DESKTOP,
+        1280,
+        720,
+        window_flags,
     ) orelse sdlPanic();
     defer c.SDL_DestroyWindow(window);
 
@@ -60,6 +70,15 @@ pub fn main() !void {
     var app: root.Application = undefined;
     try app.init(std.heap.c_allocator, &input_queue);
     defer app.deinit();
+
+    // resize application
+    {
+        var width: c_int = undefined;
+        var height: c_int = undefined;
+
+        c.SDL_GL_GetDrawableSize(window, &width, &height);
+        try app.resize(@intCast(u15, width), @intCast(u15, height));
+    }
 
     while (true) {
         var event: c.SDL_Event = undefined;
@@ -112,7 +131,7 @@ pub fn main() !void {
                         log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                     }
                 },
-                
+
                 else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, @intCast(c_int, event.type))}),
             }
         }

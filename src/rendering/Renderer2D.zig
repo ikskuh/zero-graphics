@@ -628,6 +628,8 @@ pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const
 
 /// Appends a filled, untextured quad.
 pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!void {
+    if (rectangle.size().isEmpty())
+        return;
     const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1);
     const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1);
     const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color).offset(-1, 1);
@@ -645,6 +647,9 @@ pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
 
 /// Copies the given texture to the screen
 pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const Texture, tint: ?Color) DrawError!void {
+    if (rectangle.size().isEmpty())
+        return;
+
     const color = tint orelse Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0xFF };
     const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1).withUV(0, 0);
     const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1).withUV(1, 0);
@@ -659,6 +664,9 @@ pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const 
 
 /// Appends a rectangle with a 1 pixel wide outline
 pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!void {
+    if (rectangle.size().isEmpty())
+        return;
+
     const tl = Vertex.init(rectangle.x, rectangle.y, color);
     const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color);
     const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color);

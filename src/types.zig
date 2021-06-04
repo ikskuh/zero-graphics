@@ -1,6 +1,8 @@
 const std = @import("std");
 
 pub const Point = struct {
+    pub const zero = Point{ .x = 0, .y = 0 };
+
     x: i16,
     y: i16,
 
@@ -21,12 +23,12 @@ pub const Rectangle = struct {
     width: u15,
     height: u15,
 
-    pub fn init(position: Point, size: Size) Rectangle {
+    pub fn init(pos: Point, siz: Size) Rectangle {
         return Rectangle{
-            .x = position.x,
-            .y = position.y,
-            .width = size.width,
-            .height = size.height,
+            .x = pos.x,
+            .y = pos.y,
+            .width = siz.width,
+            .height = siz.height,
         };
     }
 
@@ -44,11 +46,49 @@ pub const Rectangle = struct {
     pub fn size(self: Rectangle) Size {
         return Size{ .width = self.width, .height = self.height };
     }
+
+    pub fn shrink(self: Rectangle, delta: u15) Rectangle {
+        return self.shrinkOrGrow(-@as(i16, delta));
+    }
+
+    pub fn grow(self: Rectangle, delta: u15) Rectangle {
+        return self.shrinkOrGrow(@as(i16, delta));
+    }
+
+    pub fn shrinkOrGrow(self: Rectangle, delta: i16) Rectangle {
+        return Rectangle{
+            .x = self.x - delta,
+            .y = self.y - delta,
+            .width = @intCast(u15, if (self.width > 2 * delta) @as(i16, self.width) + 2 * delta else 0),
+            .height = @intCast(u15, if (self.height > 2 * delta) @as(i16, self.height) + 2 * delta else 0),
+        };
+    }
+
+    /// Returns a new rectangle with size (`width`,`height`) that will be centered over this
+    /// rectangle.
+    pub fn centered(self: Rectangle, width: u15, height: u15) Rectangle {
+        return Rectangle{
+            .x = self.x + @divTrunc((@as(i16, self.width) - width), 2),
+            .y = self.y + @divTrunc((@as(i16, self.height) - height), 2),
+            .width = width,
+            .height = height,
+        };
+    }
 };
 
 pub const Size = struct {
+    pub const empty = Size{ .width = 0, .height = 0 };
+
     width: u15,
     height: u15,
+
+    pub fn isEmpty(self: Size) bool {
+        return (self.width == 0) or (self.height == 0);
+    }
+
+    pub fn getArea(self: Size) u30 {
+        return @as(u30, self.width) * @as(u30, self.height);
+    }
 };
 
 pub const VerticalAlignment = enum { top, center, bottom };
@@ -86,6 +126,10 @@ pub const Color = extern struct {
 
     fn lerp(a: u8, b: u8, f: f32) u8 {
         return @floatToInt(u8, @intToFloat(f32, a) + f * (@intToFloat(f32, b) - @intToFloat(f32, a)));
+    }
+
+    pub fn gray(level: u8) Color {
+        return Color{ .r = level, .g = level, .b = level, .a = 0xFF };
     }
 
     // Predefined color values:
