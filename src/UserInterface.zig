@@ -291,9 +291,15 @@ const Widget = struct {
             pointer_release: Point,
             pointer_motion: Point,
         };
+
+        pub const DrawInfo = struct {
+            is_hovered: bool,
+            is_pressed: bool,
+        };
+
         pub const Config = struct {
             hit_test_visible: bool = true,
-            draw: ?fn (Custom, Rectangle, *Renderer) Renderer.DrawError!void = null,
+            draw: ?fn (Custom, Rectangle, *Renderer, DrawInfo) Renderer.DrawError!void = null,
             process_event: ?fn (Custom, Event) ?usize = null,
             /// generic second user data to provide context information for the user data
             context: ?*c_void = null,
@@ -872,7 +878,10 @@ pub fn render(self: UserInterface) !void {
             },
             .custom => |control| {
                 if (control.config.draw) |draw| {
-                    try draw(control, widget.bounds, renderer);
+                    try draw(control, widget.bounds, renderer, .{
+                        .is_hovered = is_hovered,
+                        .is_pressed = is_pressed,
+                    });
                 }
             },
         }
