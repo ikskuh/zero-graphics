@@ -13,6 +13,7 @@ const Self = @This();
 const Color = types.Color;
 const Rectangle = types.Rectangle;
 const Size = types.Size;
+const Point = types.Point;
 
 const TextureList = std.TailQueue(Texture);
 const TextureItem = std.TailQueue(Texture).Node;
@@ -624,6 +625,26 @@ pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const
     }
 
     draw_call.count += 3 * triangles.len;
+}
+
+/// Appends a filled, untextured quad.
+/// ```
+/// 0---1
+/// |'\.|
+/// 2---3
+/// ```
+pub fn fillQuad(self: *Self, corners: [4]Point, color: Color) DrawError!void {
+
+    // TODO: Gain pixel-perfection here!
+    const p0 = Vertex.init(corners[0].x, corners[0].y, color);
+    const p1 = Vertex.init(corners[1].x, corners[1].y, color);
+    const p2 = Vertex.init(corners[2].x, corners[2].y, color);
+    const p3 = Vertex.init(corners[3].x, corners[3].y, color);
+
+    try self.appendTriangles(null, &[_][3]Vertex{
+        .{ p0, p1, p2 },
+        .{ p1, p3, p2 },
+    });
 }
 
 /// Appends a filled, untextured quad.

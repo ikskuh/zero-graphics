@@ -705,6 +705,13 @@ fn widgetFromPosition(self: *UserInterface, point: Point) ?*Widget {
 pub const InputProcessor = struct {
     const Self = @This();
 
+    pub const MouseButton = enum {
+        /// Short click or left-click 
+        primary,
+        /// Long click or right click
+        secondary,
+    };
+
     ui: *UserInterface,
 
     pub fn finish(self: *Self) void {
@@ -744,19 +751,23 @@ pub const InputProcessor = struct {
         self.ui.pressed_widget = clicked_widget;
     }
 
-    pub fn pointerUp(self: Self) void {
+    pub fn pointerUp(self: Self, button: MouseButton) void {
         defer self.ui.pressed_widget = null;
 
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse return;
 
-        if (self.ui.pressed_widget) |widget| {
-            widget.sendEvent(.{ .pointer_release = self.ui.pointer_position });
-        }
+        if (button == .primary) {
+            if (self.ui.pressed_widget) |widget| {
+                widget.sendEvent(.{ .pointer_release = self.ui.pointer_position });
+            }
 
-        const pressed_widget = self.ui.pressed_widget orelse return;
+            const pressed_widget = self.ui.pressed_widget orelse return;
 
-        if (clicked_widget == pressed_widget) {
-            clicked_widget.click(self.ui.pointer_position);
+            if (clicked_widget == pressed_widget) {
+                clicked_widget.click(self.ui.pointer_position);
+            }
+        } else {
+            // TODO: Implement secondary click
         }
     }
 
