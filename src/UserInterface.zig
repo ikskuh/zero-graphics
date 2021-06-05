@@ -285,10 +285,15 @@ const Widget = struct {
     };
     const Custom = struct {
         pub const Event = union(enum) {
+            pub const PointerRelease = struct {
+                position: Point,
+                pointer: Pointer,
+            };
+
             pointer_enter,
             pointer_leave,
             pointer_press: Point,
-            pointer_release: Point,
+            pointer_release: PointerRelease,
             pointer_motion: Point,
         };
 
@@ -702,15 +707,18 @@ fn widgetFromPosition(self: *UserInterface, point: Point) ?*Widget {
     return null;
 }
 
+/// The user interface supports two types of pointer input.
+/// - The `primary` pointer is the normal touch input or mouse click with the left mouse button. This usually activates the main action of the widget.
+/// - The `secondary` pointer is either a long-click for touch/single button inputs or the right mouse button. This usually opens a context menu or similar.
+pub const Pointer = enum {
+    /// Short click or left-click 
+    primary,
+    /// Long click or right click
+    secondary,
+};
+
 pub const InputProcessor = struct {
     const Self = @This();
-
-    pub const MouseButton = enum {
-        /// Short click or left-click 
-        primary,
-        /// Long click or right click
-        secondary,
-    };
 
     ui: *UserInterface,
 
@@ -751,23 +759,22 @@ pub const InputProcessor = struct {
         self.ui.pressed_widget = clicked_widget;
     }
 
-    pub fn pointerUp(self: Self, button: MouseButton) void {
+    pub fn pointerUp(self: Self, pointer: Pointer) void {
         defer self.ui.pressed_widget = null;
 
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse return;
 
-        if (button == .primary) {
-            if (self.ui.pressed_widget) |widget| {
-                widget.sendEvent(.{ .pointer_release = self.ui.pointer_position });
-            }
+        if (self.ui.pressed_widget) |widget| {
+            widget.sendEvent(.{ .pointer_release = .{
+                .position = self.ui.pointer_position,
+                .pointer = pointer,
+            } });
+        }
 
-            const pressed_widget = self.ui.pressed_widget orelse return;
+        const pressed_widget = self.ui.pressed_widget orelse return;
 
-            if (clicked_widget == pressed_widget) {
-                clicked_widget.click(self.ui.pointer_position);
-            }
-        } else {
-            // TODO: Implement secondary click
+        if (pointer == .primary and clicked_widget == pressed_widget) {
+            clicked_widget.click(self.ui.pointer_position);
         }
     }
 
