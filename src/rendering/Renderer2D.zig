@@ -294,7 +294,7 @@ fn destroyFontInternal(self: *Self, node: *FontItem) void {
 
     var iter = node.data.glyphs.iterator();
     while (iter.next()) |glyph| {
-        self.destroyTexture(glyph.value.texture);
+        self.destroyTexture(glyph.value_ptr.texture);
     }
 
     node.data.glyphs.deinit();
@@ -383,9 +383,9 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u24) !Glyph {
             .offset_y = @intCast(i16, iy0),
         };
 
-        gop.entry.value = glyph;
+        gop.value_ptr.* = glyph;
     }
-    return gop.entry.value;
+    return gop.value_ptr.*;
 }
 
 fn scaleInt(ival: isize, scale: f32) i16 {
