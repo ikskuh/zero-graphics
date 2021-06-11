@@ -9,6 +9,12 @@ const Color = types.Color;
 
 const Renderer = @import("rendering/Renderer2D.zig");
 
+// layout helpers
+
+pub const VerticalStackLayout = @import("ui/VerticalStackLayout.zig");
+pub const HorizontalStackLayout = @import("ui/HorizontalStackLayout.zig");
+pub const DockStackLayout = @import("ui/DockLayout.zig");
+
 pub const CustomWidget = Widget.Custom;
 
 pub const ButtonStyle = struct {
