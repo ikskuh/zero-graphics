@@ -789,6 +789,13 @@ pub const InputProcessor = struct {
     }
 };
 
+fn clampSub(a: u15, b: u15) u15 {
+    return if (b < a)
+        a - b
+    else
+        0;
+}
+
 pub fn render(self: UserInterface) !void {
     const renderer = self.renderer;
     var iterator = self.widgetIterator(.draw_order);
@@ -862,12 +869,12 @@ pub fn render(self: UserInterface) !void {
                     control.text.get(),
                     widget.bounds.x + switch (control.config.horizontal_alignment) {
                         .left => 0,
-                        .center => (widget.bounds.width - string_size.width) / 2,
+                        .center => clampSub(widget.bounds.width, string_size.width) / 2,
                         .right => widget.bounds.width - 4 - string_size.width,
                     },
                     widget.bounds.y + switch (control.config.vertical_alignment) {
                         .top => 0,
-                        .center => (widget.bounds.height - string_size.height) / 2,
+                        .center => clampSub(widget.bounds.height, string_size.height) / 2,
                         .bottom => widget.bounds.height - string_size.height,
                     },
                     control.config.text_color orelse style.text_color,
