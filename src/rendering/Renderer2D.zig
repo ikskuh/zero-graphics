@@ -1,6 +1,7 @@
 const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
 const types = @import("../types.zig");
+const logger = std.log.scoped(.zerog_renderer2D);
 
 const c = @cImport({
     @cInclude("stb_truetype.h");
@@ -171,7 +172,10 @@ pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]cons
 /// be on disk, encoded as PNG. Other file formats might be supported,
 /// but only PNG has official support.
 pub fn loadTexture(self: *Self, image_data: []const u8) LoadTextureError!*const Texture {
-    var image = zigimg.image.Image.fromMemory(self.allocator, image_data) catch return LoadTextureError.InvalidImageData;
+    var image = zigimg.image.Image.fromMemory(self.allocator, image_data) catch |err| {
+        logger.debug("failed to load texture: {s}", .{@errorName(err)});
+        return LoadTextureError.InvalidImageData;
+    };
     defer image.deinit();
 
     var buffer = try self.allocator.alloc(u8, 4 * image.width * image.height);

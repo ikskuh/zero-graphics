@@ -678,6 +678,19 @@ pub const Builder = struct {
         updateWidgetConfig(&info.control.config, config);
     }
 
+    pub fn image(self: Self, rectangle: Rectangle, texture: *const Renderer.Texture, config: anytype) Error!void {
+        const info = try self.initOrUpdateWidget(.image, rectangle, config);
+
+        if (info.needs_init) {
+            info.control.* = .{
+                .image = texture,
+            };
+        } else {
+            info.control.image = texture;
+        }
+        updateWidgetConfig(&info.control.config, config);
+    }
+
     pub fn custom(self: Self, rectangle: Rectangle, user_data: ?*c_void, config: anytype) Error!?usize {
         const info = try self.initOrUpdateWidget(.custom, rectangle, config);
 
