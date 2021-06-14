@@ -159,14 +159,14 @@ const Widget = struct {
     pub fn isHitTestVisible(self: Widget) bool {
         return switch (self.control) {
             .unset => unreachable,
-            .panel => true,
-            .button => true,
-            .text_box => true,
-            .label => false,
-            .check_box => true,
-            .radio_button => true,
-            .image => true,
-            .modal_layer => true,
+            .panel => |ctrl| ctrl.config.hit_test_visible,
+            .button => |ctrl| ctrl.config.hit_test_visible,
+            .text_box => |ctrl| ctrl.config.hit_test_visible,
+            .label => |ctrl| ctrl.config.hit_test_visible,
+            .check_box => |ctrl| ctrl.config.hit_test_visible,
+            .radio_button => |ctrl| ctrl.config.hit_test_visible,
+            .image => |ctrl| ctrl.config.hit_test_visible,
+            .modal_layer => |ctrl| ctrl.config.hit_test_visible,
             .custom => |custom| custom.config.hit_test_visible,
         };
     }
@@ -203,7 +203,9 @@ const Widget = struct {
         }
     }
 
-    const EmptyConfig = struct {};
+    const EmptyConfig = struct {
+        hit_test_visible: bool = true,
+    };
 
     const Clickable = struct {
         clicked: bool = false,
@@ -223,6 +225,7 @@ const Widget = struct {
             icon_location: IconPosition = .left,
             enabled: bool = true,
             style: ?ButtonTheme = null,
+            hit_test_visible: bool = true,
         };
         text: StringBuffer,
         icon: ?*const Renderer.Texture,
@@ -233,6 +236,7 @@ const Widget = struct {
     const ModalLayer = struct {
         const Config = struct {
             style: ?ModalLayerStyle = null,
+            hit_test_visible: bool = true,
         };
 
         config: Config = .{},
@@ -242,6 +246,7 @@ const Widget = struct {
     const Panel = struct {
         const Config = struct {
             style: ?BoxStyle = null,
+            hit_test_visible: bool = true,
         };
 
         config: Config = .{},
@@ -249,6 +254,7 @@ const Widget = struct {
     const Image = struct {
         pub const Config = struct {
             tint: ?types.Color = null,
+            hit_test_visible: bool = true,
         };
         image: *const Renderer.Texture,
         config: Config = .{},
@@ -256,6 +262,7 @@ const Widget = struct {
     const TextBox = struct {
         const Config = struct {
             style: ?BoxStyle = null,
+            hit_test_visible: bool = true,
         };
 
         text: StringBuffer,
@@ -268,6 +275,7 @@ const Widget = struct {
             font: ?*const Renderer.Font = null,
             vertical_alignment: types.VerticalAlignment = .center,
             horizontal_alignment: types.HorzizontalAlignment = .left,
+            hit_test_visible: bool = false,
         };
 
         text: StringBuffer,
@@ -276,6 +284,7 @@ const Widget = struct {
     const CheckBox = struct {
         const Config = struct {
             enabled: bool = true,
+            hit_test_visible: bool = true,
         };
         is_checked: bool,
         clickable: Clickable = .{},
@@ -284,6 +293,7 @@ const Widget = struct {
     const RadioButton = struct {
         const Config = struct {
             enabled: bool = true,
+            hit_test_visible: bool = true,
         };
         is_checked: bool,
         clickable: Clickable = .{},
@@ -294,6 +304,7 @@ const Widget = struct {
             pub const PointerRelease = struct {
                 position: Point,
                 pointer: Pointer,
+                hit_test_visible: bool = true,
             };
 
             pointer_enter,
@@ -306,6 +317,7 @@ const Widget = struct {
         pub const DrawInfo = struct {
             is_hovered: bool,
             is_pressed: bool,
+            hit_test_visible: bool = true,
         };
 
         pub const Config = struct {
