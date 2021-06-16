@@ -362,6 +362,7 @@ pub const AndroidApp = struct {
     fn mainLoop(self: *Self) !void {
         logger.notice("mainLoop() started\n", .{});
         defer logger.notice("mainLoop() finished\n", .{});
+        errdefer |err| logger.err("mainLoop() crashed: {}", .{err});
 
         self.config = blk: {
             var cfg = android.AConfiguration_new() orelse return error.OutOfMemory;
