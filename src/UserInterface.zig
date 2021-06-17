@@ -13,7 +13,7 @@ const Renderer = @import("rendering/Renderer2D.zig");
 
 pub const VerticalStackLayout = @import("ui/VerticalStackLayout.zig");
 pub const HorizontalStackLayout = @import("ui/HorizontalStackLayout.zig");
-pub const DockStackLayout = @import("ui/DockLayout.zig");
+pub const DockLayout = @import("ui/DockLayout.zig");
 
 pub const CustomWidget = Widget.Custom;
 
