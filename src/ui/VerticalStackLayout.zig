@@ -25,6 +25,6 @@ pub fn get(self: *Self, height: u15) Rectangle {
     };
 }
 
-pub fn adavance(self: *Self, margin: u15) void {
+pub fn advance(self: *Self, margin: u15) void {
     _ = get(self, margin);
 }
