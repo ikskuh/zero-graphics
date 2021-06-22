@@ -92,9 +92,9 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
     gles.enableVertexAttribArray(uv_attribute_location);
 
     gles.bindBuffer(gles.ARRAY_BUFFER, vertex_buffer);
-    gles.vertexAttribPointer(position_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @byteOffsetOf(Vertex, "x")));
-    gles.vertexAttribPointer(color_attribute_location, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @byteOffsetOf(Vertex, "r")));
-    gles.vertexAttribPointer(uv_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @byteOffsetOf(Vertex, "u")));
+    gles.vertexAttribPointer(position_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
+    gles.vertexAttribPointer(color_attribute_location, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "r")));
+    gles.vertexAttribPointer(uv_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
 
     var self = Self{
         .shader_program = shader_program,

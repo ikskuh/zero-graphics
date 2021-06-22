@@ -132,7 +132,7 @@ pub fn main() !void {
                     }
                 },
 
-                else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, @intCast(c_int, event.type))}),
+                else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, event.type)}),
             }
         }
 

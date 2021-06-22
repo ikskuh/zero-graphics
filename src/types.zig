@@ -102,13 +102,13 @@ pub const Color = extern struct {
 
     // Support for std.json:
 
-    pub fn jsonStringify(value: @This(), options: std.json.StringifyOptions, writer: anytype) !void {
-        try writer.print("\"#{X:0>2}{X:0>2}{X:0>2}", .{ value.r, value.g, value.b });
-        if (value.a != 0xFF) {
-            try writer.print("{X:0>2}", .{value.a});
-        }
-        try writer.writeAll("\"");
-    }
+    // pub fn jsonStringify(value: @This(), options: std.json.StringifyOptions, writer: anytype) !void {
+    //     try writer.print("\"#{X:0>2}{X:0>2}{X:0>2}", .{ value.r, value.g, value.b });
+    //     if (value.a != 0xFF) {
+    //         try writer.print("{X:0>2}", .{value.a});
+    //     }
+    //     try writer.writeAll("\"");
+    // }
 
     pub fn alphaBlend(c0: Color, c1: Color, alpha: u8) Color {
         return alphaBlendF(c0, c1, @intToFloat(f32, alpha) / 255.0);
