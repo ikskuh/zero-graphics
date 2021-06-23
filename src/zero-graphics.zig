@@ -6,6 +6,8 @@ pub const Backend = enum {
     android,
 };
 
+pub const common = @import("common.zig");
+
 // TODO:
 // Specify application type for the backend, so we can remove the `@import("root").Application` reference
 pub fn Api(comptime backend: Backend) type {
@@ -17,8 +19,7 @@ pub fn Api(comptime backend: Backend) type {
 
     const T = struct {
         pub usingnamespace BackendImpl;
-
-        pub usingnamespace @import("common.zig");
+        pub usingnamespace common;
     };
 
     const required_exports = [_][]const u8{
