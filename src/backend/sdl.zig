@@ -136,11 +136,11 @@ pub const entry_point = struct {
 
                             try app.resize(@intCast(u15, width), @intCast(u15, height));
                         } else {
-                            log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
+                            // log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                         }
                     },
 
-                    else => log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, event.type)}),
+                    else => {}, //log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, event.type)}),
                 }
             }
 

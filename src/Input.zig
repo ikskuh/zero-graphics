@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const types = @import("types.zig");
+const types = @import("common.zig");
 
 const Location = types.Point;
 

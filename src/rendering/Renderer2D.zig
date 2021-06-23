@@ -1,6 +1,6 @@
 const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
-const types = @import("../types.zig");
+const types = @import("../common.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
 
 const c = @cImport({
@@ -47,6 +47,11 @@ textures: TextureList,
 fonts: FontList,
 
 white_texture: *const Texture,
+
+/// Scales all input coordinates with this factor.
+/// This can be used for DPI scaling.
+/// A value of `2.0` means that `1 unit` is equal to `2 pixels`
+unit_to_pixel_ratio: f32 = 1.0,
 
 pub fn init(allocator: *std.mem.Allocator) InitError!Self {
     const shader_program = blk: {
@@ -133,6 +138,52 @@ pub fn deinit(self: *Self) void {
     self.* = undefined;
 }
 
+pub fn getVirtualScreenSize(self: Self, physical_size: Size) Size {
+    return Size{
+        .width = @floatToInt(u15, 0.5 + @intToFloat(f32, physical_size.width) / self.unit_to_pixel_ratio),
+        .height = @floatToInt(u15, 0.5 + @intToFloat(f32, physical_size.height) / self.unit_to_pixel_ratio),
+    };
+}
+
+fn inverseScaleDimension(self: Self, size: u15) u15 {
+    return @floatToInt(u15, 0.5 + @intToFloat(f32, size) / self.unit_to_pixel_ratio);
+}
+
+fn inverseScalePosition(self: Self, val: i16) i16 {
+    return @floatToInt(i16, 0.5 + @intToFloat(f32, val) / self.unit_to_pixel_ratio);
+}
+
+fn scaleDimension(self: Self, size: u15) u15 {
+    return @floatToInt(u15, 0.5 + self.unit_to_pixel_ratio * @intToFloat(f32, size));
+}
+
+fn scalePosition(self: Self, val: i16) i16 {
+    return @floatToInt(i16, 0.5 + self.unit_to_pixel_ratio * @intToFloat(f32, val));
+}
+
+fn scalePoint(self: Self, pt: Point) Point {
+    return Point{
+        .x = self.scalePosition(pt.x),
+        .y = self.scalePosition(pt.y),
+    };
+}
+
+fn scaleSize(self: Self, size: Size) Size {
+    return Size{
+        .width = self.scaleDimension(size.width),
+        .height = self.scaleDimension(size.height),
+    };
+}
+
+fn scaleRectangle(self: Self, rect: Rectangle) Rectangle {
+    return Rectangle{
+        .x = self.scalePosition(rect.x),
+        .y = self.scalePosition(rect.y),
+        .width = self.scaleDimension(rect.width),
+        .height = self.scaleDimension(rect.height),
+    };
+}
+
 /// Creates a new texture for this renderer with the size `width`×`height`.
 /// The texture is only valid as long as the renderer is valid *or* `destroyTexture` is called,
 /// whichever happens first.
@@ -155,6 +206,9 @@ pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]cons
     }
     gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MIN_FILTER, gles.LINEAR);
     gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MAG_FILTER, gles.LINEAR);
+
+    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_WRAP_S, gles.CLAMP_TO_EDGE);
+    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_WRAP_T, gles.CLAMP_TO_EDGE);
 
     tex_node.* = .{
         .data = Texture{
@@ -237,7 +291,7 @@ pub fn updateTexture(self: *Self, texture: *Texture, data: []const u8) void {
 }
 
 /// Creates a new font from `ttf_bytes`. The bytes passed must be a valid TTF
-pub fn createFont(self: *Self, ttf_bytes: []const u8, pixel_size: u15) CreateFontError!*const Font {
+pub fn createFont(self: *Self, ttf_bytes: []const u8, size: u15) CreateFontError!*const Font {
     var info = std.mem.zeroes(c.stbtt_fontinfo);
     info.userdata = self.allocator;
 
@@ -263,11 +317,10 @@ pub fn createFont(self: *Self, ttf_bytes: []const u8, pixel_size: u15) CreateFon
             .allocator = self.allocator,
             .arena = std.heap.ArenaAllocator.init(self.allocator),
             .glyphs = std.AutoHashMap(u24, Glyph).init(self.allocator),
-            .font_size = pixel_size,
+            .font_size = size,
             .ascent = @intCast(i16, ascent),
             .descent = @intCast(i16, descent),
             .line_gap = @intCast(i16, line_gap),
-            .scale = c.stbtt_ScaleForPixelHeight(&info, @intToFloat(f32, pixel_size)),
         },
     };
 
@@ -311,30 +364,37 @@ fn destroyFontInternal(self: *Self, node: *FontItem) void {
     self.allocator.destroy(node);
 }
 
-fn getGlyph(self: *Self, font: *Font, codepoint: u24) !Glyph {
+fn getFontScale(self: Self, font: *const Font) f32 {
+    return self.unit_to_pixel_ratio * c.stbtt_ScaleForPixelHeight(&font.font, @intToFloat(f32, font.font_size));
+}
+
+fn getGlyph(self: *Self, font: *Font, codepoint: u21) !Glyph {
+    var ix0: c_int = undefined;
+    var iy0: c_int = undefined;
+    var ix1: c_int = undefined;
+    var iy1: c_int = undefined;
+
+    // Scale of `advance_width` and `left_side_bearing`
+    const scale = self.getFontScale(font);
+
+    c.stbtt_GetCodepointBitmapBox(
+        &font.font,
+        codepoint,
+        scale,
+        scale,
+        &ix0,
+        &iy0,
+        &ix1,
+        &iy1,
+    );
+    std.debug.assert(ix0 <= ix1);
+    std.debug.assert(iy0 <= iy1);
+
+    const width: u15 = @intCast(u15, ix1 - ix0);
+    const height: u15 = @intCast(u15, iy1 - iy0);
+
     var gop = try font.glyphs.getOrPut(codepoint);
-    if (!gop.found_existing) {
-        var ix0: c_int = undefined;
-        var iy0: c_int = undefined;
-        var ix1: c_int = undefined;
-        var iy1: c_int = undefined;
-
-        c.stbtt_GetCodepointBitmapBox(
-            &font.font,
-            codepoint,
-            font.scale,
-            font.scale,
-            &ix0,
-            &iy0,
-            &ix1,
-            &iy1,
-        );
-        std.debug.assert(ix0 <= ix1);
-        std.debug.assert(iy0 <= iy1);
-
-        const width: u15 = @intCast(u15, ix1 - ix0);
-        const height: u15 = @intCast(u15, iy1 - iy0);
-
+    if (!gop.found_existing or gop.value_ptr.width != width or gop.value_ptr.height != height) {
         const bitmap = try font.arena.allocator.alloc(u8, @as(usize, width) * height);
         errdefer font.arena.allocator.free(bitmap);
 
@@ -344,8 +404,8 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u24) !Glyph {
             @intCast(c_int, width),
             @intCast(c_int, height),
             @intCast(c_int, width), // stride
-            font.scale,
-            font.scale,
+            scale,
+            scale,
             codepoint,
         );
 
@@ -389,6 +449,17 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u24) !Glyph {
             .offset_y = @intCast(i16, iy0),
         };
 
+        var buf: [8]u8 = undefined;
+        const len = try std.unicode.utf8Encode(codepoint, &buf);
+        var codepoint_str = buf[0..len];
+
+        if (gop.found_existing) {
+            logger.info("regenerate glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
+            self.destroyTexture(gop.value_ptr.texture);
+        } else {
+            logger.info("render glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
+        }
+
         gop.value_ptr.* = glyph;
     }
     return gop.value_ptr.*;
@@ -402,6 +473,7 @@ const GlyphIterator = struct {
     renderer: *Self,
     font: *Font,
     codepoint_src: std.unicode.Utf8Iterator,
+    scale: f32,
 
     dx: i16,
     dy: i16,
@@ -409,6 +481,8 @@ const GlyphIterator = struct {
     previous_codepoint: ?u21 = null,
 
     pub fn init(renderer: *Self, font: *Font, text: []const u8) GlyphIterator {
+        const scale = renderer.getFontScale(font);
+
         return GlyphIterator{
             .renderer = renderer,
             .font = font,
@@ -417,8 +491,10 @@ const GlyphIterator = struct {
                 .i = 0,
             },
 
+            .scale = scale,
+
             .dx = 0,
-            .dy = scaleInt(font.ascent, font.scale),
+            .dy = scaleInt(font.ascent, scale),
         };
     }
 
@@ -439,7 +515,7 @@ const GlyphIterator = struct {
             }
             self.previous_codepoint = codepoint;
 
-            const off_x = scaleInt(self.dx + glyph.left_side_bearing, self.font.scale);
+            const off_x = scaleInt(self.dx + glyph.left_side_bearing, self.scale);
             const off_y = glyph.offset_y + self.dy;
 
             self.dx += glyph.advance_width;
@@ -458,6 +534,8 @@ const GlyphIterator = struct {
     const GlyphCmd = struct {
         codepoint: u21,
         texture: *const Texture,
+
+        // coordinates are in physical screen space
         x: i16,
         y: i16,
         width: u15,
@@ -484,10 +562,10 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle
     }
 
     return Rectangle{
-        .x = min_dx,
-        .y = min_dy,
-        .width = @intCast(u15, max_dx - min_dx),
-        .height = @intCast(u15, max_dy - min_dy),
+        .x = self.inverseScalePosition(min_dx),
+        .y = self.inverseScalePosition(min_dy),
+        .width = self.inverseScaleDimension(@intCast(u15, max_dx - min_dx)),
+        .height = self.inverseScaleDimension(@intCast(u15, max_dy - min_dy)),
     };
 }
 
@@ -498,10 +576,10 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle
 pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) DrawError!void {
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
-        try self.fillTexturedRectangle(
+        try self.fillTexturedRectanglePixels(
             Rectangle{
-                .x = x + glyph.x,
-                .y = y + glyph.y,
+                .x = self.scalePosition(x) + glyph.x,
+                .y = self.scalePosition(y) + glyph.y,
                 .width = glyph.width,
                 .height = glyph.height,
             },
@@ -640,12 +718,20 @@ pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const
 /// 2---3
 /// ```
 pub fn fillQuad(self: *Self, corners: [4]Point, color: Color) DrawError!void {
+    var real_corners: [4]Point = undefined;
+    for (real_corners) |*dst, i| {
+        dst.* = self.scalePoint(corners[i]);
+    }
+    return self.fillQuadPixels(real_corners, color);
+}
+
+pub fn fillQuadPixels(self: *Self, real_corners: [4]Point, color: Color) DrawError!void {
 
     // TODO: Gain pixel-perfection here!
-    const p0 = Vertex.init(corners[0].x, corners[0].y, color);
-    const p1 = Vertex.init(corners[1].x, corners[1].y, color);
-    const p2 = Vertex.init(corners[2].x, corners[2].y, color);
-    const p3 = Vertex.init(corners[3].x, corners[3].y, color);
+    const p0 = Vertex.init(real_corners[0].x, real_corners[0].y, color);
+    const p1 = Vertex.init(real_corners[1].x, real_corners[1].y, color);
+    const p2 = Vertex.init(real_corners[2].x, real_corners[2].y, color);
+    const p3 = Vertex.init(real_corners[3].x, real_corners[3].y, color);
 
     try self.appendTriangles(null, &[_][3]Vertex{
         .{ p0, p1, p2 },
@@ -655,12 +741,17 @@ pub fn fillQuad(self: *Self, corners: [4]Point, color: Color) DrawError!void {
 
 /// Appends a filled, untextured quad.
 pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!void {
-    if (rectangle.size().isEmpty())
+    return self.fillRectanglePixels(self.scaleRectangle(rectangle), color);
+}
+
+pub fn fillRectanglePixels(self: *Self, real_rect: Rectangle, color: Color) DrawError!void {
+    if (real_rect.size().isEmpty())
         return;
-    const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1);
-    const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1);
-    const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color).offset(-1, 1);
-    const br = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y + rectangle.height - 1, color).offset(1, 1);
+
+    const tl = Vertex.init(real_rect.x, real_rect.y, color).offset(-1, -1);
+    const tr = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y, color).offset(1, -1);
+    const bl = Vertex.init(real_rect.x, real_rect.y + real_rect.height - 1, color).offset(-1, 1);
+    const br = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y + real_rect.height - 1, color).offset(1, 1);
 
     try self.appendTriangles(null, &[_][3]Vertex{
         .{ tl, br, tr },
@@ -669,19 +760,28 @@ pub fn fillRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!
 }
 
 pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
-    try self.fillRectangle(Rectangle{ .x = x, .y = y, .width = 1, .height = 1 }, color);
+    try self.fillRectangle(Rectangle{
+        .x = self.scaleDimension(x),
+        .y = self.scaleDimension(y),
+        .width = 1,
+        .height = 1,
+    }, color);
 }
 
 /// Copies the given texture to the screen
 pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const Texture, tint: ?Color) DrawError!void {
-    if (rectangle.size().isEmpty())
+    return self.fillTexturedRectanglePixels(self.scaleRectangle(rectangle), texture, tint);
+}
+
+pub fn fillTexturedRectanglePixels(self: *Self, real_rect: Rectangle, texture: *const Texture, tint: ?Color) DrawError!void {
+    if (real_rect.size().isEmpty())
         return;
 
     const color = tint orelse Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0xFF };
-    const tl = Vertex.init(rectangle.x, rectangle.y, color).offset(-1, -1).withUV(0, 0);
-    const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color).offset(1, -1).withUV(1, 0);
-    const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color).offset(-1, 1).withUV(0, 1);
-    const br = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y + rectangle.height - 1, color).offset(1, 1).withUV(1, 1);
+    const tl = Vertex.init(real_rect.x, real_rect.y, color).offset(-1, -1).withUV(0, 0);
+    const tr = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y, color).offset(1, -1).withUV(1, 0);
+    const bl = Vertex.init(real_rect.x, real_rect.y + real_rect.height - 1, color).offset(-1, 1).withUV(0, 1);
+    const br = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y + real_rect.height - 1, color).offset(1, 1).withUV(1, 1);
 
     try self.appendTriangles(texture, &[_][3]Vertex{
         .{ tl, br, tr },
@@ -691,13 +791,17 @@ pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const 
 
 /// Appends a rectangle with a 1 pixel wide outline
 pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!void {
-    if (rectangle.size().isEmpty())
+    return self.drawRectanglePixels(self.scaleRectangle(rectangle), color);
+}
+
+pub fn drawRectanglePixels(self: *Self, real_rect: Rectangle, color: Color) DrawError!void {
+    if (real_rect.size().isEmpty())
         return;
 
-    const tl = Vertex.init(rectangle.x, rectangle.y, color);
-    const tr = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y, color);
-    const bl = Vertex.init(rectangle.x, rectangle.y + rectangle.height - 1, color);
-    const br = Vertex.init(rectangle.x + rectangle.width - 1, rectangle.y + rectangle.height - 1, color);
+    const tl = Vertex.init(real_rect.x, real_rect.y, color);
+    const tr = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y, color);
+    const bl = Vertex.init(real_rect.x, real_rect.y + real_rect.height - 1, color);
+    const br = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y + real_rect.height - 1, color);
 
     try self.appendTriangles(null, &[_][3]Vertex{
         // top
@@ -717,6 +821,16 @@ pub fn drawRectangle(self: *Self, rectangle: Rectangle, color: Color) DrawError!
 
 /// Draws a single pixel wide line from (`x0`,`y0`) to (`x1`,`y1`)
 pub fn drawLine(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Color) DrawError!void {
+    return self.drawLinePixels(
+        self.scalePosition(x0),
+        self.scalePosition(y0),
+        self.scalePosition(x1),
+        self.scalePosition(y1),
+        color,
+    );
+}
+
+pub fn drawLinePixels(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Color) DrawError!void {
     const p0 = Vertex.init(x0, y0, color);
     const p1 = Vertex.init(x1, y1, color);
 
@@ -849,18 +963,17 @@ pub const Font = struct {
     arena: std.heap.ArenaAllocator,
     glyphs: std.AutoHashMap(u24, Glyph),
 
+    /// size of the font without scaling
     font_size: u15,
 
     ascent: i16,
     descent: i16,
     line_gap: i16,
 
-    /// Scale of `advance_width` and `left_side_bearing`
-    scale: f32,
-
     /// Returns the height of a single text line of this font
     pub fn getLineHeight(self: Font) u15 {
-        return @intCast(u15, scaleInt(self.ascent - self.descent + self.line_gap, self.scale));
+        const scale = c.stbtt_ScaleForPixelHeight(&self.font, @intToFloat(f32, self.font_size));
+        return @intCast(u15, scaleInt(self.ascent - self.descent + self.line_gap, scale));
     }
 };
 

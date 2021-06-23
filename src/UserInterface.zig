@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("types.zig");
+const types = @import("common.zig");
 const logger = std.log.scoped(.user_interface);
 
 const Point = types.Point;
@@ -917,12 +917,12 @@ pub fn render(self: UserInterface) !void {
                     widget.bounds.x + switch (control.config.horizontal_alignment) {
                         .left => 0,
                         .center => clampSub(widget.bounds.width, string_size.width) / 2,
-                        .right => widget.bounds.width - 4 - string_size.width,
+                        .right => clampSub(clampSub(widget.bounds.width, 4), string_size.width),
                     },
                     widget.bounds.y + switch (control.config.vertical_alignment) {
                         .top => 0,
                         .center => clampSub(widget.bounds.height, string_size.height) / 2,
-                        .bottom => widget.bounds.height - string_size.height,
+                        .bottom => clampSub(widget.bounds.height, string_size.height),
                     },
                     control.config.text_color orelse style.text_color,
                 );
