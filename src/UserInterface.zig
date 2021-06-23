@@ -388,44 +388,26 @@ pressed_widget: ?*Widget = null,
 /// The widget which is currently hovered by the pointer.
 hovered_widget: ?*Widget = null,
 
-renderer: *Renderer,
+renderer: ?*Renderer,
 
 icons: Icons,
 
-pub fn init(allocator: *std.mem.Allocator, renderer: *Renderer) !UserInterface {
-    const default_font = try renderer.createFont(@embedFile("ui-data/FiraSans-Regular.ttf"), 16);
-    errdefer renderer.destroyFont(default_font);
-
-    var icons = Icons{
-        .checkbox_unchecked = undefined,
-        .checkbox_checked = undefined,
-        .radiobutton_unchecked = undefined,
-        .radiobutton_checked = undefined,
-    };
-
-    icons.checkbox_checked = try renderer.loadTexture(@embedFile("ui-data/checkbox-marked.png"));
-    errdefer renderer.destroyTexture(icons.checkbox_checked);
-
-    icons.checkbox_unchecked = try renderer.loadTexture(@embedFile("ui-data/checkbox-blank.png"));
-    errdefer renderer.destroyTexture(icons.checkbox_unchecked);
-
-    icons.radiobutton_checked = try renderer.loadTexture(@embedFile("ui-data/radiobox-marked.png"));
-    errdefer renderer.destroyTexture(icons.radiobutton_checked);
-
-    icons.radiobutton_unchecked = try renderer.loadTexture(@embedFile("ui-data/radiobox-blank.png"));
-    errdefer renderer.destroyTexture(icons.radiobutton_unchecked);
-
-    return UserInterface{
-        .renderer = renderer,
-        .default_font = default_font,
+pub fn init(allocator: *std.mem.Allocator, renderer: ?*Renderer) !UserInterface {
+    var ui = UserInterface{
+        .renderer = null,
+        .default_font = undefined,
+        .icons = undefined,
         .allocator = allocator,
         .arena = std.heap.ArenaAllocator.init(allocator),
         .pointer_position = Point{
             .x = std.math.minInt(i16),
             .y = std.math.minInt(i16),
         },
-        .icons = icons,
     };
+
+    try ui.setRenderer(renderer);
+
+    return ui;
 }
 
 pub fn deinit(self: *UserInterface) void {
@@ -436,14 +418,54 @@ pub fn deinit(self: *UserInterface) void {
         // node.data.deinit();
     }
 
-    self.renderer.destroyTexture(self.icons.checkbox_checked);
-    self.renderer.destroyTexture(self.icons.checkbox_unchecked);
-    self.renderer.destroyTexture(self.icons.radiobutton_checked);
-    self.renderer.destroyTexture(self.icons.radiobutton_unchecked);
-    self.renderer.destroyFont(self.default_font);
+    self.setRenderer(null) catch unreachable; // can only error when non-null is passed
 
     self.arena.deinit();
     self.* = undefined;
+}
+
+pub fn setRenderer(self: *UserInterface, new_renderer: ?*Renderer) !void {
+    if (self.renderer == new_renderer)
+        return;
+
+    if (self.renderer) |renderer| {
+        renderer.destroyTexture(self.icons.checkbox_checked);
+        renderer.destroyTexture(self.icons.checkbox_unchecked);
+        renderer.destroyTexture(self.icons.radiobutton_checked);
+        renderer.destroyTexture(self.icons.radiobutton_unchecked);
+        renderer.destroyFont(self.default_font);
+    }
+
+    self.renderer = new_renderer;
+
+    if (self.renderer) |renderer| {
+        errdefer self.renderer = null;
+
+        const default_font = try renderer.createFont(@embedFile("ui-data/FiraSans-Regular.ttf"), 16);
+        errdefer renderer.destroyFont(default_font);
+
+        var icons = Icons{
+            .checkbox_unchecked = undefined,
+            .checkbox_checked = undefined,
+            .radiobutton_unchecked = undefined,
+            .radiobutton_checked = undefined,
+        };
+
+        icons.checkbox_checked = try renderer.loadTexture(@embedFile("ui-data/checkbox-marked.png"));
+        errdefer renderer.destroyTexture(icons.checkbox_checked);
+
+        icons.checkbox_unchecked = try renderer.loadTexture(@embedFile("ui-data/checkbox-blank.png"));
+        errdefer renderer.destroyTexture(icons.checkbox_unchecked);
+
+        icons.radiobutton_checked = try renderer.loadTexture(@embedFile("ui-data/radiobox-marked.png"));
+        errdefer renderer.destroyTexture(icons.radiobutton_checked);
+
+        icons.radiobutton_unchecked = try renderer.loadTexture(@embedFile("ui-data/radiobox-blank.png"));
+        errdefer renderer.destroyTexture(icons.radiobutton_unchecked);
+
+        self.default_font = default_font;
+        self.icons = icons;
+    }
 }
 
 /// Allocates a new WidgetNode, either via the arena or 
@@ -822,7 +844,7 @@ fn clampSub(a: u15, b: u15) u15 {
 }
 
 pub fn render(self: UserInterface) !void {
-    const renderer = self.renderer;
+    const renderer = self.renderer orelse @panic("usage error");
     var iterator = self.widgetIterator(.draw_order);
     while (iterator.next()) |widget| {
         const is_hovered = (self.hovered_widget == widget);

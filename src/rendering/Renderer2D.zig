@@ -210,6 +210,7 @@ pub fn destroyTexture(self: *Self, texture: *const Texture) void {
     // we can do this as texture handles are only given out via `createTexture` which
     // returns a immutable reference.
     const mut_texture = makeTextureMut(texture);
+    std.debug.assert(mut_texture.refcount > 0);
     const node = @fieldParentPtr(TextureItem, "data", mut_texture);
     destroyTextureInternal(self, node);
 }
@@ -285,6 +286,7 @@ pub fn destroyFont(self: *Self, font: *const Font) void {
     // we can do this as texture handles are only given out via `createFont` which
     // returns a immutable reference.
     const mut_font = makeFontMut(font);
+    std.debug.assert(mut_font.refcount > 0);
     const node = @fieldParentPtr(FontItem, "data", mut_font);
     destroyFontInternal(self, node);
 }

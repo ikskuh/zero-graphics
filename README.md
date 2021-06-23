@@ -3,6 +3,8 @@
 A very minimal OpenGL ES 2.0 library for Zig. Opens you a window and let's you draw things.
 Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3D api.
 
+![Logo](design/logo.png)
+
 ## Project status
 Very *work in progress*. Right now it's more a proof of concept than everything else
 
@@ -17,14 +19,14 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
   - [ ] Windows Desktop (not tested, but should work via SDL2)
   - [x] Android
 - [x] Create an OpenGL ES 2.0 context
-- [ ] Provide input events
-  - [ ] Single pointer motion (finger or mouse)
-  - [ ] Single click event (finger, mouse)
+- [x] Provide input events
+  - [x] Single pointer motion (finger or mouse)
+  - [x] Single click event (finger, mouse)
   - [ ] Text input for keyboard (utf-8 encoded)
-- [ ] Provide window events
-  - [ ] Resize
-  - [ ] Close
-- [ ] Provide access to the underlying backend
+- [x] Provide window events
+  - [x] Resize
+  - [x] Close
+- [x] Provide access to the underlying backend
 - [ ] Allow creation of single-file applications
   - [ ] Single executable for easy distribution
   - [ ] Embedded resources
@@ -37,7 +39,7 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
     - [x] Basic "copy full texture to rectangle"
     - [ ] Copy portion of texture ("atlas rendering")
 - [x] TTF font rendering via [`stb_ttf`](https://github.com/nothings/stb)
-- [ ] Image loading via [`stb_image`](https://github.com/nothings/stb)
+- [x] Image loading via [`zigimg`](https://github.com/zigimg/zigimg)
 - [ ] Stack based/nested scissoring
 
 ## Features
@@ -71,7 +73,7 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 Requires `SDL2` to be installed.
 
 ```sh
-zig build -Dbackend=desktop_sdl2 run
+zig build run
 ```
 
 A window should open with the application in fullscreen.
@@ -81,17 +83,18 @@ A window should open with the application in fullscreen.
 Includes a teeny tiny web server for debugging.
 
 ```sh
-zig build -Dbackend=wasm install run
+zig build install run-wasm
 ```
 
 Now visit http://127.0.0.1:8000/index.htm to see the demo.
 
 ### Android
 
-Connect your phone first and install both a JDK as well as the Android SDK with NDK included.
+Connect your phone first and install both a JDK as well as the Android SDK with NDK included. The ZeroGraphics build system will tell you if
+it couldn't auto-detect the SDK paths.
 
 ```sh
-zig build -Dbackend=android run
+zig build -Denable-android run-app
 ```
 
 The app should now be installed and started on your phone.

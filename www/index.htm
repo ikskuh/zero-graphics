@@ -38,7 +38,7 @@
             ...getEnv(canvas_element, () => globalInstance),
         };
 
-        fetch("gles2-zig.wasm")
+        fetch("zerog-demo.wasm")
             .then((response) => response.arrayBuffer())
             .then((bytes) => WebAssembly.instantiate(bytes, { env }))
             .then((results) => results.instance)
@@ -64,8 +64,6 @@
                 else {
                     console.log("app_init returned ", res);
                 }
-
-
             });
     </script>
 </head>

@@ -1,18 +1,13 @@
 const std = @import("std");
 const build_options = @import("build_options");
-const zero_graphics = @import("zero-graphics");
+const zero_graphics_builder = @import("zero-graphics");
+
+const zero_graphics = zero_graphics_builder.Api(@field(zero_graphics_builder.Backend, build_options.render_backend), Application);
+
+pub usingnamespace zero_graphics.entry_point;
 
 const logger = std.log.scoped(.demo);
 const gles = zero_graphics.gles;
-
-/// This configures the application name that is shown in the android logging
-pub const android_app_name = "zig-gles2-demo";
-
-pub usingnamespace zero_graphics.EntryPoint(switch (build_options.render_backend) {
-    .desktop_sdl2 => .desktop_sdl2,
-    .wasm => .wasm,
-    .android => .android,
-});
 
 const Renderer = zero_graphics.Renderer2D;
 
@@ -20,9 +15,12 @@ const Renderer = zero_graphics.Renderer2D;
 /// zero-graphics with a main entry point.
 /// Must export the following functions:
 /// - `pub fn init(app: *Application, allocator: *std.mem.Allocator) !void`
-/// - `pub fn deinit(app: *Application) void`
+/// - `pub fn setupGraphics(app: *Application) !void`
 /// - `pub fn resize(app: *Application, width: u15, height: u15) !void`
 /// - `pub fn update(app: *Application) !bool`
+/// - `pub fn render(app: *Application) !void`
+/// - `pub fn teardownGraphics(app: *Application) void`
+/// - `pub fn deinit(app: *Application) void`
 /// 
 pub const Application = struct {
     screen_width: u15,
@@ -49,7 +47,7 @@ pub const Application = struct {
             .input = input,
         };
 
-        try gles.load({}, loadOpenGlFunction);
+        try gles.load({}, zero_graphics.loadOpenGlFunction);
 
         const RequestedExtensions = struct {
             KHR_debug: bool,
@@ -85,12 +83,22 @@ pub const Application = struct {
         // If possible, install the debug callback in debug builds
         if (std.builtin.mode == .Debug and available_extensions.KHR_debug) {
             const debug = gles.GL_KHR_debug;
-            try debug.load({}, loadOpenGlFunction);
+            try debug.load({}, zero_graphics.loadOpenGlFunction);
 
             debug.debugMessageCallbackKHR(glesDebugProc, null);
             gles.enable(debug.DEBUG_OUTPUT_KHR);
         }
 
+        app.ui = try zero_graphics.UserInterface.init(app.allocator, null);
+        errdefer app.ui.deinit();
+    }
+
+    pub fn deinit(app: *Application) void {
+        app.ui.deinit();
+        app.* = undefined;
+    }
+
+    pub fn setupGraphics(app: *Application) !void {
         app.renderer = try Renderer.init(app.allocator);
         errdefer app.renderer.deinit();
 
@@ -98,14 +106,12 @@ pub const Application = struct {
         app.texture_handle = try app.renderer.loadTexture(@embedFile("ziggy.png"));
         app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
-        app.ui = try zero_graphics.UserInterface.init(app.allocator, &app.renderer);
-        errdefer app.ui.deinit();
+        try app.ui.setRenderer(&app.renderer);
     }
 
-    pub fn deinit(app: *Application) void {
-        app.ui.deinit();
+    pub fn teardownGraphics(app: *Application) void {
+        app.ui.setRenderer(null) catch unreachable;
         app.renderer.deinit();
-        app.* = undefined;
     }
 
     pub fn resize(app: *Application, width: u15, height: u15) !void {
@@ -117,16 +123,17 @@ pub const Application = struct {
     }
 
     pub fn update(app: *Application) !bool {
-        var take_screenshot = false;
-
         {
             var ui_input = app.ui.processInput();
             while (app.input.pollEvent()) |event| {
                 switch (event) {
                     .quit => return false,
                     .pointer_motion => |pt| ui_input.setPointer(pt),
-                    .pointer_press => |cursor| if (cursor == .primary) ui_input.pointerDown(),
-                    .pointer_release => |cursor| if (cursor == .primary) ui_input.pointerUp(),
+                    .pointer_press => ui_input.pointerDown(),
+                    .pointer_release => |cursor| ui_input.pointerUp(switch (cursor) {
+                        .primary => zero_graphics.UserInterface.Pointer.primary,
+                        .secondary => .secondary,
+                    }),
                     .text_input => |text| try ui_input.enterText(text.text),
                 }
             }
@@ -134,7 +141,10 @@ pub const Application = struct {
         }
 
         {
-            var ui = app.ui.construct();
+            var ui = app.ui.construct(.{
+                .width = app.screen_width,
+                .height = app.screen_height,
+            });
 
             if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 30, .height = 30 }, app.gui_data.is_visible, .{}))
                 app.gui_data.is_visible = !app.gui_data.is_visible;
@@ -196,7 +206,7 @@ pub const Application = struct {
                             .width = 100,
                             .height = 40,
                         };
-                        const clicked = try ui.button(rect, "Click me!", .{
+                        const clicked = try ui.button(rect, "Click me!", null, .{
                             .id = i,
                             .text_color = if ((app.gui_data.last_button orelse 9999) == i)
                                 zero_graphics.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 }
@@ -235,7 +245,7 @@ pub const Application = struct {
                         return null;
                     }
 
-                    pub fn draw(self: zero_graphics.UserInterface.CustomWidget, rectangle: zero_graphics.Rectangle, painter: *Renderer) Renderer.DrawError!void {
+                    pub fn draw(self: zero_graphics.UserInterface.CustomWidget, rectangle: zero_graphics.Rectangle, painter: *Renderer, info: zero_graphics.UserInterface.CustomWidget.DrawInfo) Renderer.DrawError!void {
                         const Color = zero_graphics.Color;
                         try painter.fillRectangle(rectangle, if (mouse_in)
                             if (mouse_down)
@@ -245,9 +255,9 @@ pub const Application = struct {
                         else
                             Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x10 });
 
-                        startup_time = startup_time orelse std.time.milliTimestamp();
+                        startup_time = startup_time orelse zero_graphics.milliTimestamp();
 
-                        var t = 0.001 * @intToFloat(f32, std.time.milliTimestamp() - startup_time.?);
+                        var t = 0.001 * @intToFloat(f32, zero_graphics.milliTimestamp() - startup_time.?);
                         var points: [3][2]f32 = undefined;
 
                         for (points) |*pt, i| {
@@ -288,7 +298,15 @@ pub const Application = struct {
             ui.finish();
         }
 
+        return true;
+    }
+
+    pub fn render(app: *Application) !void {
+        var take_screenshot = false;
+
         const renderer = &app.renderer;
+
+        renderer.reset();
 
         // render scene
         {
@@ -296,8 +314,6 @@ pub const Application = struct {
 
             const red = zero_graphics.Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
             const white = zero_graphics.Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF };
-
-            renderer.reset();
 
             try renderer.fillRectangle(Rectangle{ .x = 1, .y = 1, .width = 16, .height = 16 }, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x80 });
             try renderer.fillRectangle(Rectangle{ .x = 9, .y = 9, .width = 16, .height = 16 }, .{ .r = 0x00, .g = 0xFF, .b = 0x00, .a = 0x80 });
@@ -425,8 +441,6 @@ pub const Application = struct {
                 logger.info("screenshot written to screenshot.tga", .{});
             }
         }
-
-        return true;
     }
 
     const DemoGuiData = struct {

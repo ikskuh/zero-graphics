@@ -2,7 +2,7 @@ const std = @import("std");
 const wasm = std.log.scoped(.sdl);
 const root = @import("root");
 const gles = @import("../gl_es_2v0.zig");
-const zerog = @import("../zero-graphics.zig");
+const zerog = @import("../common.zig");
 
 extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*c_void;
 
@@ -32,35 +32,52 @@ fn writeLog(ctx: void, msg: []const u8) WriteError!usize {
     return msg.len;
 }
 
-/// Overwrite default log handler
-pub fn log(
-    comptime message_level: std.log.Level,
-    comptime scope: @Type(.EnumLiteral),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    const level_txt = switch (message_level) {
-        .emerg => "emergency",
-        .alert => "alert",
-        .crit => "critical",
-        .err => "error",
-        .warn => "warning",
-        .notice => "notice",
-        .info => "info",
-        .debug => "debug",
-    };
-    const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
-
-    (LogWriter{ .context = {} }).print(level_txt ++ prefix2 ++ format ++ "\n", args) catch return;
-
-    wasm_log_flush();
+pub fn milliTimestamp() i64 {
+    return @floatToInt(i64, now_f64());
 }
 
-/// Overwrite default panic handler
-pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace) noreturn {
-    // std.log.crit("panic: {s}", .{msg});
-    wasm_panic(msg.ptr, msg.len);
-    unreachable;
+pub const entry_point = struct {
+
+    /// Overwrite default log handler
+    pub fn log(
+        comptime message_level: std.log.Level,
+        comptime scope: @Type(.EnumLiteral),
+        comptime format: []const u8,
+        args: anytype,
+    ) void {
+        const level_txt = switch (message_level) {
+            .emerg => "emergency",
+            .alert => "alert",
+            .crit => "critical",
+            .err => "error",
+            .warn => "warning",
+            .notice => "notice",
+            .info => "info",
+            .debug => "debug",
+        };
+        const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+
+        (LogWriter{ .context = {} }).print(level_txt ++ prefix2 ++ format ++ "\n", args) catch return;
+
+        wasm_log_flush();
+    }
+
+    /// Overwrite default panic handler
+    pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace) noreturn {
+        // std.log.crit("panic: {s}", .{msg});
+        wasm_panic(msg.ptr, msg.len);
+        unreachable;
+    }
+};
+
+pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
+    inline for (std.meta.declarations(WebGL)) |decl| {
+        const gl_ep = "gl" ++ [_]u8{std.ascii.toUpper(decl.name[0])} ++ decl.name[1..];
+        if (std.mem.eql(u8, gl_ep, function)) {
+            return @as(*const c_void, @field(WebGL, decl.name));
+        }
+    }
+    return null;
 }
 
 export fn app_init() u32 {
@@ -71,7 +88,9 @@ export fn app_init() u32 {
 
     input_handler = zerog.Input.init(&gpa.allocator);
 
-    app_instance.init(&gpa.allocator, &input_handler) catch return 1;
+    app_instance.init(&gpa.allocator, &input_handler) catch |err| @panic(@errorName(err));
+
+    app_instance.setupGraphics() catch |err| @panic(@errorName(err));
 
     app_instance.resize(@intCast(u15, wasm_getScreenW()), @intCast(u15, wasm_getScreenH())) catch return 2;
 
@@ -84,26 +103,18 @@ export fn app_update() u32 {
     const res = app_instance.update() catch return 1;
     if (!res)
         wasm_quit();
+    app_instance.render() catch return 3;
     return 0;
 }
 
 export fn app_deinit() u32 {
+    app_instance.teardownGraphics();
     app_instance.deinit();
     input_handler.deinit();
     // _ = gpa.deinit();
     global_arena.deinit();
 
     return 0;
-}
-
-pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
-    inline for (std.meta.declarations(WebGL)) |decl| {
-        const entry_point = "gl" ++ [_]u8{std.ascii.toUpper(decl.name[0])} ++ decl.name[1..];
-        if (std.mem.eql(u8, entry_point, function)) {
-            return @as(*const c_void, @field(WebGL, decl.name));
-        }
-    }
-    return null;
 }
 
 fn unknownOpenGlFunction() void {

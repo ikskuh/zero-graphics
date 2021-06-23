@@ -1,30 +1,38 @@
 const std = @import("std");
 
-// opengl docs can be found here:
-// https://www.khronos.org/registry/OpenGL-Refpages/es2.0/
-pub const gles = @import("gl_es_2v0.zig");
-
 pub const Backend = enum {
     desktop_sdl2,
     wasm,
     android,
 };
 
-pub fn EntryPoint(comptime backend: Backend) type {
-    return switch (backend) {
+// TODO:
+// Specify application type for the backend, so we can remove the `@import("root").Application` reference
+pub fn Api(comptime backend: Backend) type {
+    const BackendImpl = switch (backend) {
         .desktop_sdl2 => @import("backend/sdl.zig"),
         .wasm => @import("backend/wasm.zig"),
         .android => @import("backend/android.zig"),
     };
+
+    const T = struct {
+        pub usingnamespace BackendImpl;
+
+        pub usingnamespace @import("common.zig");
+    };
+
+    const required_exports = [_][]const u8{
+        "entry_point",
+        "loadOpenGlFunction",
+        "milliTimestamp",
+    };
+
+    inline for (required_exports) |export_name| {
+        if (!@hasDecl(T, export_name))
+            @compileError("Backend is missing symbol " ++ export_name ++ "!");
+    }
+    return T;
 }
-
-pub const Renderer2D = @import("rendering/Renderer2D.zig");
-
-pub const Input = @import("Input.zig");
-
-pub const UserInterface = @import("UserInterface.zig");
-
-pub usingnamespace @import("types.zig");
 
 export fn zerog_panic(msg: [*:0]const u8) noreturn {
     @panic(std.mem.span(msg));

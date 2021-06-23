@@ -1,25 +1,5 @@
 const std = @import("std");
-const android_sdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
-
-const OutputType = enum {
-    exe,
-    static_lib,
-    dynamic_lib,
-};
-
-const RenderBackend = enum {
-    desktop_sdl2,
-    wasm,
-    android,
-
-    fn outputType(self: RenderBackend) OutputType {
-        return switch (self) {
-            .desktop_sdl2 => OutputType.exe,
-            .wasm => OutputType.dynamic_lib,
-            .android => OutputType.dynamic_lib,
-        };
-    }
-};
+const AndroidSdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
 
 fn initApp(app: *std.build.LibExeObjStep) void {
     const cflags = [_][]const u8{
@@ -33,54 +13,42 @@ fn initApp(app: *std.build.LibExeObjStep) void {
 
 pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
-    const backend = b.option(
-        RenderBackend,
-        "backend",
-        "Selects the compile target for the application.",
-    ) orelse .desktop_sdl2;
 
     const root_src = "examples/demo-application.zig";
 
     const zigimg = std.build.Pkg{
         .name = "zigimg",
-        .path = "vendor/zigimg/zigimg.zig",
+        .path = .{ .path = "vendor/zigimg/zigimg.zig" },
     };
 
     var zero_graphics = std.build.Pkg{
         .name = "zero-graphics",
-        .path = "src/zero-graphics.zig",
+        .path = .{ .path = "src/zero-graphics.zig" },
         .dependencies = &[_]std.build.Pkg{
             zigimg,
         },
     };
 
-    if (backend == .android) {
+    if (b.option(bool, "enable-android", "Enables building the Android application") orelse false) {
         // TODO: Move this into a file!
-        const key_store = android_sdk.KeyStore{
+        const key_store = AndroidSdk.KeyStore{
             .file = "zig-cache/key.store",
             .password = "123456",
             .alias = "development_key",
         };
 
-        const sdk = try android_sdk.init(
-            b,
-            "vendor/ZigAndroidTemplate",
-            null,
-            .{},
-        );
-
-        zero_graphics.dependencies = &[_]std.build.Pkg{
-            zigimg, sdk.android_package,
-        };
+        const sdk = AndroidSdk.init(b, null, .{});
 
         const make_keystore = sdk.initKeystore(key_store, .{});
         b.step("init-keystore", "Initializes a fresh debug keystore.").dependOn(make_keystore);
 
-        const app_config = android_sdk.AppConfig{
+        const app_config = AndroidSdk.AppConfig{
             .app_name = "zerog-demo",
-            .display_name = "Zig OpenGL ES 2.0 Demo",
-            .package_name = "net.random_projects.zig_gles2_demo",
-            .resource_directory = "zig-cache/app-resources",
+            .display_name = "ZeroGraphics Demo",
+            .package_name = "net.random_projects.zero_graphics_demo",
+            .resources = &[_]AndroidSdk.Resource{
+                .{ .path = "mipmap/icon.png", .content = std.build.FileSource.relative("design/app-icon.png") },
+            },
             .fullscreen = true,
         };
 
@@ -101,85 +69,84 @@ pub fn build(b: *std.build.Builder) !void {
             key_store,
         );
 
+        zero_graphics.dependencies = &[_]std.build.Pkg{
+            zigimg, app.getAndroidPackage("android"),
+        };
+
         for (app.libraries) |lib| {
-            lib.addBuildOption(RenderBackend, "render_backend", backend);
+            lib.addBuildOption([]const u8, "render_backend", "android");
             lib.addPackage(zero_graphics);
             initApp(lib);
         }
 
         b.getInstallStep().dependOn(app.final_step);
 
-        const push = sdk.installApp(apk_file);
-        push.dependOn(app.final_step);
+        const push = app.install();
 
-        const run = sdk.startApp(app_config);
+        const run = app.run();
         run.dependOn(push);
 
-        const push_step = b.step("push", "Push the app to the default ADB target");
+        const push_step = b.step("install-app", "Push the app to the default ADB target");
         push_step.dependOn(push);
 
-        const run_step = b.step("run", "Runs the app on the default ADB target");
+        const run_step = b.step("run-app", "Runs the Android app on the default ADB target");
         run_step.dependOn(run);
-    } else {
-        const app = switch (backend.outputType()) {
-            .exe => b.addExecutable("zerog-demo", root_src),
-            .static_lib => b.addStaticLibrary("zerog-demo", root_src),
-            .dynamic_lib => b.addSharedLibrary("zerog-demo", root_src, .unversioned),
-        };
+    }
+
+    // Build desktop application
+    {
+        const app = b.addExecutable("zerog-demo", root_src);
         app.addPackage(zero_graphics);
-        app.addBuildOption(RenderBackend, "render_backend", backend);
+        app.addBuildOption([]const u8, "render_backend", "desktop_sdl2");
         app.setBuildMode(mode);
         initApp(app);
 
-        switch (backend) {
-            .desktop_sdl2 => {
-                const target = b.standardTargetOptions(.{});
-                app.setTarget(target);
-                app.linkLibC();
-                app.linkSystemLibrary("sdl2");
-            },
-            .wasm => {
-                // No libc on wasm!
-                app.setTarget(std.zig.CrossTarget{
-                    .cpu_arch = .wasm32,
-                    .os_tag = .freestanding,
-                    .abi = .musl,
-                });
-                app.override_dest_dir = .{ .Custom = "../www" };
-                app.single_threaded = true;
-            },
-            .android => unreachable,
-        }
+        const target = b.standardTargetOptions(.{});
+        app.setTarget(target);
+        app.linkLibC();
+        app.linkSystemLibrary("sdl2");
 
         app.install();
 
-        switch (backend) {
-            .desktop_sdl2 => {
-                const run_cmd = app.run();
-                run_cmd.step.dependOn(b.getInstallStep());
-                if (b.args) |args| {
-                    run_cmd.addArgs(args);
-                }
-
-                const run_step = b.step("run", "Run the app");
-                run_step.dependOn(&run_cmd.step);
-            },
-            .wasm => {
-                const server = b.addExecutable("http-server", "tools/http-server.zig");
-                server.addPackage(std.build.Pkg{
-                    .name = "apple_pie",
-                    .path = "vendor/apple_pie/src/apple_pie.zig",
-                });
-
-                const serve = server.run();
-
-                serve.step.dependOn(&app.step);
-
-                const run_step = b.step("run", "Serves the wasm app");
-
-                run_step.dependOn(&serve.step);
-            },
-            else => {},
+        const run_cmd = app.run();
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
         }
+
+        const run_step = b.step("run", "Runs the desktop application");
+        run_step.dependOn(&run_cmd.step);
+    }
+
+    // Build wasm application
+    {
+        const app = b.addSharedLibrary("zerog-demo", root_src, .unversioned);
+        app.addPackage(zero_graphics);
+        app.addBuildOption([]const u8, "render_backend", "wasm");
+        app.setBuildMode(mode);
+        initApp(app);
+
+        // No libc on wasm!
+        app.setTarget(std.zig.CrossTarget{
+            .cpu_arch = .wasm32,
+            .os_tag = .freestanding,
+            .abi = .musl,
+        });
+        app.override_dest_dir = .{ .custom = "../www" };
+        app.single_threaded = true;
+
+        app.install();
+
+        const server = b.addExecutable("http-server", "tools/http-server.zig");
+        server.addPackage(std.build.Pkg{
+            .name = "apple_pie",
+            .path = .{ .path = "vendor/apple_pie/src/apple_pie.zig" },
+        });
+
+        const serve = server.run();
+        serve.step.dependOn(&app.step);
+
+        const run_step = b.step("run-wasm", "Serves the wasm app");
+
+        run_step.dependOn(&serve.step);
     }
 }
