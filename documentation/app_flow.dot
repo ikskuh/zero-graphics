@@ -1,0 +1,23 @@
+digraph {
+  rankdir = LR;
+  title = "Application";
+  nodesep = 1.5;
+
+  _start [shape=none, label="Program startup"];
+  _end   [shape=none, label="Program shutdown"];
+
+  no_graphics [label="App ready"];
+  graphics    [label="Graphics ready"];
+
+  _start -> no_graphics [fontname="monospace", label=".init()"];
+  no_graphics -> _end [fontname="monospace", label=".deinit()"];
+
+  no_graphics -> no_graphics [fontname="monospace", label=".update()"];
+
+  no_graphics -> graphics [fontname="monospace", label=".setupGraphics()"];
+  graphics -> no_graphics [fontname="monospace", label=".teardownGraphics()"];
+
+  graphics -> graphics [fontname="monospace", label=".resize()"];
+  graphics -> graphics [fontname="monospace", label=".render()"];
+  graphics -> graphics [fontname="monospace", label=".update()"];
+}

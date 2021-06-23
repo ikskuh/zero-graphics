@@ -90,6 +90,8 @@ export fn app_init() u32 {
 
     app_instance.init(&gpa.allocator, &input_handler) catch |err| @panic(@errorName(err));
 
+    gles.load({}, loadOpenGlFunction) catch |err| @panic(@errorName(err));
+
     app_instance.setupGraphics() catch |err| @panic(@errorName(err));
 
     app_instance.resize(@intCast(u15, wasm_getScreenW()), @intCast(u15, wasm_getScreenH())) catch return 2;

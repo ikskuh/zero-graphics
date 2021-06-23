@@ -98,3 +98,74 @@ zig build -Denable-android run-app
 ```
 
 The app should now be installed and started on your phone.
+
+## Documentation
+
+To create a new project, copy this application skeleton:
+```zig
+const std = @import("std");
+const zero_graphics_builder = @import("zero-graphics");
+
+const zero_graphics = zero_graphics_builder.Api(zero_graphics_builder.Backend.desktop_sdl2);
+
+pub usingnamespace zero_graphics.entry_point;
+
+/// This implements your application with all state
+pub const Application = struct {
+    allocator: *std.mem.Allocator,
+    input: *zero_graphics.Input,
+
+    pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
+        // Initialize the app and all non-gpu logic here
+        app.* = Application{
+            .allocator = allocator,
+            .input = input,
+        };
+    }
+
+    pub fn deinit(app: *Application) void {
+        // destroy application data here
+        app.* = undefined;
+    }
+
+    pub fn setupGraphics(app: *Application) !void {
+        // initialize all OpenGL objects here
+    }
+
+    pub fn teardownGraphics(app: *Application) void {
+        // destroy all OpenGL objects here
+    }
+
+    pub fn update(app: *Application) !bool {
+        while (app.input.pollEvent()) |event| {
+            switch (event) {
+                .quit => return false,
+                else => std.log.info("unhandled input event: {}", .{event}),
+            }
+        }
+
+        // return false to exit the application
+        return true;
+    }
+
+    pub fn resize(app: *Application, width: u15, height: u15) !void {
+        // handle application resize logic here
+    }
+
+    pub fn render(app: *Application) !void {
+        // OpenGL is already loaded, so we can just use it :)
+        // render will never be called before `setupGraphics` is called and never
+        // after `teardownGraphics` was called.
+        zero_graphics.gles.clearColor(0.3, 0.3, 0.3, 1.0);
+        zero_graphics.gles.clear(gles.COLOR_BUFFER_BIT);
+    }
+};
+```
+
+The functions are roughly called in this order:
+
+![Application workflow](documentation/app_flow.svg)
+
+The separation between *application init* and *graphics init* is relevant for Android apps which will destroy their window when you send it into the background and will recreate it when it is selected again. This means that all GPU content will be lost then and must be restored.
+
+Your application state will not be destroyed, so the rendering can render the same data as before.

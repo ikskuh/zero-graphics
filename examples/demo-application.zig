@@ -2,7 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const zero_graphics_builder = @import("zero-graphics");
 
-const zero_graphics = zero_graphics_builder.Api(@field(zero_graphics_builder.Backend, build_options.render_backend), Application);
+const zero_graphics = zero_graphics_builder.Api(@field(zero_graphics_builder.Backend, build_options.render_backend));
 
 pub usingnamespace zero_graphics.entry_point;
 
@@ -47,8 +47,17 @@ pub const Application = struct {
             .input = input,
         };
 
-        try gles.load({}, zero_graphics.loadOpenGlFunction);
+        app.ui = try zero_graphics.UserInterface.init(app.allocator, null);
+        errdefer app.ui.deinit();
+    }
 
+    pub fn deinit(app: *Application) void {
+        app.ui.deinit();
+        app.* = undefined;
+    }
+
+    pub fn setupGraphics(app: *Application) !void {
+        // Load required extensions here:
         const RequestedExtensions = struct {
             KHR_debug: bool,
         };
@@ -89,16 +98,6 @@ pub const Application = struct {
             gles.enable(debug.DEBUG_OUTPUT_KHR);
         }
 
-        app.ui = try zero_graphics.UserInterface.init(app.allocator, null);
-        errdefer app.ui.deinit();
-    }
-
-    pub fn deinit(app: *Application) void {
-        app.ui.deinit();
-        app.* = undefined;
-    }
-
-    pub fn setupGraphics(app: *Application) !void {
         app.renderer = try Renderer.init(app.allocator);
         errdefer app.renderer.deinit();
 

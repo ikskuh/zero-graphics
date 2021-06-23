@@ -242,6 +242,8 @@ pub const entry_point = struct {
                     const egl = self.egl orelse @panic("implementation mistake");
                     try egl.makeCurrent();
 
+                    try gles.load({}, loadOpenGlFunction);
+
                     try self.application.setupGraphics();
 
                     self.egl_ready = true;

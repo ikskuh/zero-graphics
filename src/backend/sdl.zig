@@ -74,6 +74,8 @@ pub const entry_point = struct {
         try app.init(std.heap.c_allocator, &input_queue);
         defer app.deinit();
 
+        try zerog.gles.load({}, loadOpenGlFunction);
+
         try app.setupGraphics();
         defer app.teardownGraphics();
 
