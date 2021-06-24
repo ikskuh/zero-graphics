@@ -101,6 +101,8 @@ The app should now be installed and started on your phone.
 
 ## Documentation
 
+### Getting started
+
 To create a new project, copy this application skeleton:
 ```zig
 const std = @import("std");
@@ -169,3 +171,7 @@ The functions are roughly called in this order:
 The separation between *application init* and *graphics init* is relevant for Android apps which will destroy their window when you send it into the background and will recreate it when it is selected again. This means that all GPU content will be lost then and must be restored.
 
 Your application state will not be destroyed, so the rendering can render the same data as before.
+
+### Configuration
+
+For the desktop variant, the environment variable `DUNSTBLICK_DPI` might be used to set a fallback display density when the display one could not be determined.

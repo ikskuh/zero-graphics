@@ -1,5 +1,5 @@
 const std = @import("std");
-const log = std.log.scoped(.sdl);
+const logger = std.log.scoped(.sdl);
 const root = @import("root");
 const zerog = @import("../common.zig");
 const c = @cImport({
@@ -16,13 +16,28 @@ else
 pub const milliTimestamp = std.time.milliTimestamp;
 
 pub fn getDisplayDPI() f32 {
+    var fallback: f32 = 96.0; // Default DPI
+
+    if (std.process.getEnvVarOwned(std.heap.c_allocator, "DUNSTBLICK_DPI")) |env| {
+        defer std.heap.c_allocator.free(env);
+        if (std.fmt.parseFloat(f32, env)) |value| {
+            fallback = value;
+        } else |err| {
+            logger.err("Could not parse DUNSTBLICK_DPI environment variable: {s}", .{@errorName(err)});
+        }
+    } else |_| {
+        // silently ignore the error here
+    }
+
     var index = c.SDL_GetWindowDisplayIndex(window);
-    if (index < 0)
-        sdlPanic();
+    if (index < 0) {
+        return fallback;
+    }
 
     var diagonal_dpi: f32 = undefined;
-    if (c.SDL_GetDisplayDPI(index, &diagonal_dpi, null, null) < 0)
-        sdlPanic();
+    if (c.SDL_GetDisplayDPI(index, &diagonal_dpi, null, null) < 0) {
+        return fallback;
+    }
     return diagonal_dpi;
 }
 
@@ -59,7 +74,7 @@ pub const entry_point = struct {
         ) orelse sdlPanic();
         defer c.SDL_DestroyWindow(window);
 
-        log.info("SDL Video Driver:     {s}", .{std.mem.span(c.SDL_GetCurrentVideoDriver())});
+        logger.info("SDL Video Driver:     {s}", .{std.mem.span(c.SDL_GetCurrentVideoDriver())});
 
         const gl_context = c.SDL_GL_CreateContext(window) orelse sdlPanic();
         defer c.SDL_GL_DeleteContext(gl_context);
@@ -68,12 +83,12 @@ pub const entry_point = struct {
             var drawbable_width: c_int = undefined;
             var drawbable_height: c_int = undefined;
             c.SDL_GL_GetDrawableSize(window, &drawbable_width, &drawbable_height);
-            log.info("Render resolution:  {}×{}", .{ drawbable_width, drawbable_height });
+            logger.info("Render resolution:  {}×{}", .{ drawbable_width, drawbable_height });
 
             var virtual_width: c_int = undefined;
             var virtual_height: c_int = undefined;
             c.SDL_GetWindowSize(window, &virtual_width, &virtual_height);
-            log.info("Virtual resolution: {}×{}", .{ virtual_width, virtual_height });
+            logger.info("Virtual resolution: {}×{}", .{ virtual_width, virtual_height });
 
             const scale_x = @intToFloat(f32, drawbable_width) / @intToFloat(f32, virtual_width);
             const scale_y = @intToFloat(f32, drawbable_height) / @intToFloat(f32, virtual_height);
@@ -150,11 +165,11 @@ pub const entry_point = struct {
 
                             try app.resize(@intCast(u15, width), @intCast(u15, height));
                         } else {
-                            // log.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
+                            // logger.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                         }
                     },
 
-                    else => {}, //log.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, event.type)}),
+                    else => {}, //logger.info("unhandled event: {}", .{@intToEnum(c.SDL_EventType, event.type)}),
                 }
             }
 
@@ -168,7 +183,7 @@ pub const entry_point = struct {
 };
 
 pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
-    // log.debug("getting entry point for '{s}'", .{function});
+    // logger.debug("getting entry point for '{s}'", .{function});
     return c.SDL_GL_GetProcAddress(function.ptr);
 }
 
