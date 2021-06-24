@@ -6,6 +6,8 @@ const c = @cImport({
     @cInclude("SDL.h");
 });
 
+var window: *c.SDL_Window = undefined;
+
 const debug_window_mode = if (@hasDecl(root, "zerog_enable_window_mode"))
     root.zerog_enable_window_mode
 else
@@ -13,7 +15,19 @@ else
 
 pub const milliTimestamp = std.time.milliTimestamp;
 
+pub fn getDisplayDPI() f32 {
+    var index = c.SDL_GetWindowDisplayIndex(window);
+    if (index < 0)
+        sdlPanic();
+
+    var diagonal_dpi: f32 = undefined;
+    if (c.SDL_GetDisplayDPI(index, &diagonal_dpi, null, null) < 0)
+        sdlPanic();
+    return diagonal_dpi;
+}
+
 pub const entry_point = struct {
+
     // Desktop entry point
     pub fn main() !void {
         _ = c.SDL_Init(c.SDL_INIT_EVERYTHING);
@@ -35,7 +49,7 @@ pub const entry_point = struct {
         else
             0;
 
-        const window = c.SDL_CreateWindow(
+        window = c.SDL_CreateWindow(
             "OpenGL ES 2.0 - Zig Demo",
             c.SDL_WINDOWPOS_CENTERED,
             c.SDL_WINDOWPOS_CENTERED,

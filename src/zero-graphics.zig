@@ -26,6 +26,7 @@ pub fn Api(comptime backend: Backend) type {
         "entry_point",
         "loadOpenGlFunction",
         "milliTimestamp",
+        "getDisplayDPI",
     };
 
     inline for (required_exports) |export_name| {

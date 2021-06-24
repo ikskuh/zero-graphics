@@ -449,15 +449,15 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u21) !Glyph {
             .offset_y = @intCast(i16, iy0),
         };
 
-        var buf: [8]u8 = undefined;
-        const len = try std.unicode.utf8Encode(codepoint, &buf);
-        var codepoint_str = buf[0..len];
+        // var buf: [8]u8 = undefined;
+        // const len = try std.unicode.utf8Encode(codepoint, &buf);
+        // var codepoint_str = buf[0..len];
 
         if (gop.found_existing) {
-            logger.info("regenerate glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
+            // logger.info("regenerate glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
             self.destroyTexture(gop.value_ptr.texture);
         } else {
-            logger.info("render glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
+            // logger.info("render glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
         }
 
         gop.value_ptr.* = glyph;

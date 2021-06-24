@@ -18,6 +18,11 @@ pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
 
 pub const milliTimestamp = std.time.milliTimestamp;
 
+var screen_dpi: f32 = 96.0;
+pub fn getDisplayDPI() f32 {
+    return screen_dpi;
+}
+
 pub const entry_point = struct {
     pub const log = android.log;
     pub const panic = android.panic;
@@ -184,6 +189,37 @@ pub const entry_point = struct {
 
             if (self.config) |cfg| {
                 printConfig(cfg);
+
+                const density = android.AConfiguration_getDensity(cfg);
+
+                switch (density) {
+                    android.ACONFIGURATION_DENSITY_LOW,
+                    android.ACONFIGURATION_DENSITY_MEDIUM,
+                    android.ACONFIGURATION_DENSITY_TV,
+                    android.ACONFIGURATION_DENSITY_HIGH,
+                    android.ACONFIGURATION_DENSITY_XHIGH,
+                    android.ACONFIGURATION_DENSITY_XXHIGH,
+                    android.ACONFIGURATION_DENSITY_XXXHIGH,
+                    => {
+                        screen_dpi = @intToFloat(f32, density);
+                    },
+                    android.ACONFIGURATION_DENSITY_DEFAULT => {
+                        screen_dpi = 96.0;
+                        logger.warn("Cannot use default display density configuration. Using default DPI!", .{});
+                    },
+                    android.ACONFIGURATION_DENSITY_ANY => {
+                        screen_dpi = 96.0;
+                        logger.warn("Cannot use 'any' display density configuration. Using default DPI!", .{});
+                    },
+                    android.ACONFIGURATION_DENSITY_NONE => {
+                        screen_dpi = 96.0;
+                        logger.warn("No display density configuration. Using default DPI!", .{});
+                    },
+                    else => {
+                        screen_dpi = 96.0;
+                        logger.warn("Unknown display density configuration ({d}). Using default DPI!", .{density});
+                    },
+                }
             }
 
             logger.info("Init application...", .{});

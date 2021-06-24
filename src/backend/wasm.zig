@@ -36,6 +36,13 @@ pub fn milliTimestamp() i64 {
     return @floatToInt(i64, now_f64());
 }
 
+pub fn getDisplayDPI() f32 {
+    // TODO: Figure out if browsers can actually report the correct DPI scale
+    // for the display.
+    // Otherwise, keep 96 as it's the default for all browsers now?
+    return 96.0;
+}
+
 pub const entry_point = struct {
 
     /// Overwrite default log handler
