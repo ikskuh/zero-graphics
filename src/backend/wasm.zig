@@ -27,7 +27,7 @@ var gpa: std.heap.GeneralPurposeAllocator(.{
 const WriteError = error{};
 const LogWriter = std.io.Writer(void, WriteError, writeLog);
 
-fn writeLog(ctx: void, msg: []const u8) WriteError!usize {
+fn writeLog(_: void, msg: []const u8) WriteError!usize {
     wasm_log_write(msg.ptr, msg.len);
     return msg.len;
 }
@@ -70,14 +70,14 @@ pub const entry_point = struct {
     }
 
     /// Overwrite default panic handler
-    pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace) noreturn {
+    pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
         // std.log.crit("panic: {s}", .{msg});
         wasm_panic(msg.ptr, msg.len);
         unreachable;
     }
 };
 
-pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
     inline for (std.meta.declarations(WebGL)) |decl| {
         const gl_ep = "gl" ++ [_]u8{std.ascii.toUpper(decl.name[0])} ++ decl.name[1..];
         if (std.mem.eql(u8, gl_ep, function)) {
@@ -206,119 +206,7 @@ const WebGL = struct {
     pub extern fn viewport(x: c_int, y: c_int, width: c_int, height: c_int) void;
     pub extern fn scissor(x: gles.GLint, y: gles.GLint, width: gles.GLsizei, height: gles.GLsizei) void;
 
-    // unbound functions:
-    fn hint(_target: GLenum, _mode: GLenum) callconv(.C) void {
-        @panic("glHint not implemented yet!");
-    }
-    fn bindAttribLocation(_program: GLuint, _index: GLuint, _name: [*c]const GLchar) callconv(.C) void {
-        @panic("glBindAttribLocation not implemented yet!");
-    }
-    fn bindRenderbuffer(_target: GLenum, _renderbuffer: GLuint) callconv(.C) void {
-        @panic("glBindRenderbuffer not implemented yet!");
-    }
-    fn blendColor(_red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) callconv(.C) void {
-        @panic("glBlendColor not implemented yet!");
-    }
     extern fn blendEquation(_mode: GLenum) callconv(.C) void;
-    fn blendEquationSeparate(_modeRGB: GLenum, _modeAlpha: GLenum) callconv(.C) void {
-        @panic("glBlendEquationSeparate not implemented yet!");
-    }
-    fn blendFuncSeparate(_sfactorRGB: GLenum, _dfactorRGB: GLenum, _sfactorAlpha: GLenum, _dfactorAlpha: GLenum) callconv(.C) void {
-        @panic("glBlendFuncSeparate not implemented yet!");
-    }
-    fn bufferSubData(_target: GLenum, _offset: GLintptr, _size: GLsizeiptr, _data: ?*const c_void) callconv(.C) void {
-        @panic("glBufferSubData not implemented yet!");
-    }
-    fn clearDepthf(_d: GLfloat) callconv(.C) void {
-        @panic("glClearDepthf not implemented yet!");
-    }
-    fn clearStencil(_s: GLint) callconv(.C) void {
-        @panic("glClearStencil not implemented yet!");
-    }
-    fn colorMask(_red: GLboolean, _green: GLboolean, _blue: GLboolean, _alpha: GLboolean) callconv(.C) void {
-        @panic("glColorMask not implemented yet!");
-    }
-    fn compressedTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _width: GLsizei, _height: GLsizei, _border: GLint, _imageSize: GLsizei, _data: ?*const c_void) callconv(.C) void {
-        @panic("glCompressedTexImage2D not implemented yet!");
-    }
-    fn compressedTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _imageSize: GLsizei, _data: ?*const c_void) callconv(.C) void {
-        @panic("glCompressedTexSubImage2D not implemented yet!");
-    }
-    fn copyTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _border: GLint) callconv(.C) void {
-        @panic("glCopyTexImage2D not implemented yet!");
-    }
-    fn copyTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei) callconv(.C) void {
-        @panic("glCopyTexSubImage2D not implemented yet!");
-    }
-    fn deleteFramebuffers(_n: GLsizei, _framebuffers: [*c]const GLuint) callconv(.C) void {
-        @panic("glDeleteFramebuffers not implemented yet!");
-    }
-    fn deleteRenderbuffers(_n: GLsizei, _renderbuffers: [*c]const GLuint) callconv(.C) void {
-        @panic("glDeleteRenderbuffers not implemented yet!");
-    }
-    fn deleteTextures(_n: GLsizei, _textures: [*c]const GLuint) callconv(.C) void {
-        @panic("glDeleteTextures not implemented yet!");
-    }
-    fn depthMask(_flag: GLboolean) callconv(.C) void {
-        @panic("glDepthMask not implemented yet!");
-    }
-    fn depthRangef(_n: GLfloat, _f: GLfloat) callconv(.C) void {
-        @panic("glDepthRangef not implemented yet!");
-    }
-    fn disableVertexAttribArray(_index: GLuint) callconv(.C) void {
-        @panic("glDisableVertexAttribArray not implemented yet!");
-    }
-    fn finish() callconv(.C) void {
-        @panic("glFinish not implemented yet!");
-    }
-    fn flush() callconv(.C) void {
-        @panic("glFlush not implemented yet!");
-    }
-    fn framebufferRenderbuffer(_target: GLenum, _attachment: GLenum, _renderbuffertarget: GLenum, _renderbuffer: GLuint) callconv(.C) void {
-        @panic("glFramebufferRenderbuffer not implemented yet!");
-    }
-    fn generateMipmap(_target: GLenum) callconv(.C) void {
-        @panic("glGenerateMipmap not implemented yet!");
-    }
-    fn genFramebuffers(_n: GLsizei, _framebuffers: [*c]GLuint) callconv(.C) void {
-        @panic("glGenFramebuffers not implemented yet!");
-    }
-    fn genRenderbuffers(_n: GLsizei, _renderbuffers: [*c]GLuint) callconv(.C) void {
-        @panic("glGenRenderbuffers not implemented yet!");
-    }
-    fn getActiveAttrib(_program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _size: [*c]GLint, _type: [*c]GLenum, _name: [*c]GLchar) callconv(.C) void {
-        @panic("glGetActiveAttrib not implemented yet!");
-    }
-    fn getActiveUniform(_program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _size: [*c]GLint, _type: [*c]GLenum, _name: [*c]GLchar) callconv(.C) void {
-        @panic("glGetActiveUniform not implemented yet!");
-    }
-    fn getAttachedShaders(_program: GLuint, _maxCount: GLsizei, _count: [*c]GLsizei, _shaders: [*c]GLuint) callconv(.C) void {
-        @panic("glGetAttachedShaders not implemented yet!");
-    }
-    fn getBooleanv(_pname: GLenum, _data: [*c]GLboolean) callconv(.C) void {
-        @panic("glGetBooleanv not implemented yet!");
-    }
-    fn getBufferParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]GLint) callconv(.C) void {
-        @panic("glGetBufferParameteriv not implemented yet!");
-    }
-    fn getFloatv(_pname: GLenum, _data: [*c]GLfloat) callconv(.C) void {
-        @panic("glGetFloatv not implemented yet!");
-    }
-    fn getFramebufferAttachmentParameteriv(_target: GLenum, _attachment: GLenum, _pname: GLenum, _params: [*c]GLint) callconv(.C) void {
-        @panic("glGetFramebufferAttachmentParameteriv not implemented yet!");
-    }
-    fn getIntegerv(_pname: GLenum, _data: [*c]GLint) callconv(.C) void {
-        @panic("glGetIntegerv not implemented yet!");
-    }
-    fn getRenderbufferParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]GLint) callconv(.C) void {
-        @panic("glGetRenderbufferParameteriv not implemented yet!");
-    }
-    fn getShaderPrecisionFormat(_shadertype: GLenum, _precisiontype: GLenum, _range: [*c]GLint, _precision: [*c]GLint) callconv(.C) void {
-        @panic("glGetShaderPrecisionFormat not implemented yet!");
-    }
-    fn getShaderSource(_shader: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _source: [*c]GLchar) callconv(.C) void {
-        @panic("glGetShaderSource not implemented yet!");
-    }
 
     pub extern fn getStringJs(name: GLenum) void;
     fn getString(name: GLenum) callconv(.C) ?[*:0]const GLubyte {
@@ -339,164 +227,185 @@ const WebGL = struct {
 
         return String.memory.?.ptr;
     }
-    fn getTexParameterfv(_target: GLenum, _pname: GLenum, _params: [*c]GLfloat) callconv(.C) void {
-        @panic("glGetTexParameterfv not implemented yet!");
-    }
-    fn getTexParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]GLint) callconv(.C) void {
-        @panic("glGetTexParameteriv not implemented yet!");
-    }
-    fn getUniformfv(_program: GLuint, _location: GLint, _params: [*c]GLfloat) callconv(.C) void {
-        @panic("glGetUniformfv not implemented yet!");
-    }
-    fn getUniformiv(_program: GLuint, _location: GLint, _params: [*c]GLint) callconv(.C) void {
-        @panic("glGetUniformiv not implemented yet!");
-    }
-    fn getVertexAttribfv(_index: GLuint, _pname: GLenum, _params: [*c]GLfloat) callconv(.C) void {
-        @panic("glGetVertexAttribfv not implemented yet!");
-    }
-    fn getVertexAttribiv(_index: GLuint, _pname: GLenum, _params: [*c]GLint) callconv(.C) void {
-        @panic("glGetVertexAttribiv not implemented yet!");
-    }
-    fn getVertexAttribPointerv(_index: GLuint, _pname: GLenum, _pointer: ?*?*c_void) callconv(.C) void {
-        @panic("glGetVertexAttribPointerv not implemented yet!");
-    }
-    fn isBuffer(_buffer: GLuint) callconv(.C) GLboolean {
-        @panic("glIsBuffer not implemented yet!");
-    }
-    fn isEnabled(_cap: GLenum) callconv(.C) GLboolean {
-        @panic("glIsEnabled not implemented yet!");
-    }
-    fn isFramebuffer(_framebuffer: GLuint) callconv(.C) GLboolean {
-        @panic("glIsFramebuffer not implemented yet!");
-    }
-    fn isProgram(_program: GLuint) callconv(.C) GLboolean {
-        @panic("glIsProgram not implemented yet!");
-    }
-    fn isRenderbuffer(_renderbuffer: GLuint) callconv(.C) GLboolean {
-        @panic("glIsRenderbuffer not implemented yet!");
-    }
-    fn isShader(_shader: GLuint) callconv(.C) GLboolean {
-        @panic("glIsShader not implemented yet!");
-    }
-    fn isTexture(_texture: GLuint) callconv(.C) GLboolean {
-        @panic("glIsTexture not implemented yet!");
-    }
-    fn lineWidth(_width: GLfloat) callconv(.C) void {
-        @panic("glLineWidth not implemented yet!");
-    }
-    fn polygonOffset(_factor: GLfloat, _units: GLfloat) callconv(.C) void {
-        @panic("glPolygonOffset not implemented yet!");
-    }
-    fn readPixels(_x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*c_void) callconv(.C) void {
-        @panic("glReadPixels not implemented yet!");
-    }
-    fn releaseShaderCompiler() callconv(.C) void {
-        @panic("glReleaseShaderCompiler not implemented yet!");
-    }
-    fn renderbufferStorage(_target: GLenum, _internalformat: GLenum, _width: GLsizei, _height: GLsizei) callconv(.C) void {
-        @panic("glRenderbufferStorage not implemented yet!");
-    }
-    fn sampleCoverage(_value: GLfloat, _invert: GLboolean) callconv(.C) void {
-        @panic("glSampleCoverage not implemented yet!");
-    }
-    fn shaderBinary(_count: GLsizei, _shaders: [*c]const GLuint, _binaryFormat: GLenum, _binary: ?*const c_void, _length: GLsizei) callconv(.C) void {
-        @panic("glShaderBinary not implemented yet!");
-    }
-    fn stencilFunc(_func: GLenum, _ref: GLint, _mask: GLuint) callconv(.C) void {
-        @panic("glStencilFunc not implemented yet!");
-    }
-    fn stencilFuncSeparate(_face: GLenum, _func: GLenum, _ref: GLint, _mask: GLuint) callconv(.C) void {
-        @panic("glStencilFuncSeparate not implemented yet!");
-    }
-    fn stencilMask(_mask: GLuint) callconv(.C) void {
-        @panic("glStencilMask not implemented yet!");
-    }
-    fn stencilMaskSeparate(_face: GLenum, _mask: GLuint) callconv(.C) void {
-        @panic("glStencilMaskSeparate not implemented yet!");
-    }
-    fn stencilOp(_fail: GLenum, _zfail: GLenum, _zpass: GLenum) callconv(.C) void {
-        @panic("glStencilOp not implemented yet!");
-    }
-    fn stencilOpSeparate(_face: GLenum, _sfail: GLenum, _dpfail: GLenum, _dppass: GLenum) callconv(.C) void {
-        @panic("glStencilOpSeparate not implemented yet!");
-    }
-    fn texParameterfv(_target: GLenum, _pname: GLenum, _params: [*c]const GLfloat) callconv(.C) void {
-        @panic("glTexParameterfv not implemented yet!");
-    }
-    fn texParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]const GLint) callconv(.C) void {
-        @panic("glTexParameteriv not implemented yet!");
-    }
-    fn texSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*const c_void) callconv(.C) void {
-        @panic("glTexSubImage2D not implemented yet!");
-    }
-    fn uniform1fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) callconv(.C) void {
-        @panic("glUniform1fv not implemented yet!");
-    }
-    fn uniform1iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) callconv(.C) void {
-        @panic("glUniform1iv not implemented yet!");
-    }
-    fn uniform2f(_location: GLint, _v0: GLfloat, _v1: GLfloat) callconv(.C) void {
-        @panic("glUniform2f not implemented yet!");
-    }
-    fn uniform2fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) callconv(.C) void {
-        @panic("glUniform2fv not implemented yet!");
-    }
     extern fn uniform2i(_location: GLint, _v0: GLint, _v1: GLint) callconv(.C) void;
-    fn uniform2iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) callconv(.C) void {
-        @panic("glUniform2iv not implemented yet!");
-    }
-    fn uniform3f(_location: GLint, _v0: GLfloat, _v1: GLfloat, _v2: GLfloat) callconv(.C) void {
-        @panic("glUniform3f not implemented yet!");
-    }
-    fn uniform3fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) callconv(.C) void {
-        @panic("glUniform3fv not implemented yet!");
-    }
-    fn uniform3i(_location: GLint, _v0: GLint, _v1: GLint, _v2: GLint) callconv(.C) void {
-        @panic("glUniform3i not implemented yet!");
-    }
-    fn uniform3iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) callconv(.C) void {
-        @panic("glUniform3iv not implemented yet!");
-    }
-    fn uniform4fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) callconv(.C) void {
-        @panic("glUniform4fv not implemented yet!");
-    }
-    fn uniform4i(_location: GLint, _v0: GLint, _v1: GLint, _v2: GLint, _v3: GLint) callconv(.C) void {
-        @panic("glUniform4i not implemented yet!");
-    }
-    fn uniform4iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) callconv(.C) void {
-        @panic("glUniform4iv not implemented yet!");
-    }
-    fn uniformMatrix2fv(_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) callconv(.C) void {
-        @panic("glUniformMatrix2fv not implemented yet!");
-    }
-    fn uniformMatrix3fv(_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) callconv(.C) void {
-        @panic("glUniformMatrix3fv not implemented yet!");
-    }
-    fn validateProgram(_program: GLuint) callconv(.C) void {
-        @panic("glValidateProgram not implemented yet!");
-    }
-    fn vertexAttrib1f(_index: GLuint, _x: GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib1f not implemented yet!");
-    }
-    fn vertexAttrib1fv(_index: GLuint, _v: [*c]const GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib1fv not implemented yet!");
-    }
-    fn vertexAttrib2f(_index: GLuint, _x: GLfloat, _y: GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib2f not implemented yet!");
-    }
-    fn vertexAttrib2fv(_index: GLuint, _v: [*c]const GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib2fv not implemented yet!");
-    }
-    fn vertexAttrib3f(_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib3f not implemented yet!");
-    }
-    fn vertexAttrib3fv(_index: GLuint, _v: [*c]const GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib3fv not implemented yet!");
-    }
-    fn vertexAttrib4f(_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat, _w: GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib4f not implemented yet!");
-    }
-    fn vertexAttrib4fv(_index: GLuint, _v: [*c]const GLfloat) callconv(.C) void {
-        @panic("glVertexAttrib4fv not implemented yet!");
-    }
+
+    extern fn hint(_target: GLenum, _mode: GLenum) void;
+
+    extern fn bindAttribLocation(_program: GLuint, _index: GLuint, _name: [*c]const GLchar) void;
+
+    extern fn bindRenderbuffer(_target: GLenum, _renderbuffer: GLuint) void;
+
+    extern fn blendColor(_red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) void;
+
+    extern fn blendEquationSeparate(_modeRGB: GLenum, _modeAlpha: GLenum) void;
+
+    extern fn blendFuncSeparate(_sfactorRGB: GLenum, _dfactorRGB: GLenum, _sfactorAlpha: GLenum, _dfactorAlpha: GLenum) void;
+
+    extern fn bufferSubData(_target: GLenum, _offset: GLintptr, _size: GLsizeiptr, _data: ?*const c_void) void;
+
+    extern fn clearDepthf(_d: GLfloat) void;
+
+    extern fn clearStencil(_s: GLint) void;
+
+    extern fn colorMask(_red: GLboolean, _green: GLboolean, _blue: GLboolean, _alpha: GLboolean) void;
+
+    extern fn compressedTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _width: GLsizei, _height: GLsizei, _border: GLint, _imageSize: GLsizei, _data: ?*const c_void) void;
+
+    extern fn compressedTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _imageSize: GLsizei, _data: ?*const c_void) void;
+
+    extern fn copyTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _border: GLint) void;
+
+    extern fn copyTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei) void;
+
+    extern fn deleteFramebuffers(_n: GLsizei, _framebuffers: [*c]const GLuint) void;
+
+    extern fn deleteRenderbuffers(_n: GLsizei, _renderbuffers: [*c]const GLuint) void;
+
+    extern fn deleteTextures(_n: GLsizei, _textures: [*c]const GLuint) void;
+
+    extern fn depthMask(_flag: GLboolean) void;
+
+    extern fn depthRangef(_n: GLfloat, _f: GLfloat) void;
+
+    extern fn disableVertexAttribArray(_index: GLuint) void;
+
+    extern fn finish() void;
+
+    extern fn flush() void;
+
+    extern fn framebufferRenderbuffer(_target: GLenum, _attachment: GLenum, _renderbuffertarget: GLenum, _renderbuffer: GLuint) void;
+
+    extern fn generateMipmap(_target: GLenum) void;
+
+    extern fn genFramebuffers(_n: GLsizei, _framebuffers: [*c]GLuint) void;
+
+    extern fn genRenderbuffers(_n: GLsizei, _renderbuffers: [*c]GLuint) void;
+
+    extern fn getActiveAttrib(_program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _size: [*c]GLint, _type: [*c]GLenum, _name: [*c]GLchar) void;
+
+    extern fn getActiveUniform(_program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _size: [*c]GLint, _type: [*c]GLenum, _name: [*c]GLchar) void;
+
+    extern fn getAttachedShaders(_program: GLuint, _maxCount: GLsizei, _count: [*c]GLsizei, _shaders: [*c]GLuint) void;
+
+    extern fn getBooleanv(_pname: GLenum, _data: [*c]GLboolean) void;
+
+    extern fn getBufferParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+
+    extern fn getFloatv(_pname: GLenum, _data: [*c]GLfloat) void;
+
+    extern fn getFramebufferAttachmentParameteriv(_target: GLenum, _attachment: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+
+    extern fn getIntegerv(_pname: GLenum, _data: [*c]GLint) void;
+
+    extern fn getRenderbufferParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+
+    extern fn getShaderPrecisionFormat(_shadertype: GLenum, _precisiontype: GLenum, _range: [*c]GLint, _precision: [*c]GLint) void;
+
+    extern fn getShaderSource(_shader: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _source: [*c]GLchar) void;
+
+    extern fn getTexParameterfv(_target: GLenum, _pname: GLenum, _params: [*c]GLfloat) void;
+
+    extern fn getTexParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+
+    extern fn getUniformfv(_program: GLuint, _location: GLint, _params: [*c]GLfloat) void;
+
+    extern fn getUniformiv(_program: GLuint, _location: GLint, _params: [*c]GLint) void;
+
+    extern fn getVertexAttribfv(_index: GLuint, _pname: GLenum, _params: [*c]GLfloat) void;
+
+    extern fn getVertexAttribiv(_index: GLuint, _pname: GLenum, _params: [*c]GLint) void;
+
+    extern fn getVertexAttribPointerv(_index: GLuint, _pname: GLenum, _pointer: ?*?*c_void) void;
+
+    extern fn isBuffer(_buffer: GLuint) GLboolean;
+
+    extern fn isEnabled(_cap: GLenum) GLboolean;
+
+    extern fn isFramebuffer(_framebuffer: GLuint) GLboolean;
+
+    extern fn isProgram(_program: GLuint) GLboolean;
+
+    extern fn isRenderbuffer(_renderbuffer: GLuint) GLboolean;
+
+    extern fn isShader(_shader: GLuint) GLboolean;
+
+    extern fn isTexture(_texture: GLuint) GLboolean;
+
+    extern fn lineWidth(_width: GLfloat) void;
+
+    extern fn polygonOffset(_factor: GLfloat, _units: GLfloat) void;
+
+    extern fn readPixels(_x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*c_void) void;
+
+    extern fn releaseShaderCompiler() void;
+
+    extern fn renderbufferStorage(_target: GLenum, _internalformat: GLenum, _width: GLsizei, _height: GLsizei) void;
+
+    extern fn sampleCoverage(_value: GLfloat, _invert: GLboolean) void;
+
+    extern fn shaderBinary(_count: GLsizei, _shaders: [*c]const GLuint, _binaryFormat: GLenum, _binary: ?*const c_void, _length: GLsizei) void;
+
+    extern fn stencilFunc(_func: GLenum, _ref: GLint, _mask: GLuint) void;
+
+    extern fn stencilFuncSeparate(_face: GLenum, _func: GLenum, _ref: GLint, _mask: GLuint) void;
+
+    extern fn stencilMask(_mask: GLuint) void;
+
+    extern fn stencilMaskSeparate(_face: GLenum, _mask: GLuint) void;
+
+    extern fn stencilOp(_fail: GLenum, _zfail: GLenum, _zpass: GLenum) void;
+
+    extern fn stencilOpSeparate(_face: GLenum, _sfail: GLenum, _dpfail: GLenum, _dppass: GLenum) void;
+
+    extern fn texParameterfv(_target: GLenum, _pname: GLenum, _params: [*c]const GLfloat) void;
+
+    extern fn texParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]const GLint) void;
+
+    extern fn texSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*const c_void) void;
+
+    extern fn uniform1fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+
+    extern fn uniform1iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+
+    extern fn uniform2f(_location: GLint, _v0: GLfloat, _v1: GLfloat) void;
+
+    extern fn uniform2fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+
+    extern fn uniform2iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+
+    extern fn uniform3f(_location: GLint, _v0: GLfloat, _v1: GLfloat, _v2: GLfloat) void;
+
+    extern fn uniform3fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+
+    extern fn uniform3i(_location: GLint, _v0: GLint, _v1: GLint, _v2: GLint) void;
+
+    extern fn uniform3iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+
+    extern fn uniform4fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+
+    extern fn uniform4i(_location: GLint, _v0: GLint, _v1: GLint, _v2: GLint, _v3: GLint) void;
+
+    extern fn uniform4iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+
+    extern fn uniformMatrix2fv(_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) void;
+
+    extern fn uniformMatrix3fv(_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) void;
+
+    extern fn validateProgram(_program: GLuint) void;
+
+    extern fn vertexAttrib1f(_index: GLuint, _x: GLfloat) void;
+
+    extern fn vertexAttrib1fv(_index: GLuint, _v: [*c]const GLfloat) void;
+
+    extern fn vertexAttrib2f(_index: GLuint, _x: GLfloat, _y: GLfloat) void;
+
+    extern fn vertexAttrib2fv(_index: GLuint, _v: [*c]const GLfloat) void;
+
+    extern fn vertexAttrib3f(_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat) void;
+
+    extern fn vertexAttrib3fv(_index: GLuint, _v: [*c]const GLfloat) void;
+
+    extern fn vertexAttrib4f(_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat, _w: GLfloat) void;
+
+    extern fn vertexAttrib4fv(_index: GLuint, _v: [*c]const GLfloat) void;
 };

@@ -396,5 +396,276 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
                 zigidx += 1;
             }
         },
+        // unimplemented opengl:
+        hint() { // extern fn hint (_target: GLenum, _mode: GLenum) void;
+            throw 'hint not implemented yet';
+        },
+        bindAttribLocation() { // extern fn bindAttribLocation (_program: GLuint, _index: GLuint, _name: [*c]const GLchar) void;
+            throw 'bindAttribLocation not implemented yet';
+        },
+        bindRenderbuffer() { // extern fn bindRenderbuffer (_target: GLenum, _renderbuffer: GLuint) void;
+            throw 'bindRenderbuffer not implemented yet';
+        },
+        blendColor() { // extern fn blendColor (_red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) void;
+            throw 'blendColor not implemented yet';
+        },
+        blendEquationSeparate() { // extern fn blendEquationSeparate (_modeRGB: GLenum, _modeAlpha: GLenum) void;
+            throw 'blendEquationSeparate not implemented yet';
+        },
+        blendFuncSeparate() { // extern fn blendFuncSeparate (_sfactorRGB: GLenum, _dfactorRGB: GLenum, _sfactorAlpha: GLenum, _dfactorAlpha: GLenum) void;
+            throw 'blendFuncSeparate not implemented yet';
+        },
+        bufferSubData() { // extern fn bufferSubData (_target: GLenum, _offset: GLintptr, _size: GLsizeiptr, _data: ?*const c_void) void;
+            throw 'bufferSubData not implemented yet';
+        },
+        clearDepthf() { // extern fn clearDepthf (_d: GLfloat) void;
+            throw 'clearDepthf not implemented yet';
+        },
+        clearStencil() { // extern fn clearStencil (_s: GLint) void;
+            throw 'clearStencil not implemented yet';
+        },
+        colorMask() { // extern fn colorMask (_red: GLboolean, _green: GLboolean, _blue: GLboolean, _alpha: GLboolean) void;
+            throw 'colorMask not implemented yet';
+        },
+        compressedTexImage2D() { // extern fn compressedTexImage2D (_target: GLenum, _level: GLint, _internalformat: GLenum, _width: GLsizei, _height: GLsizei, _border: GLint, _imageSize: GLsizei, _data: ?*const c_void) void;
+            throw 'compressedTexImage2D not implemented yet';
+        },
+        compressedTexSubImage2D() { // extern fn compressedTexSubImage2D (_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _imageSize: GLsizei, _data: ?*const c_void) void;
+            throw 'compressedTexSubImage2D not implemented yet';
+        },
+        copyTexImage2D() { // extern fn copyTexImage2D (_target: GLenum, _level: GLint, _internalformat: GLenum, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _border: GLint) void;
+            throw 'copyTexImage2D not implemented yet';
+        },
+        copyTexSubImage2D() { // extern fn copyTexSubImage2D (_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei) void;
+            throw 'copyTexSubImage2D not implemented yet';
+        },
+        deleteFramebuffers() { // extern fn deleteFramebuffers (_n: GLsizei, _framebuffers: [*c]const GLuint) void;
+            throw 'deleteFramebuffers not implemented yet';
+        },
+        deleteRenderbuffers() { // extern fn deleteRenderbuffers (_n: GLsizei, _renderbuffers: [*c]const GLuint) void;
+            throw 'deleteRenderbuffers not implemented yet';
+        },
+        deleteTextures() { // extern fn deleteTextures (_n: GLsizei, _textures: [*c]const GLuint) void;
+            throw 'deleteTextures not implemented yet';
+        },
+        depthMask() { // extern fn depthMask (_flag: GLboolean) void;
+            throw 'depthMask not implemented yet';
+        },
+        depthRangef() { // extern fn depthRangef (_n: GLfloat, _f: GLfloat) void;
+            throw 'depthRangef not implemented yet';
+        },
+        disableVertexAttribArray() { // extern fn disableVertexAttribArray (_index: GLuint) void;
+            throw 'disableVertexAttribArray not implemented yet';
+        },
+        finish() { // extern fn finish () void;
+            throw 'finish not implemented yet';
+        },
+        flush() { // extern fn flush () void;
+            throw 'flush not implemented yet';
+        },
+        framebufferRenderbuffer() { // extern fn framebufferRenderbuffer (_target: GLenum, _attachment: GLenum, _renderbuffertarget: GLenum, _renderbuffer: GLuint) void;
+            throw 'framebufferRenderbuffer not implemented yet';
+        },
+        generateMipmap() { // extern fn generateMipmap (_target: GLenum) void;
+            throw 'generateMipmap not implemented yet';
+        },
+        genFramebuffers() { // extern fn genFramebuffers (_n: GLsizei, _framebuffers: [*c]GLuint) void;
+            throw 'genFramebuffers not implemented yet';
+        },
+        genRenderbuffers() { // extern fn genRenderbuffers (_n: GLsizei, _renderbuffers: [*c]GLuint) void;
+            throw 'genRenderbuffers not implemented yet';
+        },
+        getActiveAttrib() { // extern fn getActiveAttrib (_program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _size: [*c]GLint, _type: [*c]GLenum, _name: [*c]GLchar) void;
+            throw 'getActiveAttrib not implemented yet';
+        },
+        getActiveUniform() { // extern fn getActiveUniform (_program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _size: [*c]GLint, _type: [*c]GLenum, _name: [*c]GLchar) void;
+            throw 'getActiveUniform not implemented yet';
+        },
+        getAttachedShaders() { // extern fn getAttachedShaders (_program: GLuint, _maxCount: GLsizei, _count: [*c]GLsizei, _shaders: [*c]GLuint) void;
+            throw 'getAttachedShaders not implemented yet';
+        },
+        getBooleanv() { // extern fn getBooleanv (_pname: GLenum, _data: [*c]GLboolean) void;
+            throw 'getBooleanv not implemented yet';
+        },
+        getBufferParameteriv() { // extern fn getBufferParameteriv (_target: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+            throw 'getBufferParameteriv not implemented yet';
+        },
+        getFloatv() { // extern fn getFloatv (_pname: GLenum, _data: [*c]GLfloat) void;
+            throw 'getFloatv not implemented yet';
+        },
+        getFramebufferAttachmentParameteriv() { // extern fn getFramebufferAttachmentParameteriv (_target: GLenum, _attachment: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+            throw 'getFramebufferAttachmentParameteriv not implemented yet';
+        },
+        getIntegerv() { // extern fn getIntegerv (_pname: GLenum, _data: [*c]GLint) void;
+            throw 'getIntegerv not implemented yet';
+        },
+        getRenderbufferParameteriv() { // extern fn getRenderbufferParameteriv (_target: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+            throw 'getRenderbufferParameteriv not implemented yet';
+        },
+        getShaderPrecisionFormat() { // extern fn getShaderPrecisionFormat (_shadertype: GLenum, _precisiontype: GLenum, _range: [*c]GLint, _precision: [*c]GLint) void;
+            throw 'getShaderPrecisionFormat not implemented yet';
+        },
+        getShaderSource() { // extern fn getShaderSource (_shader: GLuint, _bufSize: GLsizei, _length: [*c]GLsizei, _source: [*c]GLchar) void;
+            throw 'getShaderSource not implemented yet';
+        },
+        getTexParameterfv() { // extern fn getTexParameterfv (_target: GLenum, _pname: GLenum, _params: [*c]GLfloat) void;
+            throw 'getTexParameterfv not implemented yet';
+        },
+        getTexParameteriv() { // extern fn getTexParameteriv (_target: GLenum, _pname: GLenum, _params: [*c]GLint) void;
+            throw 'getTexParameteriv not implemented yet';
+        },
+        getUniformfv() { // extern fn getUniformfv (_program: GLuint, _location: GLint, _params: [*c]GLfloat) void;
+            throw 'getUniformfv not implemented yet';
+        },
+        getUniformiv() { // extern fn getUniformiv (_program: GLuint, _location: GLint, _params: [*c]GLint) void;
+            throw 'getUniformiv not implemented yet';
+        },
+        getVertexAttribfv() { // extern fn getVertexAttribfv (_index: GLuint, _pname: GLenum, _params: [*c]GLfloat) void;
+            throw 'getVertexAttribfv not implemented yet';
+        },
+        getVertexAttribiv() { // extern fn getVertexAttribiv (_index: GLuint, _pname: GLenum, _params: [*c]GLint) void;
+            throw 'getVertexAttribiv not implemented yet';
+        },
+        getVertexAttribPointerv() { // extern fn getVertexAttribPointerv (_index: GLuint, _pname: GLenum, _pointer: ?*?*c_void) void;
+            throw 'getVertexAttribPointerv not implemented yet';
+        },
+        isBuffer() { // extern fn isBuffer (_buffer: GLuint) GLboolean;
+            throw 'isBuffer not implemented yet';
+        },
+        isEnabled() { // extern fn isEnabled (_cap: GLenum) GLboolean;
+            throw 'isEnabled not implemented yet';
+        },
+        isFramebuffer() { // extern fn isFramebuffer (_framebuffer: GLuint) GLboolean;
+            throw 'isFramebuffer not implemented yet';
+        },
+        isProgram() { // extern fn isProgram (_program: GLuint) GLboolean;
+            throw 'isProgram not implemented yet';
+        },
+        isRenderbuffer() { // extern fn isRenderbuffer (_renderbuffer: GLuint) GLboolean;
+            throw 'isRenderbuffer not implemented yet';
+        },
+        isShader() { // extern fn isShader (_shader: GLuint) GLboolean;
+            throw 'isShader not implemented yet';
+        },
+        isTexture() { // extern fn isTexture (_texture: GLuint) GLboolean;
+            throw 'isTexture not implemented yet';
+        },
+        lineWidth() { // extern fn lineWidth (_width: GLfloat) void;
+            throw 'lineWidth not implemented yet';
+        },
+        polygonOffset() { // extern fn polygonOffset (_factor: GLfloat, _units: GLfloat) void;
+            throw 'polygonOffset not implemented yet';
+        },
+        readPixels() { // extern fn readPixels (_x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*c_void) void;
+            throw 'readPixels not implemented yet';
+        },
+        releaseShaderCompiler() { // extern fn releaseShaderCompiler () void;
+            throw 'releaseShaderCompiler not implemented yet';
+        },
+        renderbufferStorage() { // extern fn renderbufferStorage (_target: GLenum, _internalformat: GLenum, _width: GLsizei, _height: GLsizei) void;
+            throw 'renderbufferStorage not implemented yet';
+        },
+        sampleCoverage() { // extern fn sampleCoverage (_value: GLfloat, _invert: GLboolean) void;
+            throw 'sampleCoverage not implemented yet';
+        },
+        shaderBinary() { // extern fn shaderBinary (_count: GLsizei, _shaders: [*c]const GLuint, _binaryFormat: GLenum, _binary: ?*const c_void, _length: GLsizei) void;
+            throw 'shaderBinary not implemented yet';
+        },
+        stencilFunc() { // extern fn stencilFunc (_func: GLenum, _ref: GLint, _mask: GLuint) void;
+            throw 'stencilFunc not implemented yet';
+        },
+        stencilFuncSeparate() { // extern fn stencilFuncSeparate (_face: GLenum, _func: GLenum, _ref: GLint, _mask: GLuint) void;
+            throw 'stencilFuncSeparate not implemented yet';
+        },
+        stencilMask() { // extern fn stencilMask (_mask: GLuint) void;
+            throw 'stencilMask not implemented yet';
+        },
+        stencilMaskSeparate() { // extern fn stencilMaskSeparate (_face: GLenum, _mask: GLuint) void;
+            throw 'stencilMaskSeparate not implemented yet';
+        },
+        stencilOp() { // extern fn stencilOp (_fail: GLenum, _zfail: GLenum, _zpass: GLenum) void;
+            throw 'stencilOp not implemented yet';
+        },
+        stencilOpSeparate() { // extern fn stencilOpSeparate (_face: GLenum, _sfail: GLenum, _dpfail: GLenum, _dppass: GLenum) void;
+            throw 'stencilOpSeparate not implemented yet';
+        },
+        texParameterfv() { // extern fn texParameterfv (_target: GLenum, _pname: GLenum, _params: [*c]const GLfloat) void;
+            throw 'texParameterfv not implemented yet';
+        },
+        texParameteriv() { // extern fn texParameteriv (_target: GLenum, _pname: GLenum, _params: [*c]const GLint) void;
+            throw 'texParameteriv not implemented yet';
+        },
+        texSubImage2D() { // extern fn texSubImage2D (_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*const c_void) void;
+            throw 'texSubImage2D not implemented yet';
+        },
+        uniform1fv() { // extern fn uniform1fv (_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+            throw 'uniform1fv not implemented yet';
+        },
+        uniform1iv() { // extern fn uniform1iv (_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+            throw 'uniform1iv not implemented yet';
+        },
+        uniform2f() { // extern fn uniform2f (_location: GLint, _v0: GLfloat, _v1: GLfloat) void;
+            throw 'uniform2f not implemented yet';
+        },
+        uniform2fv() { // extern fn uniform2fv (_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+            throw 'uniform2fv not implemented yet';
+        },
+        uniform2iv() { // extern fn uniform2iv (_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+            throw 'uniform2iv not implemented yet';
+        },
+        uniform3f() { // extern fn uniform3f (_location: GLint, _v0: GLfloat, _v1: GLfloat, _v2: GLfloat) void;
+            throw 'uniform3f not implemented yet';
+        },
+        uniform3fv() { // extern fn uniform3fv (_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+            throw 'uniform3fv not implemented yet';
+        },
+        uniform3i() { // extern fn uniform3i (_location: GLint, _v0: GLint, _v1: GLint, _v2: GLint) void;
+            throw 'uniform3i not implemented yet';
+        },
+        uniform3iv() { // extern fn uniform3iv (_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+            throw 'uniform3iv not implemented yet';
+        },
+        uniform4fv() { // extern fn uniform4fv (_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
+            throw 'uniform4fv not implemented yet';
+        },
+        uniform4i() { // extern fn uniform4i (_location: GLint, _v0: GLint, _v1: GLint, _v2: GLint, _v3: GLint) void;
+            throw 'uniform4i not implemented yet';
+        },
+        uniform4iv() { // extern fn uniform4iv (_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
+            throw 'uniform4iv not implemented yet';
+        },
+        uniformMatrix2fv() { // extern fn uniformMatrix2fv (_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) void;
+            throw 'uniformMatrix2fv not implemented yet';
+        },
+        uniformMatrix3fv() { // extern fn uniformMatrix3fv (_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) void;
+            throw 'uniformMatrix3fv not implemented yet';
+        },
+        validateProgram() { // extern fn validateProgram (_program: GLuint) void;
+            throw 'validateProgram not implemented yet';
+        },
+        vertexAttrib1f() { // extern fn vertexAttrib1f (_index: GLuint, _x: GLfloat) void;
+            throw 'vertexAttrib1f not implemented yet';
+        },
+        vertexAttrib1fv() { // extern fn vertexAttrib1fv (_index: GLuint, _v: [*c]const GLfloat) void;
+            throw 'vertexAttrib1fv not implemented yet';
+        },
+        vertexAttrib2f() { // extern fn vertexAttrib2f (_index: GLuint, _x: GLfloat, _y: GLfloat) void;
+            throw 'vertexAttrib2f not implemented yet';
+        },
+        vertexAttrib2fv() { // extern fn vertexAttrib2fv (_index: GLuint, _v: [*c]const GLfloat) void;
+            throw 'vertexAttrib2fv not implemented yet';
+        },
+        vertexAttrib3f() { // extern fn vertexAttrib3f (_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat) void;
+            throw 'vertexAttrib3f not implemented yet';
+        },
+        vertexAttrib3fv() { // extern fn vertexAttrib3fv (_index: GLuint, _v: [*c]const GLfloat) void;
+            throw 'vertexAttrib3fv not implemented yet';
+        },
+        vertexAttrib4f() { // extern fn vertexAttrib4f (_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat, _w: GLfloat) void;
+            throw 'vertexAttrib4f not implemented yet';
+        },
+        vertexAttrib4fv() { // extern fn vertexAttrib4fv (_index: GLuint, _v: [*c]const GLfloat) void;
+            throw 'vertexAttrib4fv not implemented yet';
+        },
     };
 }

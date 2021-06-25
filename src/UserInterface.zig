@@ -136,8 +136,8 @@ const Widget = struct {
 
     fn deinit(self: *Widget) void {
         switch (self.control) {
-            .unset => |*ctrl| {},
-            .panel => |*ctrl| {},
+            .unset => {},
+            .panel => {},
             .button => |*ctrl| {
                 ctrl.text.deinit();
             },
@@ -147,10 +147,10 @@ const Widget = struct {
             .label => |*ctrl| {
                 ctrl.text.deinit();
             },
-            .check_box => |*ctrl| {},
-            .radio_button => |*ctrl| {},
-            .image => |*ctrl| {},
-            .custom => |*ctrl| {},
+            .check_box => {},
+            .radio_button => {},
+            .image => {},
+            .custom => {},
             .modal_layer => {},
         }
         self.* = undefined;
@@ -171,7 +171,7 @@ const Widget = struct {
         };
     }
 
-    pub fn click(self: *Widget, pos: Point) void {
+    pub fn click(self: *Widget, _: Point) void {
         switch (self.control) {
             .button => |*control| {
                 if (control.config.enabled) {
@@ -416,6 +416,7 @@ pub fn deinit(self: *UserInterface) void {
     }
     while (self.free_widgets.popFirst()) |node| {
         // node.data.deinit();
+        _ = node;
     }
 
     self.setRenderer(null) catch unreachable; // can only error when non-null is passed
@@ -519,6 +520,7 @@ fn findOrAllocWidget(self: *UserInterface, widget_type: ControlType, id: WidgetI
 
 /// Returns a unqiue identifier for each type.
 fn typeId(comptime T: type) usize {
+    _ = T;
     return comptime @ptrToInt(&struct {
         var i: u8 = 0;
     }.i);
@@ -787,11 +789,6 @@ pub const InputProcessor = struct {
         const previous_hovered_widget = self.ui.hovered_widget;
         self.ui.hovered_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
 
-        var hacky_workaround: Widget = undefined; // this is a sentinel pointer
-
-        const prev = previous_hovered_widget orelse &hacky_workaround;
-        const now = self.ui.hovered_widget orelse &hacky_workaround;
-
         if (previous_hovered_widget != self.ui.hovered_widget) {
             if (previous_hovered_widget) |w| w.sendEvent(.pointer_leave);
             if (self.ui.hovered_widget) |w| w.sendEvent(.pointer_enter);
@@ -832,6 +829,8 @@ pub const InputProcessor = struct {
     }
 
     pub fn enterText(self: Self, string: []const u8) !void {
+        _ = self;
+        _ = string;
         logger.info("not implemented yet: enterText", .{});
     }
 };
@@ -904,6 +903,7 @@ pub fn render(self: UserInterface) !void {
             },
 
             .text_box => |control| {
+                _ = control;
                 @panic("not implemented yet!");
             },
             .label => |control| {
@@ -1143,6 +1143,9 @@ const StringBuffer = union(enum) {
     }
 
     pub fn format(self: StringBuffer, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+        _ = fmt;
+        _ = options;
+
         try writer.print("\"{s}\"", .{self.get()});
     }
 };

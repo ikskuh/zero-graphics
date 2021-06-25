@@ -1,5 +1,6 @@
 const std = @import("std");
 const AndroidSdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
+const SdlSdk = @import("vendor/SDL.zig/Sdk.zig");
 
 fn initApp(app: *std.build.LibExeObjStep) void {
     const cflags = [_][]const u8{
@@ -21,13 +22,7 @@ pub fn build(b: *std.build.Builder) !void {
         .path = .{ .path = "vendor/zigimg/zigimg.zig" },
     };
 
-    var zero_graphics = std.build.Pkg{
-        .name = "zero-graphics",
-        .path = .{ .path = "src/zero-graphics.zig" },
-        .dependencies = &[_]std.build.Pkg{
-            zigimg,
-        },
-    };
+    const sdl_sdk = SdlSdk.init(b);
 
     if (b.option(bool, "enable-android", "Enables building the Android application") orelse false) {
         // TODO: Move this into a file!
@@ -69,10 +64,13 @@ pub fn build(b: *std.build.Builder) !void {
             key_store,
         );
 
-        zero_graphics.dependencies = &[_]std.build.Pkg{
-            zigimg, app.getAndroidPackage("android"),
+        const zero_graphics = std.build.Pkg{
+            .name = "zero-graphics",
+            .path = .{ .path = "src/zero-graphics.zig" },
+            .dependencies = &[_]std.build.Pkg{
+                zigimg, app.getAndroidPackage("android"),
+            },
         };
-
         for (app.libraries) |lib| {
             lib.addBuildOption([]const u8, "render_backend", "android");
             lib.addPackage(zero_graphics);
@@ -96,15 +94,26 @@ pub fn build(b: *std.build.Builder) !void {
     // Build desktop application
     {
         const app = b.addExecutable("zerog-demo", root_src);
-        app.addPackage(zero_graphics);
+
         app.addBuildOption([]const u8, "render_backend", "desktop_sdl2");
         app.setBuildMode(mode);
         initApp(app);
 
         const target = b.standardTargetOptions(.{});
         app.setTarget(target);
+
+        const zero_graphics = std.build.Pkg{
+            .name = "zero-graphics",
+            .path = .{ .path = "src/zero-graphics.zig" },
+            .dependencies = &[_]std.build.Pkg{
+                zigimg, sdl_sdk.getNativePackage("sdl2"),
+            },
+        };
+        app.addPackage(zero_graphics);
+
         app.linkLibC();
-        app.linkSystemLibrary("sdl2");
+
+        sdl_sdk.link(app, .dynamic);
 
         app.install();
 
@@ -120,10 +129,19 @@ pub fn build(b: *std.build.Builder) !void {
     // Build wasm application
     {
         const app = b.addSharedLibrary("zerog-demo", root_src, .unversioned);
-        app.addPackage(zero_graphics);
+
         app.addBuildOption([]const u8, "render_backend", "wasm");
         app.setBuildMode(mode);
         initApp(app);
+
+        const zero_graphics = std.build.Pkg{
+            .name = "zero-graphics",
+            .path = .{ .path = "src/zero-graphics.zig" },
+            .dependencies = &[_]std.build.Pkg{
+                zigimg, sdl_sdk.getNativePackage("sdl2"),
+            },
+        };
+        app.addPackage(zero_graphics);
 
         // No libc on wasm!
         app.setTarget(std.zig.CrossTarget{

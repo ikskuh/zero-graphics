@@ -2,9 +2,7 @@ const std = @import("std");
 const logger = std.log.scoped(.sdl);
 const root = @import("root");
 const zerog = @import("../common.zig");
-const c = @cImport({
-    @cInclude("SDL.h");
-});
+const c = @import("sdl2");
 
 var window: *c.SDL_Window = undefined;
 
@@ -15,19 +13,35 @@ else
 
 pub const milliTimestamp = std.time.milliTimestamp;
 
-pub fn getDisplayDPI() f32 {
-    var fallback: f32 = 96.0; // Default DPI
+const DPI_AWARENESS_CONTEXT_UNAWARE = (DPI_AWARENESS_CONTEXT - 1);
+const DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = (DPI_AWARENESS_CONTEXT - 2);
+const DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE = (DPI_AWARENESS_CONTEXT - 3);
+const DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = (DPI_AWARENESS_CONTEXT - 4);
+const DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED = (DPI_AWARENESS_CONTEXT - 5);
 
+const PROCESS_DPI_AWARENESS = enum(c_int) {
+    PROCESS_DPI_UNAWARE,
+    PROCESS_SYSTEM_DPI_AWARE,
+    PROCESS_PER_MONITOR_DPI_AWARE,
+};
+
+extern "user32" fn SetProcessDPIAware() callconv(std.os.windows.WINAPI) std.os.windows.BOOL;
+extern "shcore" fn SetProcessDpiAwareness(value: PROCESS_DPI_AWARENESS) callconv(std.os.windows.WINAPI) std.os.windows.HRESULT;
+
+pub fn getDisplayDPI() f32 {
+    // Env var always overrides the
     if (std.process.getEnvVarOwned(std.heap.c_allocator, "DUNSTBLICK_DPI")) |env| {
         defer std.heap.c_allocator.free(env);
         if (std.fmt.parseFloat(f32, env)) |value| {
-            fallback = value;
+            return value;
         } else |err| {
             logger.err("Could not parse DUNSTBLICK_DPI environment variable: {s}", .{@errorName(err)});
         }
     } else |_| {
         // silently ignore the error here
     }
+
+    var fallback: f32 = 96.0; // Default DPI
 
     var index = c.SDL_GetWindowDisplayIndex(window);
     if (index < 0) {
@@ -45,31 +59,82 @@ pub const entry_point = struct {
 
     // Desktop entry point
     pub fn main() !void {
+        // Must happen before *any* SDL calls!
+        if (std.builtin.os.tag == .windows) {
+            if (SetProcessDPIAware() == std.os.windows.FALSE) {
+                logger.warn("Could not set application DPI aware!", .{});
+            }
+            const hresult = SetProcessDpiAwareness(.PROCESS_SYSTEM_DPI_AWARE);
+            if (hresult != std.os.windows.S_OK) {
+                logger.warn("Failed to set process DPI awareness: 0x{X}", .{hresult});
+            }
+        }
+
         _ = c.SDL_Init(c.SDL_INIT_EVERYTHING);
         defer _ = c.SDL_Quit();
 
-        _ = c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-        _ = c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+        _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
-        _ = c.SDL_GL_SetAttribute(c.SDL_GL_DOUBLEBUFFER, 1);
+        _ = c.SDL_GL_SetAttribute(.SDL_GL_DOUBLEBUFFER, 1);
         //    _ = c.SDL_GL_SetAttribute(.SDL_GL_DEPTH_SIZE, 24);
-        _ = c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES);
+        _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES);
 
         if (std.builtin.mode == .Debug) {
-            _ = c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_FLAGS, c.SDL_GL_CONTEXT_DEBUG_FLAG);
+            _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_FLAGS, c.SDL_GL_CONTEXT_DEBUG_FLAG);
         }
 
-        const window_flags = c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI | if (!debug_window_mode)
-            c.SDL_WINDOW_MAXIMIZED | c.SDL_WINDOW_FULLSCREEN_DESKTOP
-        else
-            0;
+        var force_fullscreen: ?bool = null;
+        if (!debug_window_mode) {
+            force_fullscreen = false;
+        }
+
+        if (std.process.getEnvVarOwned(std.heap.c_allocator, "DUNSTBLICK_FULLSCREEN")) |env| {
+            defer std.heap.c_allocator.free(env);
+
+            if (std.mem.startsWith(u8, env, "y")) {
+                force_fullscreen = true;
+            } else if (std.mem.startsWith(u8, env, "n")) {
+                force_fullscreen = false;
+            } else {
+                logger.err("Could not parse DUNSTBLICK_FULLSCREEN environment variable: Unknown value", .{});
+            }
+        } else |_| {
+            // silently ignore the error here
+        }
+
+        const use_fullscreen = force_fullscreen orelse true;
+
+        var window_flags: u32 = c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI;
+        if (use_fullscreen) {
+            window_flags |= c.SDL_WINDOW_FULLSCREEN_DESKTOP;
+        }
+
+        var resolution: c.SDL_Point = undefined;
+        if (use_fullscreen) {
+            var display_mode: c.SDL_DisplayMode = undefined;
+
+            // 0 = primary display
+            if (c.SDL_GetDesktopDisplayMode(0, &display_mode) < 0)
+                sdlPanic();
+
+            resolution = .{
+                .x = display_mode.w,
+                .y = display_mode.h,
+            };
+        } else {
+            resolution = .{
+                .x = 1280,
+                .y = 720,
+            };
+        }
 
         window = c.SDL_CreateWindow(
             "OpenGL ES 2.0 - Zig Demo",
             c.SDL_WINDOWPOS_CENTERED,
             c.SDL_WINDOWPOS_CENTERED,
-            1280,
-            720,
+            resolution.x,
+            resolution.y,
             window_flags,
         ) orelse sdlPanic();
         defer c.SDL_DestroyWindow(window);
@@ -182,7 +247,7 @@ pub const entry_point = struct {
     }
 };
 
-pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
     // logger.debug("getting entry point for '{s}'", .{function});
     return c.SDL_GL_GetProcAddress(function.ptr);
 }

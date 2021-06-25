@@ -89,6 +89,8 @@ pub const Application = struct {
             logger.info("Available extensions: {}", .{available_extensions});
         }
 
+        logger.info("Display density: {d:.3} DPI", .{zero_graphics.getDisplayDPI()});
+
         // If possible, install the debug callback in debug builds
         if (std.builtin.mode == .Debug and available_extensions.KHR_debug) {
             const debug = gles.GL_KHR_debug;
@@ -233,6 +235,7 @@ pub const Application = struct {
                     var mouse_down: bool = false;
 
                     pub fn update(self: zero_graphics.UserInterface.CustomWidget, event: zero_graphics.UserInterface.CustomWidget.Event) ?usize {
+                        _ = self;
                         logger.info("custom widget received event: {}", .{event});
                         switch (event) {
                             .pointer_enter => mouse_in = true,
@@ -245,6 +248,8 @@ pub const Application = struct {
                     }
 
                     pub fn draw(self: zero_graphics.UserInterface.CustomWidget, rectangle: zero_graphics.Rectangle, painter: *Renderer, info: zero_graphics.UserInterface.CustomWidget.DrawInfo) Renderer.DrawError!void {
+                        _ = self;
+                        _ = info;
                         const Color = zero_graphics.Color;
                         try painter.fillRectangle(rectangle, if (mouse_in)
                             if (mouse_down)
@@ -463,6 +468,9 @@ fn glesDebugProc(
     message_ptr: [*:0]const u8,
     userParam: ?*c_void,
 ) callconv(.C) void {
+    _ = msg_type;
+    _ = userParam;
+    _ = id;
     // This callback is only used when the extension is available
     const debug = gles.GL_KHR_debug;
 

@@ -1,4 +1,4 @@
-﻿const std = @import("std");
+const std = @import("std");
 const log = std.log.scoped(.OpenGL);
 
 pub const GLenum = c_uint;

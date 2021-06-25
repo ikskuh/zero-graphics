@@ -13,3 +13,6 @@
 [submodule "vendor/zigimg"]
 	path = vendor/zigimg
 	url = https://github.com/zigimg/zigimg
+[submodule "vendor/SDL.zig"]
+	path = vendor/SDL.zig
+	url = https://github.com/MasterQ32/SDL.zig

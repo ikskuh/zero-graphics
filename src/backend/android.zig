@@ -11,7 +11,7 @@ const android = @import("android");
 const EGLContext = android.egl.EGLContext;
 const JNI = android.JNI;
 
-pub fn loadOpenGlFunction(ctx: void, function: [:0]const u8) ?*const c_void {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
     // We can "safely" convert the function name here as eglGetProcAddress is documented as `const`
     return android.egl.c.eglGetProcAddress(function.ptr);
 }
@@ -132,7 +132,7 @@ pub const entry_point = struct {
                 logger.err("Failed to initialize EGL for window: {}\n", .{err});
                 break :blk null;
             };
-            if (self.egl) |*egl| {
+            if (self.egl != null) {
                 egl_held.release();
                 @atomicStore(bool, &self.egl_init, true, .SeqCst);
                 while (@atomicLoad(bool, &self.egl_init, .SeqCst) == true) {
@@ -143,6 +143,7 @@ pub const entry_point = struct {
         }
 
         pub fn onNativeWindowDestroyed(self: *Self, window: *android.ANativeWindow) !void {
+            _ = window;
             logger.info("AndroidApp.onNativeWindowDestroyed()", .{});
             var egl_held = self.egl_lock.acquire();
             defer egl_held.release();
@@ -169,6 +170,7 @@ pub const entry_point = struct {
         }
 
         pub fn onInputQueueDestroyed(self: *Self, input: *android.AInputQueue) void {
+            _ = input;
             logger.info("AndroidApp.onInputQueueDestroyed()", .{});
             var held = self.input_lock.acquire();
             defer held.release();
