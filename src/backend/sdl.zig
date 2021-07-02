@@ -26,7 +26,7 @@ const PROCESS_DPI_AWARENESS = enum(c_int) {
 };
 
 extern "user32" fn SetProcessDPIAware() callconv(std.os.windows.WINAPI) std.os.windows.BOOL;
-extern "shcore" fn SetProcessDpiAwareness(value: PROCESS_DPI_AWARENESS) callconv(std.os.windows.WINAPI) std.os.windows.HRESULT;
+// extern "shcore" fn SetProcessDpiAwareness(value: PROCESS_DPI_AWARENESS) callconv(std.os.windows.WINAPI) std.os.windows.HRESULT;
 
 pub fn getDisplayDPI() f32 {
     // Env var always overrides the
@@ -64,10 +64,10 @@ pub const entry_point = struct {
             if (SetProcessDPIAware() == std.os.windows.FALSE) {
                 logger.warn("Could not set application DPI aware!", .{});
             }
-            const hresult = SetProcessDpiAwareness(.PROCESS_SYSTEM_DPI_AWARE);
-            if (hresult != std.os.windows.S_OK) {
-                logger.warn("Failed to set process DPI awareness: 0x{X}", .{hresult});
-            }
+            // const hresult = SetProcessDpiAwareness(.PROCESS_SYSTEM_DPI_AWARE);
+            // if (hresult != std.os.windows.S_OK) {
+            //     logger.warn("Failed to set process DPI awareness: 0x{X}", .{hresult});
+            // }
         }
 
         _ = c.SDL_Init(c.SDL_INIT_EVERYTHING);

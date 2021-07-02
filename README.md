@@ -50,7 +50,6 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 - *coming soon:* Android support
 - Pixel perfect 2D rendering
 
-
 ## Dependencies
 
 ### Desktop
