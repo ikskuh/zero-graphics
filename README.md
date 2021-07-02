@@ -5,8 +5,24 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 
 ![Logo](design/logo.png)
 
+## Features
+
+- Multi-platform support
+    - Desktop (Linux, MacOS, Windows, ...)
+    - WebAssembly
+    - Android
+- Pixel perfect 2D rendering
+    - Primitives (line, rectangle, triangle, ...)
+    - Text / TTF fonts
+    - Textures
+- Zig-style immediate-mode user interface
+- Proper DPI scaling support in renderer
+
 ## Project status
-Very *work in progress*. Right now it's more a proof of concept than everything else
+
+[![Nightly Build](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml/badge.svg)](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml)
+
+Work-in-progress, but works quite well already. There is one [big project](https://github.com/Dunstwolke/core) depending on it and is used as a *real-world application* driver behind *Zero Graphics*.
 
 ![Preview screenshot in FireFox](https://mq32.de/public/7207fdc86224d69a7af0e8289c6b7a687c757cf8.png)
 
@@ -14,10 +30,19 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 
 ### Basic Framework
 - [ ] Support the following platforms
-  - [x] Wasm
-  - [x] Linux Desktop
+  - [ ] Wasm
+    - [x] Create OpenGL ES 2.0 context
+    - [ ] Input Mouse
+    - [ ] Input Keyboard
+  - [ ] Linux Desktop
+    - [x] Create OpenGL ES 2.0 context
+    - [x] Input Mouse
+    - [ ] Input Keyboard
   - [ ] Windows Desktop (not tested, but should work via SDL2)
-  - [x] Android
+  - [ ] Android
+    - [x] Create OpenGL ES 2.0 context
+    - [x] Input Mouse
+    - [ ] Input Keyboard
 - [x] Create an OpenGL ES 2.0 context
 - [x] Provide input events
   - [x] Single pointer motion (finger or mouse)
@@ -41,14 +66,6 @@ Very *work in progress*. Right now it's more a proof of concept than everything 
 - [x] TTF font rendering via [`stb_ttf`](https://github.com/nothings/stb)
 - [x] Image loading via [`zigimg`](https://github.com/zigimg/zigimg)
 - [ ] Stack based/nested scissoring
-
-## Features
-
-- Support for desktop linux
-- Mobile linux (PinePhone) supported as well
-- Browser support via Wasm
-- *coming soon:* Android support
-- Pixel perfect 2D rendering
 
 ## Dependencies
 
