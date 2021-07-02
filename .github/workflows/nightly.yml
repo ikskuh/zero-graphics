@@ -57,6 +57,8 @@ jobs:
 
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: master
 
       - name: Download SDL2 (MinGW)
         uses: carlosperate/download-file-action@v1.0.3
