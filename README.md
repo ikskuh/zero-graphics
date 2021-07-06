@@ -24,6 +24,8 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 
 Work-in-progress, but works quite well already. There is one [big project](https://github.com/Dunstwolke/core) depending on it and is used as a *real-world application* driver behind *Zero Graphics*.
 
+![Preview screenshot for SDL2](documentation/screen01.png)
+
 ![Preview screenshot in FireFox](https://mq32.de/public/7207fdc86224d69a7af0e8289c6b7a687c757cf8.png)
 
 ## Project Goals
