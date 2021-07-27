@@ -18,7 +18,9 @@ jobs:
           submodules: "recursive"
 
       - name: Install dependencies
-        run: sudo apt-get install libsdl2-dev
+        run:  |
+          sudo apt-get update
+          sudo apt-get install libsdl2-dev
 
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@v1
