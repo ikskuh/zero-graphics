@@ -10,6 +10,17 @@ pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
     const platform = sdk.standardPlatformOptions();
 
+    const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
+    converter.addCSourceFile("tools/modelconv/converter.cpp", &[_][]const u8{
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+    });
+    converter.linkLibC();
+    converter.linkLibCpp();
+    converter.linkSystemLibrary("assimp");
+    converter.install();
+
     const app = sdk.createApplication("demo_application", "examples/demo-application.zig");
     app.setDisplayName("ZeroGraphics Demo");
     app.setPackageName("net.random_projects.zero_graphics.demo");
