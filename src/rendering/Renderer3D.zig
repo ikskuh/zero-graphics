@@ -1,6 +1,6 @@
 const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
-const types = @import("../common.zig");
+const types = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
 
 const ResourcePool = @import("resource_pool.zig").ResourcePool;

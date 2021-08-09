@@ -69,6 +69,19 @@ Work-in-progress, but works quite well already. There is one [big project](https
 - [x] Image loading via [`zigimg`](https://github.com/zigimg/zigimg)
 - [ ] Stack based/nested scissoring
 
+### 3D Rendering library
+- [ ] Tool based on Assimp to convert models into loadable format
+- [ ] Blender export script
+- [x] Draw static geometry
+- [ ] Draw animated geometry
+  - [ ] Skinning based on skeletons
+- [ ] Axis- and camera aligned billboards
+- [ ] Basic particles
+- [ ] Tiny built-in pipeline with
+  - [ ] shadow mapping
+  - [ ] planar reflections
+  - [ ] water reflections
+
 ## Dependencies
 
 ### Desktop
@@ -124,62 +137,58 @@ The app should now be installed and started on your phone.
 To create a new project, copy this application skeleton:
 ```zig
 const std = @import("std");
-const zero_graphics_builder = @import("zero-graphics");
-
-const zero_graphics = zero_graphics_builder.Api(zero_graphics_builder.Backend.desktop_sdl2);
-
-pub usingnamespace zero_graphics.entry_point;
+const zero_graphics = @import("zero-graphics");
 
 /// This implements your application with all state
-pub const Application = struct {
-    allocator: *std.mem.Allocator,
-    input: *zero_graphics.Input,
+const Application = @This();
 
-    pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
-        // Initialize the app and all non-gpu logic here
-        app.* = Application{
-            .allocator = allocator,
-            .input = input,
-        };
-    }
+allocator: *std.mem.Allocator,
+input: *zero_graphics.Input,
 
-    pub fn deinit(app: *Application) void {
-        // destroy application data here
-        app.* = undefined;
-    }
+pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
+    // Initialize the app and all non-gpu logic here
+    app.* = Application{
+        .allocator = allocator,
+        .input = input,
+    };
+}
 
-    pub fn setupGraphics(app: *Application) !void {
-        // initialize all OpenGL objects here
-    }
+pub fn deinit(app: *Application) void {
+    // destroy application data here
+    app.* = undefined;
+}
 
-    pub fn teardownGraphics(app: *Application) void {
-        // destroy all OpenGL objects here
-    }
+pub fn setupGraphics(app: *Application) !void {
+    // initialize all OpenGL objects here
+}
 
-    pub fn update(app: *Application) !bool {
-        while (app.input.pollEvent()) |event| {
-            switch (event) {
-                .quit => return false,
-                else => std.log.info("unhandled input event: {}", .{event}),
-            }
+pub fn teardownGraphics(app: *Application) void {
+    // destroy all OpenGL objects here
+}
+
+pub fn update(app: *Application) !bool {
+    while (app.input.pollEvent()) |event| {
+        switch (event) {
+            .quit => return false,
+            else => std.log.info("unhandled input event: {}", .{event}),
         }
-
-        // return false to exit the application
-        return true;
     }
 
-    pub fn resize(app: *Application, width: u15, height: u15) !void {
-        // handle application resize logic here
-    }
+    // return false to exit the application
+    return true;
+}
 
-    pub fn render(app: *Application) !void {
-        // OpenGL is already loaded, so we can just use it :)
-        // render will never be called before `setupGraphics` is called and never
-        // after `teardownGraphics` was called.
-        zero_graphics.gles.clearColor(0.3, 0.3, 0.3, 1.0);
-        zero_graphics.gles.clear(gles.COLOR_BUFFER_BIT);
-    }
-};
+pub fn resize(app: *Application, width: u15, height: u15) !void {
+    // handle application resize logic here
+}
+
+pub fn render(app: *Application) !void {
+    // OpenGL is already loaded, so we can just use it :)
+    // render will never be called before `setupGraphics` is called and never
+    // after `teardownGraphics` was called.
+    zero_graphics.gles.clearColor(0.3, 0.3, 0.3, 1.0);
+    zero_graphics.gles.clear(gles.COLOR_BUFFER_BIT);
+}
 ```
 
 The functions are roughly called in this order:
@@ -190,8 +199,11 @@ The separation between *application init* and *graphics init* is relevant for An
 
 Your application state will not be destroyed, so the rendering can render the same data as before.
 
-### Configuration
+### Architecture
 
-For the desktop variant, the following environment variables are available for configuration:
-- `DUNSTBLICK_DPI` might be used to set a fallback display density when the display one could not be determined
-- `DUNSTBLICK_FULLSCREEN` might be used to enforce fullscreen or window mode. Use `yes` or `no`
+`zero-graphics` follows a somewhat unusual architecture for Zig applications.
+Your applications is a *package* that will be consumed by a `zero-graphics` host. This host is implementing the "main loop" and will invoke both `update` and `render` periodically. It will also initialize and open the window and pump events.
+
+This design allows `zero-graphics` to run on several different platforms, including most desktop PCs, Android and even web browsers via WebAssembly.
+
+You can check out the [Sdk.zig](Sdk.zig) file to find out how a application is built.

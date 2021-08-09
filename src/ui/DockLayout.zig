@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("../common.zig");
+const types = @import("../zero-graphics.zig");
 
 const Rectangle = types.Rectangle;
 

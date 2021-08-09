@@ -1,8 +1,15 @@
 const std = @import("std");
-const wasm = std.log.scoped(.sdl);
-const root = @import("root");
 const gles = @import("../gl_es_2v0.zig");
-const zerog = @import("../common.zig");
+const zerog = @import("../zero-graphics.zig");
+const Application = @import("application");
+
+comptime {
+    // enforce inclusion of "extern  c" implementations
+    const common = @import("common.zig");
+
+    // verify the application api
+    common.verifyApplication(Application);
+}
 
 extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*c_void;
 
@@ -16,7 +23,7 @@ extern fn now_f64() f64;
 
 pub const log_level = .info;
 
-var app_instance: root.Application = undefined;
+var app_instance: Application = undefined;
 var input_handler: zerog.Input = undefined;
 
 var global_arena: std.heap.ArenaAllocator = undefined;

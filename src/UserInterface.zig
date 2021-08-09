@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("common.zig");
+const types = @import("zero-graphics.zig");
 const logger = std.log.scoped(.user_interface);
 
 const Point = types.Point;
