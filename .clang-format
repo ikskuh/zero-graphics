@@ -1,0 +1,6 @@
+BasedOnStyle: LLVM
+
+SortIncludes: false
+MaxEmptyLinesToKeep: 1
+IndentWidth: 2
+ColumnLimit: 0

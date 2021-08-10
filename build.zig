@@ -10,11 +10,17 @@ pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
     const platform = sdk.standardPlatformOptions();
 
+    const converter_api = b.addTranslateC(.{ .path = "tools/modelconv/api.h" });
+
     const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
     converter.addCSourceFile("tools/modelconv/converter.cpp", &[_][]const u8{
         "-std=c++17",
         "-Wall",
         "-Wextra",
+    });
+    converter.addPackage(std.build.Pkg{
+        .name = "api",
+        .path = .{ .generated = &converter_api.output_file },
     });
     converter.linkLibC();
     converter.linkLibCpp();
