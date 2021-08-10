@@ -1,5 +1,6 @@
 const std = @import("std");
 const api = @import("api");
+const z3d = @import("z3d");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub fn main() !u8 {
@@ -84,6 +85,10 @@ const Stream = struct {
         if (stream.failed != null)
             return;
 
+        if (vertices == 0) return stream.setError(error.NoVertices);
+        if (indices == 0) return stream.setError(error.NoFaces);
+        if (ranges == 0) return stream.setError(error.NoMeshes);
+
         stream.vertex_count = vertices;
         stream.index_count = indices;
         stream.mesh_count = ranges;
@@ -92,13 +97,15 @@ const Stream = struct {
         stream.index_offset = 0;
         stream.mesh_offset = 0;
 
+        std.log.info("compile offsets: {} {} {}", .{ stream.vertexOffset(), stream.indexOffset(), stream.meshOffset() });
+
         stream.target_buffer.resize(stream.fileSize()) catch |err| return stream.setError(err);
 
         std.mem.set(u8, stream.target_buffer.items, 0x55); // set to "undefined"
 
-        const header = @ptrCast(*align(1) static_model.Header, &stream.target_buffer.items[0]);
-        header.* = static_model.Header{
-            .common = CommonHeader{ .type = .static },
+        const header = @ptrCast(*align(1) z3d.static_model.Header, &stream.target_buffer.items[0]);
+        header.* = z3d.static_model.Header{
+            .common = z3d.CommonHeader{ .type = .static },
             .vertex_count = std.mem.nativeToLittle(u32, std.math.cast(u32, vertices) catch |err| return stream.setError(err)),
             .index_count = std.mem.nativeToLittle(u32, std.math.cast(u32, indices) catch |err| return stream.setError(err)),
             .mesh_count = std.mem.nativeToLittle(u32, std.math.cast(u32, ranges) catch |err| return stream.setError(err)),
@@ -112,8 +119,8 @@ const Stream = struct {
         if (stream.failed != null)
             return;
 
-        const vertices = @ptrCast([*]align(1) static_model.Vertex, &stream.target_buffer.items[stream.vertexOffset()]);
-        vertices[stream.vertex_offset] = static_model.Vertex{
+        const vertices = @ptrCast([*]align(1) z3d.static_model.Vertex, &stream.target_buffer.items[stream.vertexOffset()]);
+        vertices[stream.vertex_offset] = z3d.static_model.Vertex{
             .x = x,
             .y = y,
             .z = z,
@@ -133,7 +140,7 @@ const Stream = struct {
         if (stream.failed != null)
             return;
 
-        const indices = @ptrCast([*]align(1) static_model.Index, &stream.target_buffer.items[stream.indexOffset()]);
+        const indices = @ptrCast([*]align(1) z3d.static_model.Index, &stream.target_buffer.items[stream.indexOffset()]);
         indices[stream.index_offset + 0] = index0;
         indices[stream.index_offset + 1] = index1;
         indices[stream.index_offset + 2] = index2;
@@ -150,8 +157,8 @@ const Stream = struct {
         if (texture_file.len > 120)
             return stream.setError(error.FileNameTooLong);
 
-        const meshes = @ptrCast([*]align(1) static_model.Mesh, &stream.target_buffer.items[stream.meshOffset()]);
-        meshes[stream.mesh_offset] = static_model.Mesh{
+        const meshes = @ptrCast([*]align(1) z3d.static_model.Mesh, &stream.target_buffer.items[stream.meshOffset()]);
+        meshes[stream.mesh_offset] = z3d.static_model.Mesh{
             .offset = std.mem.nativeToLittle(u32, std.math.cast(u32, offset) catch |e| return stream.setError(e)),
             .length = std.mem.nativeToLittle(u32, std.math.cast(u32, length) catch |e| return stream.setError(e)),
             .texture_file = [1]u8{0} ** 120,
@@ -167,54 +174,4 @@ const Stream = struct {
 
         // std.log.info("[{} {} \"{s}\"]", .{ offset, count, std.mem.sliceTo(texture.?, 0) });
     }
-
-    const FileType = enum(u8) { static = 0, dynamic = 1 };
-
-    const CommonHeader = extern struct {
-        magic: [4]u8 = .{ 0xae, 0x32, 0x51, 0x1d },
-
-        version: u16 = std.mem.nativeToLittle(u16, 1),
-        type: FileType,
-        _pad0: u8 = undefined,
-    };
-
-    const static_model = struct {
-        comptime {
-            if (@sizeOf(Header) != 24) @compileError("Header must have 24 byte!");
-            if (@sizeOf(Vertex) != 32) @compileError("Vertex must have 32 byte!");
-            if (@sizeOf(Index) != 2) @compileError("Index must have 2 byte!");
-            if (@sizeOf(Mesh) != 128) @compileError("Mesh must have 128 byte!");
-        }
-
-        // size: 24
-        const Header = extern struct {
-            common: CommonHeader,
-            vertex_count: u32,
-            index_count: u32,
-            mesh_count: u32,
-            _pad1: u32 = undefined,
-        };
-
-        // size: 32
-        const Vertex = extern struct {
-            x: f32,
-            y: f32,
-            z: f32,
-            nx: f32,
-            ny: f32,
-            nz: f32,
-            u: f32,
-            v: f32,
-        };
-
-        // size: 2
-        const Index = u16;
-
-        // size: 128
-        const Mesh = extern struct {
-            offset: u32,
-            length: u32,
-            texture_file: [120]u8, // NUL padded
-        };
-    };
 };

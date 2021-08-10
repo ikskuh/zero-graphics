@@ -50,39 +50,36 @@ pub fn getDisplayDPI() f32 {
     return 96.0;
 }
 
-pub const entry_point = struct {
+/// Overwrite default log handler
+pub fn log(
+    comptime message_level: std.log.Level,
+    comptime scope: @Type(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    const level_txt = switch (message_level) {
+        .emerg => "emergency",
+        .alert => "alert",
+        .crit => "critical",
+        .err => "error",
+        .warn => "warning",
+        .notice => "notice",
+        .info => "info",
+        .debug => "debug",
+    };
+    const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
-    /// Overwrite default log handler
-    pub fn log(
-        comptime message_level: std.log.Level,
-        comptime scope: @Type(.EnumLiteral),
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        const level_txt = switch (message_level) {
-            .emerg => "emergency",
-            .alert => "alert",
-            .crit => "critical",
-            .err => "error",
-            .warn => "warning",
-            .notice => "notice",
-            .info => "info",
-            .debug => "debug",
-        };
-        const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+    (LogWriter{ .context = {} }).print(level_txt ++ prefix2 ++ format ++ "\n", args) catch return;
 
-        (LogWriter{ .context = {} }).print(level_txt ++ prefix2 ++ format ++ "\n", args) catch return;
+    wasm_log_flush();
+}
 
-        wasm_log_flush();
-    }
-
-    /// Overwrite default panic handler
-    pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
-        // std.log.crit("panic: {s}", .{msg});
-        wasm_panic(msg.ptr, msg.len);
-        unreachable;
-    }
-};
+/// Overwrite default panic handler
+pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
+    // std.log.crit("panic: {s}", .{msg});
+    wasm_panic(msg.ptr, msg.len);
+    unreachable;
+}
 
 pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
     inline for (std.meta.declarations(WebGL)) |decl| {

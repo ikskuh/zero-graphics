@@ -22,6 +22,10 @@ pub fn build(b: *std.build.Builder) !void {
         .name = "api",
         .path = .{ .generated = &converter_api.output_file },
     });
+    converter.addPackage(std.build.Pkg{
+        .name = "z3d",
+        .path = .{ .path = "src/rendering/z3d-format.zig" },
+    });
     converter.linkLibC();
     converter.linkLibCpp();
     converter.linkSystemLibrary("assimp");

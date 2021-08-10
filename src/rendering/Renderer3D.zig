@@ -2,6 +2,7 @@ const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
 const types = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
+const z3d = @import("z3d-format.zig");
 
 const ResourcePool = @import("resource_pool.zig").ResourcePool;
 
@@ -18,6 +19,9 @@ const Mat4 = [4][4]f32;
 pub const DrawError = error{OutOfMemory};
 pub const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
 pub const LoadTextureError = CreateTextureError || error{InvalidImageData};
+pub const CreateGeometryError = error{ OutOfMemory, GraphicsApiFailure };
+pub const LoadTextureFileError = LoadTextureError || error{FileNotFound};
+pub const LoadGeometryError = CreateGeometryError || LoadTextureFileError || error{InvalidGeometryData};
 pub const InitError = error{ OutOfMemory, GraphicsApiFailure };
 
 fn makeMut(comptime T: type, ptr: *const T) *T {
@@ -260,7 +264,7 @@ pub fn updateTexture(self: *Self, texture: *Texture, data: []const u8) void {
 /// - `vertices` is an array of model vertices.
 /// - `indices` is a the full index buffer, where each three consecutive indices describe a triangle.
 /// - `meshes` is a list of ranges into `indices` with each range associated with a texture to be drawn
-pub fn createGeometry(self: *Self, vertices: []const Vertex, indices: []const u16, meshes: []const Mesh) !*const Geometry {
+pub fn createGeometry(self: *Self, vertices: []const Vertex, indices: []const u16, meshes: []const Mesh) CreateGeometryError!*const Geometry {
     for (indices) |idx| {
         std.debug.assert(idx < vertices.len);
     }
@@ -307,7 +311,7 @@ pub fn createGeometry(self: *Self, vertices: []const Vertex, indices: []const u1
 /// - `vertices` is an array of model vertices.
 /// - `indices` is a the full index buffer, where each three consecutive indices describe a triangle.
 /// - `texture` is the texture the geometry is drawn with.
-pub fn createMesh(self: *Self, vertices: []const Vertex, indices: []const u16, texture: ?*const Texture) !*const Geometry {
+pub fn createMesh(self: *Self, vertices: []const Vertex, indices: []const u16, texture: ?*const Texture) CreateGeometryError!*const Geometry {
     return self.createGeometry(
         vertices,
         indices,
@@ -315,6 +319,94 @@ pub fn createMesh(self: *Self, vertices: []const Vertex, indices: []const u16, t
             Mesh{ .offset = 0, .count = indices.len, .texture = texture },
         },
     );
+}
+
+pub fn loadGeometry(self: *Self, geometry_data: []const u8, loader_context: anytype, loadTextureFile: fn (*Self, @TypeOf(loader_context), name: []const u8) LoadTextureFileError!*const Texture) LoadGeometryError!*const Geometry {
+    if (geometry_data.len < @sizeOf(z3d.CommonHeader))
+        return error.InvalidGeometryData;
+
+    const common_header = @ptrCast(*align(1) const z3d.CommonHeader, &geometry_data[0]);
+
+    if (!std.mem.eql(u8, &common_header.magic, &z3d.magic_number))
+        return error.InvalidGeometryData;
+    if (std.mem.littleToNative(u16, common_header.version) != 1)
+        return error.InvalidGeometryData;
+
+    var loader_arena = std.heap.ArenaAllocator.init(self.allocator);
+    defer loader_arena.deinit();
+
+    const allocator = &loader_arena.allocator;
+
+    switch (common_header.type) {
+        .static => {
+            const header = @ptrCast(*align(1) const z3d.static_model.Header, &geometry_data[0]);
+            const vertex_count = std.mem.littleToNative(u32, header.vertex_count);
+            const index_count = std.mem.littleToNative(u32, header.index_count);
+            const mesh_count = std.mem.littleToNative(u32, header.mesh_count);
+            if (vertex_count == 0)
+                return error.InvalidGeometryData;
+            if (index_count == 0)
+                return error.InvalidGeometryData;
+            if (mesh_count == 0)
+                return error.InvalidGeometryData;
+
+            const vertex_offset = 24;
+            const index_offset = vertex_offset + 32 * vertex_count;
+            const mesh_offset = index_offset + 2 * index_count;
+
+            const src_vertices = @ptrCast([*]align(1) const z3d.static_model.Vertex, &geometry_data[vertex_offset]);
+            const src_indices = @ptrCast([*]align(1) const z3d.static_model.Index, &geometry_data[index_offset]);
+            const src_meshes = @ptrCast([*]align(1) const z3d.static_model.Mesh, &geometry_data[mesh_offset]);
+
+            const dst_vertices = try allocator.alloc(Vertex, vertex_count);
+            const dst_indices = try allocator.alloc(u16, index_count);
+            const dst_meshes = try allocator.alloc(Mesh, mesh_count);
+
+            for (dst_vertices) |*vtx, i| {
+                const src = src_vertices[i];
+                vtx.* = Vertex{
+                    .x = src.x,
+                    .y = src.y,
+                    .z = src.z,
+                    .nx = src.nx,
+                    .ny = src.ny,
+                    .nz = src.nz,
+                    .u = src.u,
+                    .v = src.v,
+                };
+            }
+            for (dst_indices) |*idx, i| {
+                idx.* = std.mem.littleToNative(u16, src_indices[i]);
+            }
+
+            for (dst_meshes) |*mesh, i| {
+                const src_mesh = src_meshes[i];
+                mesh.* = Mesh{
+                    .offset = std.mem.littleToNative(u32, src_mesh.offset),
+                    .count = std.mem.littleToNative(u32, src_mesh.length),
+                    .texture = null,
+                };
+
+                const texture_file_len = std.mem.indexOfScalar(u8, &src_mesh.texture_file, 0) orelse src_mesh.texture_file.len;
+                const texture_file = src_mesh.texture_file[0..texture_file_len];
+
+                if (texture_file.len > 0) {
+                    mesh.texture = try loadTextureFile(self, loader_context, texture_file);
+                }
+            }
+
+            _ = loader_context;
+            _ = loadTextureFile;
+
+            return try self.createGeometry(
+                dst_vertices,
+                dst_indices,
+                dst_meshes,
+            );
+        },
+        .dynamic => @panic("dynamic model loading not supported yet!"),
+        _ => return error.InvalidGeometryData,
+    }
 }
 
 /// Destroys a previously created geometry. Do not use the pointer afterwards anymore. The geometry

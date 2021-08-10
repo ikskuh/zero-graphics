@@ -94,10 +94,10 @@ static bool createStaticModel(aiScene const *scene, MeshStream *stream) {
 
     stream->writeMeshRange(stream,
                            index_offset,
-                           mesh->mNumVertices,
+                           3 * mesh->mNumFaces,
                            path.C_Str());
 
-    index_offset += mesh->mNumVertices;
+    index_offset += 3 * mesh->mNumFaces;
   }
 
   return true;
