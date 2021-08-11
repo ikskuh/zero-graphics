@@ -153,8 +153,8 @@ pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]cons
     } else {
         gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, width, height, 0, gles.RGBA, gles.UNSIGNED_BYTE, null);
     }
-    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MIN_FILTER, gles.LINEAR);
-    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MAG_FILTER, gles.LINEAR_MIPMAP_LINEAR);
+    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MIN_FILTER, gles.LINEAR_MIPMAP_LINEAR);
+    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MAG_FILTER, gles.LINEAR);
 
     gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_WRAP_S, gles.REPEAT);
     gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_WRAP_T, gles.REPEAT);

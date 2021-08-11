@@ -28,18 +28,19 @@
     </style>
 
     <script type="module" defer="true">
-        import getEnv from "./binding.js";
+        import {createPlatformEnvironment, createWebGlModule} from "./binding.js";
 
         const canvas_element = document.getElementById("render-canvas");
         var globalInstance;
 
-        let env = {
-            ...getEnv(canvas_element, () => globalInstance),
+        let imports = {
+            env: createPlatformEnvironment(() => globalInstance),
+            webgl: createWebGlModule(canvas_element, () => globalInstance),
         };
-
+                
         fetch("demo_application.wasm")
             .then((response) => response.arrayBuffer())
-            .then((bytes) => WebAssembly.instantiate(bytes, { env }))
+            .then((bytes) => WebAssembly.instantiate(bytes, imports))
             .then((results) => results.instance)
             .then((instance) => {
                 globalInstance = instance;

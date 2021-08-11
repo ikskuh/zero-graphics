@@ -1,9 +1,41 @@
-// Platform ENV
-export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
+const utf8decoder = new TextDecoder();
+
+function createPlatformEnvironment(getInstance) {
     const getMemory = () => getInstance().exports.memory;
-    const utf8decoder = new TextDecoder();
-    const readCharStr = (ptr, len) =>
-        utf8decoder.decode(new Uint8Array(getMemory().buffer, ptr, len));
+
+    let log_string = "";
+    return {
+        wasm_quit() {
+            throw 'application exit';
+        },
+        wasm_panic: (ptr, len) => {
+            let msg = utf8decoder.decode(
+                new Uint8Array(getMemory().buffer, ptr, len)
+            );
+            throw Error(msg);
+        },
+        wasm_log_write: (ptr, len) => {
+            log_string += utf8decoder.decode(
+                new Uint8Array(getMemory().buffer, ptr, len)
+            );
+        },
+        wasm_log_flush: () => {
+            console.log(log_string);
+            log_string = "";
+        },
+
+        now_f64() {
+            return Date.now();
+        },
+
+    };
+}
+
+function createWebGlModule(canvas_element, getInstance, stop_fn) {
+    const getMemory = () => getInstance().exports.memory;
+
+    const readCharStr = (ptr, len) => utf8decoder.decode(new Uint8Array(getMemory().buffer, ptr, len));
+
     const writeCharStr = (ptr, len, lenRetPtr, text) => {
         const encoder = new TextEncoder();
         const message = encoder.encode(text);
@@ -38,37 +70,13 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
     const glFramebuffers = [null];
     const glUniformLocations = [null];
 
-    let log_string = "";
-
     return {
-        wasm_quit() {
-            stop_fn();
-        },
-        wasm_panic: (ptr, len) => {
-            let msg = utf8decoder.decode(
-                new Uint8Array(getMemory().buffer, ptr, len)
-            );
-            throw Error(msg);
-        },
-        wasm_log_write: (ptr, len) => {
-            log_string += utf8decoder.decode(
-                new Uint8Array(getMemory().buffer, ptr, len)
-            );
-        },
-        wasm_log_flush: () => {
-            console.log(log_string);
-            log_string = "";
-        },
 
-        wasm_getScreenW() {
+        meta_getScreenW() {
             return gl.drawingBufferWidth; // canvas_element.clientWidth; //
         },
-        wasm_getScreenH() {
+        meta_getScreenH() {
             return gl.drawingBufferHeight; // canvas_element.clientHeight; // 
-        },
-
-        now_f64() {
-            return Date.now();
         },
 
         // GL stuff
@@ -676,4 +684,9 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
             throw 'vertexAttrib4fv not implemented yet';
         },
     };
+}
+
+export {
+    createWebGlModule,
+    createPlatformEnvironment,
 }
