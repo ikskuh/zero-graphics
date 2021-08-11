@@ -3,6 +3,8 @@ const gles = @import("../gl_es_2v0.zig");
 const types = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
 
+const glesh = @import("gles-helper.zig");
+
 const c = @cImport({
     @cInclude("stb_truetype.h");
 });
@@ -28,15 +30,22 @@ pub const LoadTextureError = CreateTextureError || error{InvalidImageData};
 pub const CreateFontError = error{ OutOfMemory, InvalidFontFile };
 pub const InitError = error{ OutOfMemory, GraphicsApiFailure };
 
+/// Vertex attributes used in this renderer
+const vertex_attributes = .{
+    .vPosition = 0,
+    .vColor = 1,
+    .vUV = 2,
+};
+
+const Uniforms = struct {
+    uScreenSize: gles.GLint,
+    uTexture: gles.GLint,
+};
+
 shader_program: gles.GLuint,
-screen_size_location: gles.GLint,
-texture_location: gles.GLint,
+uniforms: Uniforms,
 
 vertex_buffer: gles.GLuint,
-
-position_attribute_location: gles.GLuint,
-color_attribute_location: gles.GLuint,
-uv_attribute_location: gles.GLuint,
 
 /// list of CCW triangles that will be rendered 
 vertices: std.ArrayList(Vertex),
@@ -54,31 +63,7 @@ white_texture: *const Texture,
 unit_to_pixel_ratio: f32 = 1.0,
 
 pub fn init(allocator: *std.mem.Allocator) InitError!Self {
-    const shader_program = blk: {
-        // Create and compile vertex shader
-        const vertex_shader = createAndCompileShader(gles.VERTEX_SHADER, vertexSource) catch return error.GraphicsApiFailure;
-        defer gles.deleteShader(vertex_shader);
-
-        const fragment_shader = createAndCompileShader(gles.FRAGMENT_SHADER, fragmentSource) catch return error.GraphicsApiFailure;
-        defer gles.deleteShader(fragment_shader);
-
-        const program = gles.createProgram();
-
-        gles.attachShader(program, vertex_shader);
-        defer gles.detachShader(program, vertex_shader);
-
-        gles.attachShader(program, fragment_shader);
-        defer gles.detachShader(program, fragment_shader);
-
-        gles.linkProgram(program);
-
-        var status: gles.GLint = undefined;
-        gles.getProgramiv(program, gles.LINK_STATUS, &status);
-        if (status != gles.TRUE)
-            return error.GraphicsApiFailure;
-
-        break :blk program;
-    };
+    const shader_program = try glesh.compileShaderProgram(vertex_attributes, vertexSource, fragmentSource);
     errdefer gles.deleteProgram(shader_program);
 
     // Create vertex buffer object and copy vertex data into it
@@ -88,28 +73,12 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
         return error.GraphicsApiFailure;
     errdefer gles.deleteBuffers(1, &vertex_buffer);
 
-    const position_attribute_location = std.math.cast(gles.GLuint, gles.getAttribLocation(shader_program, "vPosition")) catch return error.GraphicsApiFailure;
-    const color_attribute_location = std.math.cast(gles.GLuint, gles.getAttribLocation(shader_program, "vColor")) catch return error.GraphicsApiFailure;
-    const uv_attribute_location = std.math.cast(gles.GLuint, gles.getAttribLocation(shader_program, "vUV")) catch return error.GraphicsApiFailure;
-
-    gles.enableVertexAttribArray(position_attribute_location);
-    gles.enableVertexAttribArray(color_attribute_location);
-    gles.enableVertexAttribArray(uv_attribute_location);
-
-    gles.bindBuffer(gles.ARRAY_BUFFER, vertex_buffer);
-    gles.vertexAttribPointer(position_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
-    gles.vertexAttribPointer(color_attribute_location, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "r")));
-    gles.vertexAttribPointer(uv_attribute_location, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
-
     var self = Self{
         .shader_program = shader_program,
-        .screen_size_location = gles.getUniformLocation(shader_program, "uScreenSize"),
-        .texture_location = gles.getUniformLocation(shader_program, "uTexture"),
+        .uniforms = glesh.fetchUniforms(shader_program, Uniforms),
         .vertices = std.ArrayList(Vertex).init(allocator),
         .vertex_buffer = vertex_buffer,
-        .position_attribute_location = position_attribute_location,
-        .color_attribute_location = color_attribute_location,
-        .uv_attribute_location = uv_attribute_location,
+
         .allocator = allocator,
         .textures = .{},
         .fonts = .{},
@@ -662,14 +631,23 @@ pub fn reset(self: *Self) void {
 
 /// Renders the currently contained data to the screen.
 pub fn render(self: Self, screen_size: Size) void {
+    glesh.enableAttributes(vertex_attributes);
+    defer glesh.disableAttributes(vertex_attributes);
+
+    gles.disable(gles.DEPTH_TEST);
+    gles.enable(gles.BLEND);
+
     gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer);
     gles.bufferData(gles.ARRAY_BUFFER, @intCast(gles.GLsizeiptr, @sizeOf(Vertex) * self.vertices.items.len), self.vertices.items.ptr, gles.STATIC_DRAW);
 
-    gles.useProgram(self.shader_program);
-    gles.uniform2i(self.screen_size_location, screen_size.width, screen_size.height);
-    gles.uniform1i(self.texture_location, 0);
+    gles.vertexAttribPointer(vertex_attributes.vPosition, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
+    gles.vertexAttribPointer(vertex_attributes.vColor, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "r")));
+    gles.vertexAttribPointer(vertex_attributes.vUV, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
 
-    gles.enable(gles.BLEND);
+    gles.useProgram(self.shader_program);
+    gles.uniform2i(self.uniforms.uScreenSize, screen_size.width, screen_size.height);
+    gles.uniform1i(self.uniforms.uTexture, 0);
+
     gles.blendFunc(gles.SRC_ALPHA, gles.ONE_MINUS_SRC_ALPHA);
     gles.blendEquation(gles.FUNC_ADD);
 

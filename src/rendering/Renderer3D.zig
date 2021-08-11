@@ -4,6 +4,8 @@ const types = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
 const z3d = @import("z3d-format.zig");
 
+const glesh = @import("gles-helper.zig");
+
 const ResourcePool = @import("resource_pool.zig").ResourcePool;
 
 const zigimg = @import("zigimg");
@@ -30,6 +32,13 @@ fn makeMut(comptime T: type, ptr: *const T) *T {
 
 const TexturePool = ResourcePool(Texture, *Self, destroyTextureInternal);
 const GeometryPool = ResourcePool(Geometry, *Self, destroyGeometryInternal);
+
+/// Vertex attributes used in this renderer
+const attributes = .{
+    .vPosition = 0,
+    .vNormal = 1,
+    .vUV = 2,
+};
 
 static_geometry_shader: GeometryShader,
 
@@ -73,10 +82,6 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
     var static_geometry_shader = try GeometryShader.create(static_vertex_source, static_fragment_source);
     errdefer static_geometry_shader.destroy();
 
-    gles.enableVertexAttribArray(attributes.vPosition);
-    gles.enableVertexAttribArray(attributes.vNormal);
-    gles.enableVertexAttribArray(attributes.vUV);
-
     var self = Self{
         .allocator = allocator,
 
@@ -102,52 +107,6 @@ pub fn deinit(self: *Self) void {
     self.* = undefined;
 }
 
-const attributes = .{
-    .vPosition = 0,
-    .vNormal = 1,
-    .vUV = 2,
-};
-
-fn compileShaderProgram(vertex_source: []const u8, fragment_source: []const u8) !gles.GLuint {
-    // Create and compile vertex shader
-    const vertex_shader = createAndCompileShader(gles.VERTEX_SHADER, vertex_source) catch return error.GraphicsApiFailure;
-    defer gles.deleteShader(vertex_shader);
-
-    const fragment_shader = createAndCompileShader(gles.FRAGMENT_SHADER, fragment_source) catch return error.GraphicsApiFailure;
-    defer gles.deleteShader(fragment_shader);
-
-    const program = gles.createProgram();
-
-    inline for (std.meta.fields(@TypeOf(attributes))) |attrib| {
-        const name = comptime attrib.name[0.. :0];
-        gles.bindAttribLocation(program, @field(attributes, attrib.name), name.ptr);
-    }
-
-    gles.attachShader(program, vertex_shader);
-    defer gles.detachShader(program, vertex_shader);
-
-    gles.attachShader(program, fragment_shader);
-    defer gles.detachShader(program, fragment_shader);
-
-    gles.linkProgram(program);
-
-    var status: gles.GLint = undefined;
-    gles.getProgramiv(program, gles.LINK_STATUS, &status);
-    if (status != gles.TRUE)
-        return error.GraphicsApiFailure;
-
-    return program;
-}
-
-fn fetchUniforms(program: gles.GLuint, comptime T: type) T {
-    var t: T = undefined;
-    inline for (std.meta.fields(T)) |fld| {
-        const name = comptime fld.name[0.. :0];
-        @field(t, fld.name) = gles.getUniformLocation(program, name.ptr);
-    }
-    return t;
-}
-
 const GeometryShader = struct {
     const Uniforms = struct {
         // vertex shader
@@ -162,12 +121,12 @@ const GeometryShader = struct {
     uniforms: Uniforms,
 
     pub fn create(vertex_source: []const u8, fragment_source: []const u8) !GeometryShader {
-        const shader_program = try compileShaderProgram(vertex_source, fragment_source);
+        const shader_program = try glesh.compileShaderProgram(attributes, vertex_source, fragment_source);
         errdefer gles.deleteProgram(shader_program);
 
         return GeometryShader{
             .program = shader_program,
-            .uniforms = fetchUniforms(shader_program, Uniforms),
+            .uniforms = glesh.fetchUniforms(shader_program, Uniforms),
         };
     }
 
@@ -459,6 +418,9 @@ pub fn drawGeometry(self: *Self, geometry: *const Geometry, transform: Mat4) !vo
 
 /// Renders the currently contained data to the screen.
 pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
+    glesh.enableAttributes(attributes);
+    defer glesh.disableAttributes(attributes);
+
     gles.enable(gles.DEPTH_TEST);
     gles.disable(gles.BLEND);
 
@@ -487,30 +449,6 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
             );
         }
     }
-}
-
-fn createAndCompileShader(shader_type: gles.GLenum, source: []const u8) !gles.GLuint {
-    const source_ptr = source.ptr;
-    const source_len = @intCast(gles.GLint, source.len);
-
-    // Create and compile vertex shader
-    const shader = gles.createShader(shader_type);
-    errdefer gles.deleteShader(shader);
-
-    gles.shaderSource(
-        shader,
-        1,
-        @ptrCast([*]const [*c]const u8, &source_ptr),
-        @ptrCast([*]const gles.GLint, &source_len),
-    );
-    gles.compileShader(shader);
-
-    var status: gles.GLint = undefined;
-    gles.getShaderiv(shader, gles.COMPILE_STATUS, &status);
-    if (status != gles.TRUE)
-        return error.FailedToCompileShader;
-
-    return shader;
 }
 
 pub const Vertex = extern struct {

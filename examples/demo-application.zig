@@ -9,12 +9,14 @@
 //!
 
 const std = @import("std");
+const zlm = @import("zlm");
 const zero_graphics = @import("zero-graphics");
 
 const logger = std.log.scoped(.demo);
 const gles = zero_graphics.gles;
 
 const Renderer = zero_graphics.Renderer2D;
+const Renderer3D = zero_graphics.Renderer3D;
 
 const Application = @This();
 
@@ -30,6 +32,11 @@ ui: zero_graphics.UserInterface,
 
 gui_data: DemoGuiData = .{},
 
+renderer3d: Renderer3D,
+mesh: *const Renderer3D.Geometry,
+
+startup_time: i64,
+
 pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
     app.* = Application{
         .allocator = allocator,
@@ -40,6 +47,11 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
         .ui = undefined,
         .font = undefined,
         .input = input,
+
+        .renderer3d = undefined,
+        .mesh = undefined,
+
+        .startup_time = zero_graphics.milliTimestamp(),
     };
 
     app.ui = try zero_graphics.UserInterface.init(app.allocator, null);
@@ -103,11 +115,32 @@ pub fn setupGraphics(app: *Application) !void {
     app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
     try app.ui.setRenderer(&app.renderer);
+
+    app.renderer3d = try Renderer3D.init(app.allocator);
+    errdefer app.renderer3d.deinit();
+
+    app.mesh = try app.renderer3d.loadGeometry(
+        @embedFile("twocubes.z3d"),
+        {},
+        struct {
+            fn f(ren: *Renderer3D, ctx: void, file_name: []const u8) !*const Renderer3D.Texture {
+                _ = ctx;
+                if (std.mem.eql(u8, file_name, "metal-01.png"))
+                    return try ren.loadTexture(@embedFile("data/metal-01.png"));
+                if (std.mem.eql(u8, file_name, "metal-02.png"))
+                    return try ren.loadTexture(@embedFile("data/metal-02.png"));
+                return error.FileNotFound;
+            }
+        }.f,
+    );
 }
 
 pub fn teardownGraphics(app: *Application) void {
     app.ui.setRenderer(null) catch unreachable;
     app.renderer.deinit();
+
+    app.renderer3d.destroyGeometry(app.mesh);
+    app.renderer3d.deinit();
 }
 
 pub fn resize(app: *Application, width: u15, height: u15) !void {
@@ -384,15 +417,45 @@ pub fn render(app: *Application) !void {
         }
     }
 
+    app.renderer3d.reset();
+    try app.renderer3d.drawGeometry(app.mesh, zlm.Mat4.identity.fields);
+
     // OpenGL rendering
     {
+        const aspect = @intToFloat(f32, app.screen_width) / @intToFloat(f32, app.screen_height);
+
         gles.viewport(0, 0, app.screen_width, app.screen_height);
 
         gles.clearColor(0.3, 0.3, 0.3, 1.0);
-        gles.clear(gles.COLOR_BUFFER_BIT);
+        gles.clearDepthf(1.0);
+        gles.clear(gles.COLOR_BUFFER_BIT | gles.DEPTH_BUFFER_BIT);
 
         gles.frontFace(gles.CCW);
         gles.cullFace(gles.BACK);
+
+        const perspective_mat = zlm.specializeOn(f32).Mat4.createPerspective(
+            zlm.toRadians(60.0),
+            aspect,
+            0.1,
+            10_000.0,
+        );
+
+        const ts = @intToFloat(f32, zero_graphics.milliTimestamp() - app.startup_time) / 1000.0;
+
+        const lookat_mat = zlm.specializeOn(f32).Mat4.createLookAt(
+            // zlm.specializeOn(f32).vec3(0, 0, -10),
+            zlm.specializeOn(f32).vec3(
+                4.0 * std.math.sin(ts),
+                3.0,
+                4.0 * std.math.cos(ts),
+            ),
+            zlm.specializeOn(f32).Vec3.zero,
+            zlm.specializeOn(f32).Vec3.unitY,
+        );
+
+        const view_projection_matrix = lookat_mat.mul(perspective_mat);
+
+        app.renderer3d.render(view_projection_matrix.fields);
 
         renderer.render(zero_graphics.Size{ .width = app.screen_width, .height = app.screen_height });
     }

@@ -36,6 +36,11 @@ pub fn build(b: *std.build.Builder) !void {
     app.setPackageName("net.random_projects.zero_graphics.demo");
     app.setBuildMode(mode);
 
+    app.addPackage(std.build.Pkg{
+        .name = "zlm",
+        .path = .{ .path = "vendor/zlm/zlm.zig" },
+    });
+
     const exe = app.compileFor(platform);
     exe.install();
 
