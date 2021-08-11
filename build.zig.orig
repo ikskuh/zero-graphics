@@ -36,11 +36,15 @@ pub fn build(b: *std.build.Builder) !void {
     app.setPackageName("net.random_projects.zero_graphics.demo");
     app.setBuildMode(mode);
 
+<<<<<<< HEAD
     app.addPackage(std.build.Pkg{
         .name = "zlm",
         .path = .{ .path = "vendor/zlm/zlm.zig" },
     });
 
+    const exe = app.compileFor(platform);
+    exe.install();
+=======
     {
         const desktop_exe = app.compileFor(platform);
         desktop_exe.install();
@@ -66,6 +70,7 @@ pub fn build(b: *std.build.Builder) !void {
             .name = "apple_pie",
             .path = .{ .path = "vendor/apple_pie/src/apple_pie.zig" },
         });
+>>>>>>> 94201c7 (Improves build file.)
 
         const serve = server.run();
         serve.step.dependOn(&wasm_build.single_step.exe.step);
