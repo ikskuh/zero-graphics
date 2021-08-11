@@ -72,6 +72,11 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         },
 
         // GL stuff
+
+        // Documentation
+        // WebGL:         https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/lineWidth
+        // OpenGL ES 2.0: https://www.khronos.org/registry/OpenGL-Refpages/es2.0/
+
         activeTexture(target) {
             gl.activeTexture(target);
         },
@@ -206,6 +211,9 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         enableVertexAttribArray(x) {
             gl.enableVertexAttribArray(x);
         },
+        bindAttribLocation(x) {
+            gl.bindAttribLocation(x);
+        },
         framebufferTexture2D(target, attachment, textarget, texture, level) {
             gl.framebufferTexture2D(
                 target,
@@ -305,13 +313,13 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
             if (!format) throw new Error("Unimplemented pixel format");
 
             const data =
-                data_ptr != 0
-                    ? new Uint8Array(
-                        getMemory().buffer,
-                        data_ptr,
-                        width * height * pixel_size
-                    )
-                    : null;
+                data_ptr != 0 ?
+                new Uint8Array(
+                    getMemory().buffer,
+                    data_ptr,
+                    width * height * pixel_size
+                ) :
+                null;
 
             gl.texImage2D(
                 target,
@@ -400,11 +408,11 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         hint() { // extern fn hint (_target: GLenum, _mode: GLenum) void;
             throw 'hint not implemented yet';
         },
-        bindAttribLocation() { // extern fn bindAttribLocation (_program: GLuint, _index: GLuint, _name: [*c]const GLchar) void;
-            throw 'bindAttribLocation not implemented yet';
+        bindAttribLocationJs(pgm, idx, name_ptr, name_len) { // extern fn bindAttribLocation (_program: GLuint, _index: GLuint, _name: [*c]const GLchar) void;
+            gl.bindAttribLocation(glPrograms[pgm], idx, readCharStr(name_ptr, name_len));
         },
-        bindRenderbuffer() { // extern fn bindRenderbuffer (_target: GLenum, _renderbuffer: GLuint) void;
-            throw 'bindRenderbuffer not implemented yet';
+        bindRenderbuffer(target, rbuf) { // extern fn bindRenderbuffer (_target: GLenum, _renderbuffer: GLuint) void;
+            gl.bindRenderbuffer(target, rbuf);
         },
         blendColor() { // extern fn blendColor (_red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) void;
             throw 'blendColor not implemented yet';
@@ -418,14 +426,14 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         bufferSubData() { // extern fn bufferSubData (_target: GLenum, _offset: GLintptr, _size: GLsizeiptr, _data: ?*const c_void) void;
             throw 'bufferSubData not implemented yet';
         },
-        clearDepthf() { // extern fn clearDepthf (_d: GLfloat) void;
-            throw 'clearDepthf not implemented yet';
+        clearDepthf(depth) { // extern fn clearDepthf (_d: GLfloat) void;
+            gl.clearDepth(depth);
         },
-        clearStencil() { // extern fn clearStencil (_s: GLint) void;
-            throw 'clearStencil not implemented yet';
+        clearStencil(mask) { // extern fn clearStencil (_s: GLint) void;
+            gl.clearStencil(mask);
         },
-        colorMask() { // extern fn colorMask (_red: GLboolean, _green: GLboolean, _blue: GLboolean, _alpha: GLboolean) void;
-            throw 'colorMask not implemented yet';
+        colorMask(r, g, b, a) { // extern fn colorMask (_red: GLboolean, _green: GLboolean, _blue: GLboolean, _alpha: GLboolean) void;
+            gl.colorMask(r, g, b, a);
         },
         compressedTexImage2D() { // extern fn compressedTexImage2D (_target: GLenum, _level: GLint, _internalformat: GLenum, _width: GLsizei, _height: GLsizei, _border: GLint, _imageSize: GLsizei, _data: ?*const c_void) void;
             throw 'compressedTexImage2D not implemented yet';
@@ -454,20 +462,20 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         depthRangef() { // extern fn depthRangef (_n: GLfloat, _f: GLfloat) void;
             throw 'depthRangef not implemented yet';
         },
-        disableVertexAttribArray() { // extern fn disableVertexAttribArray (_index: GLuint) void;
-            throw 'disableVertexAttribArray not implemented yet';
+        disableVertexAttribArray(id) { // extern fn disableVertexAttribArray (_index: GLuint) void;
+            gl.disableVertexAttribArray(id);
         },
         finish() { // extern fn finish () void;
-            throw 'finish not implemented yet';
+            gl.finish();
         },
         flush() { // extern fn flush () void;
-            throw 'flush not implemented yet';
+            gl.flush();
         },
         framebufferRenderbuffer() { // extern fn framebufferRenderbuffer (_target: GLenum, _attachment: GLenum, _renderbuffertarget: GLenum, _renderbuffer: GLuint) void;
             throw 'framebufferRenderbuffer not implemented yet';
         },
-        generateMipmap() { // extern fn generateMipmap (_target: GLenum) void;
-            throw 'generateMipmap not implemented yet';
+        generateMipmap(tex) { // extern fn generateMipmap (_target: GLenum) void;
+            gl.generateMipmap(tex);
         },
         genFramebuffers() { // extern fn genFramebuffers (_n: GLsizei, _framebuffers: [*c]GLuint) void;
             throw 'genFramebuffers not implemented yet';
@@ -532,26 +540,26 @@ export default function getPlatformEnv(canvas_element, getInstance, stop_fn) {
         isBuffer() { // extern fn isBuffer (_buffer: GLuint) GLboolean;
             throw 'isBuffer not implemented yet';
         },
-        isEnabled() { // extern fn isEnabled (_cap: GLenum) GLboolean;
-            throw 'isEnabled not implemented yet';
+        isEnabled(cap) { // extern fn isEnabled (_cap: GLenum) GLboolean;
+            return gl.isEnabled(cap);
         },
-        isFramebuffer() { // extern fn isFramebuffer (_framebuffer: GLuint) GLboolean;
-            throw 'isFramebuffer not implemented yet';
+        isFramebuffer(fb) { // extern fn isFramebuffer (_framebuffer: GLuint) GLboolean;
+            return gl.isFramebuffer(fb);
         },
-        isProgram() { // extern fn isProgram (_program: GLuint) GLboolean;
-            throw 'isProgram not implemented yet';
+        isProgram(pgm) { // extern fn isProgram (_program: GLuint) GLboolean;
+            return gl.isProgram(glPrograms[pgm]);
         },
-        isRenderbuffer() { // extern fn isRenderbuffer (_renderbuffer: GLuint) GLboolean;
-            throw 'isRenderbuffer not implemented yet';
+        isRenderbuffer(rb) { // extern fn isRenderbuffer (_renderbuffer: GLuint) GLboolean;
+            return gl.isRenderbuffer(rb);
         },
-        isShader() { // extern fn isShader (_shader: GLuint) GLboolean;
-            throw 'isShader not implemented yet';
+        isShader(shader) { // extern fn isShader (_shader: GLuint) GLboolean;
+            return gl.isShader(glShaders[shader]);
         },
-        isTexture() { // extern fn isTexture (_texture: GLuint) GLboolean;
-            throw 'isTexture not implemented yet';
+        isTexture(tex) { // extern fn isTexture (_texture: GLuint) GLboolean;
+            return gl.isTexture(glTextures[tex]);
         },
-        lineWidth() { // extern fn lineWidth (_width: GLfloat) void;
-            throw 'lineWidth not implemented yet';
+        lineWidth(width) { // extern fn lineWidth (_width: GLfloat) void;
+            gl.lineWidth(width);
         },
         polygonOffset() { // extern fn polygonOffset (_factor: GLfloat, _units: GLfloat) void;
             throw 'polygonOffset not implemented yet';

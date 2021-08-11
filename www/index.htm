@@ -25,7 +25,6 @@
             padding: 2px;
 
         }
-
     </style>
 
     <script type="module" defer="true">
@@ -38,7 +37,7 @@
             ...getEnv(canvas_element, () => globalInstance),
         };
 
-        fetch("zerog-demo.wasm")
+        fetch("demo_application.wasm")
             .then((response) => response.arrayBuffer())
             .then((bytes) => WebAssembly.instantiate(bytes, { env }))
             .then((results) => results.instance)

@@ -235,7 +235,10 @@ const WebGL = struct {
 
     extern fn hint(_target: GLenum, _mode: GLenum) void;
 
-    extern fn bindAttribLocation(_program: GLuint, _index: GLuint, _name: [*c]const GLchar) void;
+    extern fn bindAttribLocationJs(_program: GLuint, _index: GLuint, _name: [*]const GLchar, name_len: usize) void;
+    fn bindAttribLocation(_program: GLuint, _index: GLuint, _name: [*c]const GLchar) callconv(.C) void {
+        bindAttribLocationJs(_program, _index, _name, std.mem.lenZ(@as([*:0]const u8, _name)));
+    }
 
     extern fn bindRenderbuffer(_target: GLenum, _renderbuffer: GLuint) void;
 
