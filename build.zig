@@ -10,26 +10,55 @@ pub fn build(b: *std.build.Builder) !void {
     const mode = b.standardReleaseOptions();
     const platform = sdk.standardPlatformOptions();
 
-    const converter_api = b.addTranslateC(.{ .path = "tools/modelconv/api.h" });
+    {
+        const zero_init = b.addExecutable("zero-init", "tools/zero-init/main.zig");
+        zero_init.addPackage(std.build.Pkg{
+            .name = "args",
+            .path = .{ .path = "vendor/args/args.zig" },
+        });
+        zero_init.install();
+    }
 
-    const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
-    converter.addCSourceFile("tools/modelconv/converter.cpp", &[_][]const u8{
-        "-std=c++17",
-        "-Wall",
-        "-Wextra",
-    });
-    converter.addPackage(std.build.Pkg{
-        .name = "api",
-        .path = .{ .generated = &converter_api.output_file },
-    });
-    converter.addPackage(std.build.Pkg{
-        .name = "z3d",
-        .path = .{ .path = "src/rendering/z3d-format.zig" },
-    });
-    converter.linkLibC();
-    converter.linkLibCpp();
-    converter.linkSystemLibrary("assimp");
-    converter.install();
+    // compile the zero-init example so can be sure that it actually compiles!
+    {
+        const app = sdk.createApplication("zero_init_app", "tools/zero-init/template/src/main.zig");
+        app.setDisplayName("ZeroGraphics Init App");
+        app.setPackageName("net.random_projects.zero_graphics.init_app");
+        app.setBuildMode(mode);
+
+        b.getInstallStep().dependOn(app.compileFor(platform).getStep());
+        b.getInstallStep().dependOn(app.compileFor(.web).getStep());
+        if (enable_android) {
+            b.getInstallStep().dependOn(app.compileFor(.android).getStep());
+        }
+    }
+
+    {
+        const converter_api = b.addTranslateC(.{ .path = "tools/modelconv/api.h" });
+
+        const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
+        converter.addCSourceFile("tools/modelconv/converter.cpp", &[_][]const u8{
+            "-std=c++17",
+            "-Wall",
+            "-Wextra",
+        });
+        converter.addPackage(std.build.Pkg{
+            .name = "api",
+            .path = .{ .generated = &converter_api.output_file },
+        });
+        converter.addPackage(std.build.Pkg{
+            .name = "z3d",
+            .path = .{ .path = "src/rendering/z3d-format.zig" },
+        });
+        converter.addPackage(std.build.Pkg{
+            .name = "args",
+            .path = .{ .path = "vendor/args/args.zig" },
+        });
+        converter.linkLibC();
+        converter.linkLibCpp();
+        converter.linkSystemLibrary("assimp");
+        converter.install();
+    }
 
     const app = sdk.createApplication("demo_application", "examples/demo-application.zig");
     app.setDisplayName("ZeroGraphics Demo");

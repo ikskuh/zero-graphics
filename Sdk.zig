@@ -235,6 +235,13 @@ pub const AppCompilation = union(enum) {
     single_step: Single,
     android: Android,
 
+    pub fn getStep(comp: *AppCompilation) *std.build.Step {
+        return switch (comp.*) {
+            .single_step => |step| &step.exe.step,
+            .android => |android| android.app.final_step,
+        };
+    }
+
     pub fn install(comp: *AppCompilation) void {
         switch (comp.*) {
             .single_step => |step| {

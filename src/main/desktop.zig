@@ -68,7 +68,7 @@ pub fn main() !void {
         force_fullscreen = false;
     }
 
-    if (std.process.getEnvVarOwned(std.heap.c_allocator, "DUNSTBLICK_FULLSCREEN")) |env| {
+    if (std.process.getEnvVarOwned(std.heap.c_allocator, "ZEROG_FULLSCREEN")) |env| {
         defer std.heap.c_allocator.free(env);
 
         if (std.mem.startsWith(u8, env, "y")) {
@@ -76,7 +76,7 @@ pub fn main() !void {
         } else if (std.mem.startsWith(u8, env, "n")) {
             force_fullscreen = false;
         } else {
-            logger.err("Could not parse DUNSTBLICK_FULLSCREEN environment variable: Unknown value", .{});
+            logger.err("Could not parse ZEROG_FULLSCREEN environment variable: Unknown value", .{});
         }
     } else |_| {
         // silently ignore the error here

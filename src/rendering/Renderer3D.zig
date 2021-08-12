@@ -68,7 +68,7 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
         \\   aUV = vUV;
         \\}
     ;
-    const static_fragment_source =
+    const static_alphatest_fragment_source =
         \\precision mediump float;
         \\varying vec2 aUV;
         \\varying vec3 aNormal;
@@ -76,10 +76,12 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
         \\void main()
         \\{
         \\   gl_FragColor = texture2D(uTexture, aUV);
+        \\   if(gl_FragColor.a < 0.5)
+        \\     discard;
         \\}
     ;
 
-    var static_geometry_shader = try GeometryShader.create(static_vertex_source, static_fragment_source);
+    var static_geometry_shader = try GeometryShader.create(static_vertex_source, static_alphatest_fragment_source);
     errdefer static_geometry_shader.destroy();
 
     var self = Self{

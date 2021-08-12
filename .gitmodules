@@ -19,3 +19,6 @@
 [submodule "vendor/zlm"]
 	path = vendor/zlm
 	url = https://github.com/ziglibs/zlm
+[submodule "vendor/args"]
+	path = vendor/args
+	url = https://github.com/MasterQ32/zig-args

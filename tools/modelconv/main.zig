@@ -1,6 +1,34 @@
 const std = @import("std");
 const api = @import("api");
 const z3d = @import("z3d");
+const args_parser = @import("args");
+
+const CliArgs = struct {
+    output: ?[]const u8 = null,
+    dynamic: bool = false,
+    help: bool = false,
+    @"test": bool = false,
+
+    pub const shorthands = .{
+        .o = "output",
+        .h = "help",
+        .d = "dynamic",
+    };
+};
+
+fn printUsage(writer: anytype) !void {
+    try writer.writeAll(
+        \\mconv - convert 3d models to zero-graphics format
+        \\
+        \\Usage:
+        \\  mconv [--help] [--output <file>] [--dynamic] [--test] <input file>
+        \\  -h, --help           Prints this help and succeeds.
+        \\  -o, --output <file>  Writes the file to <file>. Otherwise, the extension of the input file is changed to .z3d
+        \\  -d, --dynamic        Converts the model as a dynamic model with skinning information. Those models are usually somewhat larger, but can be animated.
+        \\      --test           Does not write the output file, but will still perform the model conversion. This can be used to check if a model is convertible.
+        \\
+    );
+}
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub fn main() !u8 {
@@ -8,22 +36,50 @@ pub fn main() !u8 {
 
     const allocator = &gpa.allocator;
 
-    const src_file = "/home/felix/projects/experiments/zero3d/vendor/zero-graphics/examples/data/twocubes.obj";
-    const dst_file = "/home/felix/projects/experiments/zero3d/vendor/zero-graphics/examples/twocubes.z3d";
+    const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
+
+    var cli = args_parser.parseForCurrentProcess(CliArgs, allocator, .print) catch return 1;
+    defer cli.deinit();
+
+    if (cli.options.help) {
+        try printUsage(stdout);
+        return 0;
+    }
+    if (cli.positionals.len != 1) {
+        try printUsage(stderr);
+        return 1;
+    }
+
+    const src_file = cli.positionals[0];
+
+    var dst_file = std.ArrayList(u8).init(allocator);
+    defer dst_file.deinit();
+
+    if (cli.options.output) |dst| {
+        try dst_file.appendSlice(dst);
+    } else {
+        try dst_file.appendSlice(src_file);
+        const ext = std.fs.path.extension(src_file);
+        dst_file.shrinkRetainingCapacity(dst_file.items.len - ext.len);
+        try dst_file.appendSlice(".z3d");
+    }
 
     var stream = Stream{
         .target_buffer = std.ArrayList(u8).init(allocator),
     };
     defer stream.target_buffer.deinit();
 
-    if (!api.transformFile(src_file, &stream.mesh_stream, api.static_geometry)) {
+    if (!api.transformFile(src_file.ptr, &stream.mesh_stream, if (cli.options.dynamic) api.dynamic_geometry else api.static_geometry)) {
         return 1;
     }
 
-    try std.fs.cwd().writeFile(
-        dst_file,
-        stream.target_buffer.items,
-    );
+    if (!cli.options.@"test") {
+        try std.fs.cwd().writeFile(
+            dst_file.items,
+            stream.target_buffer.items,
+        );
+    }
 
     return 0;
 }
@@ -96,8 +152,6 @@ const Stream = struct {
         stream.vertex_offset = 0;
         stream.index_offset = 0;
         stream.mesh_offset = 0;
-
-        std.log.info("compile offsets: {} {} {}", .{ stream.vertexOffset(), stream.indexOffset(), stream.meshOffset() });
 
         stream.target_buffer.resize(stream.fileSize()) catch |err| return stream.setError(err);
 
