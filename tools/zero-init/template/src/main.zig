@@ -29,6 +29,11 @@ pub fn setupGraphics(app: *Application) !void {
     logger.info("OpenGL Renderer:      {s}", .{std.mem.span(gl.getString(gl.RENDERER))});
     logger.info("OpenGL GLSL:          {s}", .{std.mem.span(gl.getString(gl.SHADING_LANGUAGE_VERSION))});
 
+    // If possible, install the debug callback in debug builds
+    if (std.builtin.mode == .Debug) {
+        zero_graphics.gles_utils.enableDebugOutput() catch {};
+    }
+
     // initialize your graphics objects here!
     _ = app;
 }

@@ -64,47 +64,18 @@ pub fn deinit(app: *Application) void {
 }
 
 pub fn setupGraphics(app: *Application) !void {
-    // Load required extensions here:
-    const RequestedExtensions = struct {
-        KHR_debug: bool,
-    };
-
-    const available_extensions = blk: {
-        var exts = std.mem.zeroes(RequestedExtensions);
-
-        if (std.builtin.cpu.arch != .wasm32) {
-            const extension_list = std.mem.span(gles.getString(gles.EXTENSIONS)) orelse break :blk exts;
-            var iterator = std.mem.split(u8, extension_list, " ");
-            while (iterator.next()) |extension| {
-                inline for (std.meta.fields(RequestedExtensions)) |fld| {
-                    if (std.mem.eql(u8, extension, "GL_" ++ fld.name)) {
-                        @field(exts, fld.name) = true;
-                    }
-                }
-            }
-        }
-
-        break :blk exts;
-    };
-
     {
         logger.info("OpenGL Version:       {s}", .{std.mem.span(gles.getString(gles.VERSION))});
         logger.info("OpenGL Vendor:        {s}", .{std.mem.span(gles.getString(gles.VENDOR))});
         logger.info("OpenGL Renderer:      {s}", .{std.mem.span(gles.getString(gles.RENDERER))});
         logger.info("OpenGL GLSL:          {s}", .{std.mem.span(gles.getString(gles.SHADING_LANGUAGE_VERSION))});
-
-        logger.info("Available extensions: {}", .{available_extensions});
     }
 
     logger.info("Display density: {d:.3} DPI", .{zero_graphics.getDisplayDPI()});
 
     // If possible, install the debug callback in debug builds
-    if (std.builtin.mode == .Debug and available_extensions.KHR_debug) {
-        const debug = gles.GL_KHR_debug;
-        try debug.load({}, zero_graphics.loadOpenGlFunction);
-
-        debug.debugMessageCallbackKHR(glesDebugProc, null);
-        gles.enable(debug.DEBUG_OUTPUT_KHR);
+    if (std.builtin.mode == .Debug) {
+        zero_graphics.gles_utils.enableDebugOutput() catch {};
     }
 
     app.renderer = try Renderer.init(app.allocator);
@@ -515,54 +486,3 @@ const DemoGuiData = struct {
 
     check_group: [4]bool = .{ false, false, false, false },
 };
-
-fn glesDebugProc(
-    source: gles.GLenum,
-    msg_type: gles.GLenum,
-    id: gles.GLuint,
-    severity: gles.GLenum,
-    length: gles.GLsizei,
-    message_ptr: [*:0]const u8,
-    userParam: ?*c_void,
-) callconv(.C) void {
-    _ = msg_type;
-    _ = userParam;
-    _ = id;
-    // This callback is only used when the extension is available
-    const debug = gles.GL_KHR_debug;
-
-    const source_name = switch (source) {
-        debug.DEBUG_SOURCE_API_KHR => "api",
-        debug.DEBUG_SOURCE_WINDOW_SYSTEM_KHR => "window system",
-        debug.DEBUG_SOURCE_SHADER_COMPILER_KHR => "shader compiler",
-        debug.DEBUG_SOURCE_THIRD_PARTY_KHR => "third party",
-        debug.DEBUG_SOURCE_APPLICATION_KHR => "application",
-        debug.DEBUG_SOURCE_OTHER_KHR => "other",
-        else => "unknown",
-    };
-
-    const type_name = switch (msg_type) {
-        debug.DEBUG_TYPE_ERROR_KHR => "error",
-        debug.DEBUG_TYPE_DEPRECATED_BEHAVIOR_KHR => "deprecated behavior",
-        debug.DEBUG_TYPE_UNDEFINED_BEHAVIOR_KHR => "undefined behavior",
-        debug.DEBUG_TYPE_PORTABILITY_KHR => "portability",
-        debug.DEBUG_TYPE_PERFORMANCE_KHR => "performance",
-        debug.DEBUG_TYPE_OTHER_KHR => "other",
-        debug.DEBUG_TYPE_MARKER_KHR => "marker",
-        debug.DEBUG_TYPE_PUSH_GROUP_KHR => "push group",
-        debug.DEBUG_TYPE_POP_GROUP_KHR => "pop group",
-        else => "unknown",
-    };
-    const message = message_ptr[0..@intCast(usize, length)];
-
-    const fmt_string = "[{s}] [{s}] {s}";
-    var fmt_arg = .{ source_name, type_name, message };
-
-    switch (severity) {
-        debug.DEBUG_SEVERITY_HIGH_KHR => logger.emerg(fmt_string, fmt_arg),
-        debug.DEBUG_SEVERITY_MEDIUM_KHR => logger.err(fmt_string, fmt_arg),
-        debug.DEBUG_SEVERITY_LOW_KHR => logger.warn(fmt_string, fmt_arg),
-        debug.DEBUG_SEVERITY_NOTIFICATION_KHR => logger.info(fmt_string, fmt_arg),
-        else => logger.emerg("encountered invalid log severity: {}", .{severity}),
-    }
-}

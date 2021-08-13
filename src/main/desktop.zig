@@ -3,6 +3,7 @@ const logger = std.log.scoped(.sdl);
 const zerog = @import("../zero-graphics.zig");
 const c = @import("sdl2");
 const Application = @import("application");
+const app_meta = @import("application-meta");
 
 comptime {
     // enforce inclusion of "extern  c" implementations
@@ -57,7 +58,12 @@ pub fn main() !void {
 
     _ = c.SDL_GL_SetAttribute(.SDL_GL_DOUBLEBUFFER, 1);
     //    _ = c.SDL_GL_SetAttribute(.SDL_GL_DEPTH_SIZE, 24);
-    _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES);
+    if (std.builtin.os.tag == .windows) {
+        // We just fake OpenGL ES 2.0 by just loading OpenGL fully /o\
+        // _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES);
+    } else {
+        _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES);
+    }
 
     if (std.builtin.mode == .Debug) {
         _ = c.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_FLAGS, c.SDL_GL_CONTEXT_DEBUG_FLAG);
@@ -82,34 +88,48 @@ pub fn main() !void {
         // silently ignore the error here
     }
 
-    const use_fullscreen = force_fullscreen orelse true;
+    const use_fullscreen = force_fullscreen orelse !@hasDecl(app_meta, "initial_resolution");
 
     var window_flags: u32 = c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI;
     if (use_fullscreen) {
         window_flags |= c.SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
 
+    var display_mode: c.SDL_DisplayMode = undefined;
+
+    // 0 = primary display
+    if (c.SDL_GetDesktopDisplayMode(0, &display_mode) < 0)
+        sdlPanic();
+
     var resolution: c.SDL_Point = undefined;
     if (use_fullscreen) {
-        var display_mode: c.SDL_DisplayMode = undefined;
-
-        // 0 = primary display
-        if (c.SDL_GetDesktopDisplayMode(0, &display_mode) < 0)
-            sdlPanic();
-
         resolution = .{
             .x = display_mode.w,
             .y = display_mode.h,
         };
     } else {
-        resolution = .{
-            .x = 1280,
-            .y = 720,
-        };
+        if (@hasDecl(app_meta, "initial_resolution")) {
+            resolution = .{
+                .x = app_meta.initial_resolution.width,
+                .y = app_meta.initial_resolution.height,
+            };
+        } else {
+            resolution = .{
+                .x = 1280,
+                .y = 720,
+            };
+        }
     }
 
+    var input_queue = zerog.Input.init(std.heap.c_allocator);
+    defer input_queue.deinit();
+
+    var app: Application = undefined;
+    try app.init(std.heap.c_allocator, &input_queue);
+    defer app.deinit();
+
     window = c.SDL_CreateWindow(
-        "OpenGL ES 2.0 - Zig Demo",
+        app_meta.display_name,
         c.SDL_WINDOWPOS_CENTERED,
         c.SDL_WINDOWPOS_CENTERED,
         resolution.x,
@@ -139,13 +159,6 @@ pub fn main() !void {
         std.debug.assert(std.math.approxEqAbs(f32, scale_x, scale_y, 1e-3)); // assert uniform
         break :blk scale_x;
     };
-
-    var input_queue = zerog.Input.init(std.heap.c_allocator);
-    defer input_queue.deinit();
-
-    var app: Application = undefined;
-    try app.init(std.heap.c_allocator, &input_queue);
-    defer app.deinit();
 
     try zerog.gles.load({}, loadOpenGlFunction);
 
