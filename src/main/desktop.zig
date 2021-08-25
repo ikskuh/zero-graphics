@@ -16,7 +16,7 @@ comptime {
 var window: *c.SDL_Window = undefined;
 
 const debug_window_mode = if (@hasDecl(Application, "zerog_enable_window_mode"))
-    root.zerog_enable_window_mode
+    Application.zerog_enable_window_mode
 else
     false;
 

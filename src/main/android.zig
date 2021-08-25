@@ -14,7 +14,8 @@ comptime {
 
 const Point = zerog.Point;
 
-const android = @import("android");
+/// Exported "android" package so the user can access it via @import("root").android
+pub const android = @import("android");
 
 const EGLContext = android.egl.EGLContext;
 const JNI = android.JNI;
