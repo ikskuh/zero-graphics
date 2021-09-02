@@ -220,7 +220,7 @@ pub fn updateTexture(self: *Self, texture: *Texture, data: []const u8) void {
     _ = self;
     std.debug.assert(data.len == 4 * @as(usize, texture.width) * @as(usize, texture.height));
     gles.bindTexture(gles.TEXTURE_2D, texture.handle);
-    gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, width, height, 0, gles.RGBA, gles.UNSIGNED_BYTE, data.ptr);
+    gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, texture.width, texture.height, 0, gles.RGBA, gles.UNSIGNED_BYTE, data.ptr);
 }
 
 /// Creates a new drawable geometry.
