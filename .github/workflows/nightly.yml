@@ -28,7 +28,7 @@ jobs:
           version: master
 
       - name: Build (native) desktop + WASM
-        run: zig build install
+        run: zig build install -Dno-model-converter
 
   build-macos:
     runs-on: macos-latest
@@ -47,7 +47,7 @@ jobs:
           version: master
 
       - name: Build (native) desktop + WASM
-        run: zig build install
+        run: zig build install -Dno-model-converter
   
   build-windows:
     runs-on: windows-latest
@@ -94,4 +94,4 @@ jobs:
           write-mode: overwrite
 
       - name: Build (native) desktop + WASM
-        run: zig build install
+        run: zig build install -Dno-model-converter

@@ -33,7 +33,7 @@ pub fn build(b: *std.build.Builder) !void {
         }
     }
 
-    {
+    if (!(b.option(bool, "no-model-converter", "Disables the model converter build") orelse false)) {
         const converter_api = b.addTranslateC(.{ .path = "tools/modelconv/api.h" });
 
         const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
@@ -87,7 +87,6 @@ pub fn build(b: *std.build.Builder) !void {
     // Build wasm application
     {
         const wasm_build = app.compileFor(.web);
-        wasm_build.single_step.exe.override_dest_dir = .{ .custom = "../www" };
         wasm_build.install();
 
         const server = b.addExecutable("http-server", "tools/http-server.zig");
@@ -97,8 +96,7 @@ pub fn build(b: *std.build.Builder) !void {
         });
 
         const serve = server.run();
-        serve.step.dependOn(&wasm_build.single_step.exe.step);
-        serve.step.dependOn(&wasm_build.single_step.exe.install_step.?.step);
+        serve.step.dependOn(&wasm_build.data.web.install_step.?.step);
 
         const run_step = b.step("run-wasm", "Serves the wasm app");
 
@@ -111,9 +109,9 @@ pub fn build(b: *std.build.Builder) !void {
 
         b.step("init-keystore", "Initializes a fresh debug keystore.").dependOn(sdk.initializeKeystore());
 
-        const push = android_build.android.app.install();
+        const push = android_build.data.android.install();
 
-        const run = android_build.android.app.run();
+        const run = android_build.data.android.run();
         run.dependOn(push);
 
         const push_step = b.step("install-app", "Push the app to the default ADB target");
