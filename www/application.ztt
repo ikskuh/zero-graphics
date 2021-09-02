@@ -3,7 +3,7 @@
 
 <head>
     <meta charset=" utf-8">
-    <title>OpenGL ES 2.0 - Zig Demo</title>
+    <title><? try output.writeAll(context.display_name); ?></title>
 
     <style>
         body {
@@ -25,10 +25,11 @@
             padding: 2px;
 
         }
+
     </style>
 
     <script type="module" defer="true">
-        import {createPlatformEnvironment, createWebGlModule} from "./binding.js";
+        import { createPlatformEnvironment, createWebGlModule } from "./zero-graphics.js";
 
         const canvas_element = document.getElementById("render-canvas");
         var globalInstance;
@@ -37,8 +38,8 @@
             env: createPlatformEnvironment(() => globalInstance),
             webgl: createWebGlModule(canvas_element, () => globalInstance),
         };
-                
-        fetch("demo_application.wasm")
+
+        fetch("<? try output.writeAll(context.app_name); ?>.wasm")
             .then((response) => response.arrayBuffer())
             .then((bytes) => WebAssembly.instantiate(bytes, imports))
             .then((results) => results.instance)
@@ -71,7 +72,6 @@
 <body>
     <canvas id="render-canvas" tabindex="1">
     </canvas>
-    <h1>OpenGL ES 2.0 - Zig Demo</h1>
 </body>
 
 </html>

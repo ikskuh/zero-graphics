@@ -8,6 +8,7 @@ const Sdk = @This();
 
 const SdlSdk = @import("vendor/SDL.zig/Sdk.zig");
 const AndroidSdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
+const TemplateStep = @import("vendor/ztt/src/TemplateStep.zig");
 
 pub const Platform = union(enum) {
     desktop: std.zig.CrossTarget,
@@ -26,11 +27,17 @@ const zero_graphics_package = std.build.Pkg{
     },
 };
 
+const web_folder = std.build.InstallDir{ .custom = "www" };
+
 builder: *std.build.Builder,
 sdl_sdk: *SdlSdk,
 android_sdk: ?*AndroidSdk,
 key_store: ?AndroidSdk.KeyStore,
 make_keystore_step: ?*std.build.Step,
+
+install_web_sources: []*std.build.InstallFileStep,
+
+render_main_page_tool: *std.build.LibExeObjStep,
 
 pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
     const sdk = builder.allocator.create(Sdk) catch @panic("out of memory");
@@ -43,7 +50,16 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
             null,
         .key_store = null,
         .make_keystore_step = null,
+        .install_web_sources = builder.allocator.dupe(*std.build.InstallFileStep, &[_]*std.build.InstallFileStep{
+            builder.addInstallFileWithDir(.{ .path = sdkRoot() ++ "/www/zero-graphics.js" }, web_folder, "zero-graphics.js"),
+        }) catch @panic("out of memory"),
+        .render_main_page_tool = builder.addExecutable("render-html-page", sdkRoot() ++ "/tools/render-ztt-page.zig"),
     };
+
+    sdk.render_main_page_tool.addPackage(.{
+        .name = "html",
+        .path = TemplateStep.transform(builder, sdkRoot() ++ "/www/application.ztt"),
+    });
 
     if (sdk.android_sdk) |asdk| {
         _ = asdk;
@@ -168,8 +184,6 @@ pub const Application = struct {
     }
 
     pub fn compileFor(app: *Application, platform: Platform) *AppCompilation {
-        const comp = app.sdk.builder.allocator.create(AppCompilation) catch @panic("out of memory");
-
         const app_pkg = app.sdk.builder.dupePkg(std.build.Pkg{
             .name = "application",
             .path = app.root_file,
@@ -188,11 +202,9 @@ pub const Application = struct {
 
                 app.prepareExe(exe, app_pkg);
 
-                comp.* = AppCompilation{
-                    .single_step = .{
-                        .exe = exe,
-                    },
-                };
+                return app.createCompilation(.{
+                    .desktop = exe,
+                });
             },
             .web => {
                 const exe = app.sdk.builder.addSharedLibrary(app.name, sdkRoot() ++ "/src/main/wasm.zig", .unversioned);
@@ -206,11 +218,9 @@ pub const Application = struct {
 
                 app.prepareExe(exe, app_pkg);
 
-                comp.* = AppCompilation{
-                    .single_step = .{
-                        .exe = exe,
-                    },
-                };
+                return app.createCompilation(.{
+                    .web = exe,
+                });
             },
             .android => {
                 const asdk = app.sdk.android_sdk orelse @panic("Android build support is disabled!");
@@ -237,51 +247,79 @@ pub const Application = struct {
                     lib.addPackage(android_app.getAndroidPackage("android"));
                 }
 
-                comp.* = AppCompilation{
-                    .android = .{
-                        .app = android_app,
-                        .sdk = app.sdk,
-                    },
-                };
+                return app.createCompilation(.{
+                    .android = android_app,
+                });
             },
         }
+    }
+
+    fn createCompilation(app: *Application, data: AppCompilation.Data) *AppCompilation {
+        const comp = app.sdk.builder.allocator.create(AppCompilation) catch @panic("out of memory");
+        comp.* = AppCompilation{
+            .sdk = app.sdk,
+            .app = app,
+            .data = data,
+        };
         return comp;
     }
 };
 
-pub const AppCompilation = union(enum) {
-    const Android = struct {
-        app: AndroidSdk.CreateAppStep,
-        sdk: *Sdk,
-    };
-    const Single = struct {
-        exe: *std.build.LibExeObjStep,
+pub const AppCompilation = struct {
+    const Data = union(enum) {
+        desktop: *std.build.LibExeObjStep,
+        web: *std.build.LibExeObjStep,
+        android: AndroidSdk.CreateAppStep,
     };
 
-    single_step: Single,
-    android: Android,
+    sdk: *Sdk,
+    app: *Application,
+    data: Data,
 
     pub fn getStep(comp: *AppCompilation) *std.build.Step {
-        return switch (comp.*) {
-            .single_step => |step| &step.exe.step,
-            .android => |android| android.app.final_step,
+        return switch (comp.data) {
+            .desktop => |step| &step.step,
+            .web => |step| &step.step,
+            .android => |android| android.final_step,
         };
     }
 
     pub fn install(comp: *AppCompilation) void {
-        switch (comp.*) {
-            .single_step => |step| {
-                step.exe.install();
+        switch (comp.data) {
+            .desktop => |step| step.install(),
+            .web => |step| {
+                step.install();
+
+                const install_step = step.install_step.?;
+                install_step.dest_dir = web_folder;
+
+                for (comp.sdk.install_web_sources) |installer| {
+                    install_step.step.dependOn(&installer.step);
+                }
+
+                const file_name = comp.sdk.builder.fmt("{s}.htm", .{step.name});
+
+                const app_html_page = CreateApplicationHtmlPageStep.create(
+                    comp.sdk,
+                    comp.app.name,
+                    comp.app.display_name orelse "Untitled Application",
+                );
+
+                const install_html_page = comp.sdk.builder.addInstallFileWithDir(.{ .generated = &app_html_page.outfile }, web_folder, file_name);
+                install_html_page.step.dependOn(&app_html_page.step);
+
+                install_step.step.dependOn(&install_html_page.step);
             },
             .android => |step| {
-                step.sdk.builder.getInstallStep().dependOn(step.app.final_step);
+                comp.sdk.builder.getInstallStep().dependOn(step.final_step);
             },
         }
     }
 
     pub fn run(comp: *AppCompilation) *std.build.RunStep {
-        return switch (comp.*) {
-            .single_step => |step| step.exe.run(),
+        return switch (comp.data) {
+            .desktop => |step| step.run(),
+            .web => @panic("Web cannot be run yet!"),
             .android => @panic("Android cannot be run yet!"),
         };
     }
@@ -333,6 +371,54 @@ const CreateAppMetaStep = struct {
         cache.addBytes(file_data.items);
 
         self.outfile.path = try cache.createSingleFile("app-meta.zig", file_data.items);
+    }
+};
+
+const CreateApplicationHtmlPageStep = struct {
+    step: std.build.Step,
+
+    sdk: *Sdk,
+    app_name: []const u8,
+    display_name: []const u8,
+
+    outfile: std.build.GeneratedFile,
+
+    pub fn create(sdk: *Sdk, app_name: []const u8, display_name: []const u8) *CreateApplicationHtmlPageStep {
+        const ms = sdk.builder.allocator.create(CreateApplicationHtmlPageStep) catch @panic("out of memory");
+        ms.* = CreateApplicationHtmlPageStep{
+            .step = std.build.Step.init(.custom, "Create application html page", sdk.builder.allocator, make),
+
+            .sdk = sdk,
+            .app_name = sdk.builder.dupe(app_name),
+            .display_name = sdk.builder.dupe(display_name),
+
+            .outfile = std.build.GeneratedFile{ .step = &ms.step },
+        };
+        ms.step.dependOn(&sdk.render_main_page_tool.step);
+        return ms;
+    }
+
+    fn make(step: *std.build.Step) !void {
+        const self = @fieldParentPtr(CreateApplicationHtmlPageStep, "step", step);
+
+        var cache = CacheBuilder.init(self.sdk.builder, "zero-graphics");
+
+        cache.addBytes(self.app_name);
+        cache.addBytes(self.display_name);
+
+        const folder_path = try cache.createAndGetPath();
+
+        self.outfile.path = try std.fs.path.join(self.sdk.builder.allocator, &[_][]const u8{
+            folder_path,
+            "index.htm",
+        });
+
+        _ = try self.sdk.builder.execFromStep(&[_][]const u8{
+            self.sdk.render_main_page_tool.getOutputSource().getPath(self.sdk.builder),
+            self.outfile.path.?,
+            self.app_name,
+            self.display_name,
+        }, step);
     }
 };
 

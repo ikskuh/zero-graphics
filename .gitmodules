@@ -22,3 +22,6 @@
 [submodule "vendor/args"]
 	path = vendor/args
 	url = https://github.com/MasterQ32/zig-args
+[submodule "vendor/ZTT"]
+	path = vendor/ztt
+	url = https://github.com/MasterQ32/ZTT
