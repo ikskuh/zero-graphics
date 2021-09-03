@@ -117,11 +117,12 @@ extern "C" bool transformFile(char const *src_file_name, MeshStream *stream, Fil
                       aiProcess_Triangulate |
                       aiProcess_JoinIdenticalVertices |
                       aiProcess_RemoveRedundantMaterials |
-                      aiProcess_OptimizeGraph |
                       aiProcess_OptimizeMeshes |
                       aiProcess_SortByPType;
   if (create_static_model) {
     import_flags |= aiProcess_PreTransformVertices;
+  } else {
+    import_flags |= aiProcess_OptimizeGraph;
   }
 
   // And have it read the given file with some example postprocessing
