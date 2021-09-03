@@ -25,3 +25,6 @@
 [submodule "vendor/ZTT"]
 	path = vendor/ztt
 	url = https://github.com/MasterQ32/ZTT
+[submodule "vendor/zig-assimp"]
+	path = vendor/zig-assimp
+	url = https://github.com/MasterQ32/zig-assimp

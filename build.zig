@@ -1,11 +1,13 @@
 const std = @import("std");
 
 const Sdk = @import("Sdk.zig");
+const Assimp = @import("vendor/zig-assimp/Sdk.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     const enable_android = b.option(bool, "enable-android", "Enables android build support. Requires the android sdk and ndk to be installed.") orelse false;
 
     const sdk = Sdk.init(b, enable_android);
+    const assimp = Assimp.init(b);
 
     const mode = b.standardReleaseOptions();
     const platform = sdk.standardPlatformOptions();
@@ -33,7 +35,7 @@ pub fn build(b: *std.build.Builder) !void {
         }
     }
 
-    if (!(b.option(bool, "no-model-converter", "Disables the model converter build") orelse false)) {
+    {
         const converter_api = b.addTranslateC(.{ .path = "tools/modelconv/api.h" });
 
         const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
@@ -56,7 +58,7 @@ pub fn build(b: *std.build.Builder) !void {
         });
         converter.linkLibC();
         converter.linkLibCpp();
-        converter.linkSystemLibrary("assimp");
+        assimp.addTo(converter, .static, Assimp.FormatSet.default);
         converter.install();
     }
 
