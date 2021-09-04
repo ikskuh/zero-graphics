@@ -207,8 +207,8 @@ const Stream = struct {
         if (stream.failed != null)
             return;
 
-        const texture_file = std.mem.sliceTo(texture.?, 0);
-        if (texture_file.len > 120)
+        const texture_file = if (texture) |tex_str| std.mem.sliceTo(tex_str, 0) else null;
+        if (texture_file != null and texture_file.?.len > 120)
             return stream.setError(error.FileNameTooLong);
 
         const meshes = @ptrCast([*]align(1) z3d.static_model.Mesh, &stream.target_buffer.items[stream.meshOffset()]);
@@ -218,11 +218,13 @@ const Stream = struct {
             .texture_file = [1]u8{0} ** 120,
         };
 
-        std.mem.copy(
-            u8,
-            &meshes[stream.mesh_offset].texture_file,
-            texture_file,
-        );
+        if (texture_file) |file_name| {
+            std.mem.copy(
+                u8,
+                &meshes[stream.mesh_offset].texture_file,
+                file_name,
+            );
+        }
 
         stream.mesh_offset += 1;
 

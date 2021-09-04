@@ -75,9 +75,17 @@ pub fn init(allocator: *std.mem.Allocator) InitError!Self {
         \\uniform sampler2D uTexture;
         \\void main()
         \\{
+        \\   vec3 light_color_a = vec3(0.86, 0.77, 0.38); // 0xdcc663
+        \\   vec3 light_color_b = vec3(0.25, 0.44, 0.43); // 0x40716f
+        \\   vec3 light_dir_a = normalize(vec3(-0.3, -0.4, -0.1));
+        \\   vec3 light_dir_b = normalize(vec3(0.1, 1.0, 0.2));
+        \\   float light_val_a = clamp(-dot(aNormal, light_dir_a), 0.0, 1.0);
+        \\   float light_val_b = clamp(-dot(aNormal, light_dir_b), 0.0, 1.0);
+        \\   vec3 lighting = light_color_a * light_val_a + light_color_b * light_val_b;
         \\   gl_FragColor = texture2D(uTexture, aUV);
         \\   if(gl_FragColor.a < 0.5)
         \\     discard;
+        \\   gl_FragColor.rgb *= lighting;
         \\}
     ;
 
@@ -258,7 +266,7 @@ pub fn createGeometry(self: *Self, vertices: []const Vertex, indices: []const u1
     gles.bindBuffer(gles.ARRAY_BUFFER, 0);
 
     gles.bindBuffer(gles.ELEMENT_ARRAY_BUFFER, geom.index_buffer);
-    gles.bufferData(gles.ELEMENT_ARRAY_BUFFER, @intCast(gles.GLsizei, @sizeOf(Vertex) * geom.indices.len), geom.indices.ptr, gles.STATIC_DRAW);
+    gles.bufferData(gles.ELEMENT_ARRAY_BUFFER, @intCast(gles.GLsizei, @sizeOf(u16) * geom.indices.len), geom.indices.ptr, gles.STATIC_DRAW);
     gles.bindBuffer(gles.ELEMENT_ARRAY_BUFFER, 0);
 
     for (geom.meshes) |mesh| {

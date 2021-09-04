@@ -10,6 +10,8 @@
 
 #include "api.h"
 
+#include <string.h>
+
 extern "C" void printErrorMessage(char const *text, size_t length);
 extern "C" void printInfoMessage(char const *text, size_t length);
 extern "C" void printWarningMessage(char const *text, size_t length);
@@ -81,21 +83,34 @@ static bool createStaticModel(aiScene const *scene, MeshStream *stream) {
     index_offset += mesh->mNumVertices;
   }
 
+  auto texture_warning = false;
+
   index_offset = 0;
   for (size_t i = 0; i < scene->mNumMeshes; i++) {
     aiMesh const *mesh = scene->mMeshes[i];
     aiMaterial const *mtl = scene->mMaterials[mesh->mMaterialIndex];
 
+    aiString name = mtl->GetName();
+
     aiString path;
-    if (mtl->GetTexture(aiTextureType_DIFFUSE, 0, &path) != aiReturn_SUCCESS) {
-      printErrorMessage("At least once mesh doesn't have a texture assigned!");
-      return false;
+    bool has_texture = false;
+    if (mtl->GetTexture(aiTextureType_DIFFUSE, 0, &path) == aiReturn_SUCCESS) {
+      has_texture = true;
+    } else {
+      if (!texture_warning) {
+        printErrorMessage("At least once mesh doesn't have a texture assigned!");
+        texture_warning = true;
+      }
     }
+
+    // char msgBuf[64];
+    // sprintf(msgBuf, "texture: %s, %s", name.C_Str(), path.C_Str());
+    // printWarningMessage(msgBuf);
 
     stream->writeMeshRange(stream,
                            index_offset,
                            3 * mesh->mNumFaces,
-                           path.C_Str());
+                           has_texture ? path.C_Str() : nullptr);
 
     index_offset += 3 * mesh->mNumFaces;
   }
