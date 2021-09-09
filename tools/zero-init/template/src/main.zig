@@ -59,6 +59,8 @@ pub fn update(app: *Application) !bool {
             .pointer_press => {},
             .pointer_release => {},
             .text_input => {},
+            .key_down => {},
+            .key_up => {},
         }
     }
 
