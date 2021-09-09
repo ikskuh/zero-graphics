@@ -40,9 +40,9 @@ pub fn build(b: *std.build.Builder) !void {
 
         b.step("init-keystore", "Initializes a fresh debug keystore.").dependOn(sdk.initializeKeystore());
 
-        const push = android_build.android.app.install();
+        const push = android_build.data.android.install();
 
-        const run = android_build.android.app.run();
+        const run = android_build.data.android.run();
         run.dependOn(push);
 
         const push_step = b.step("install-app", "Push the app to the default ADB target");

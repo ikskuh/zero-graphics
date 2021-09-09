@@ -29,6 +29,13 @@ jobs:
 
       - name: Build (native) desktop + WASM
         run: zig build install
+      
+      - name: Kickstart project template
+        run: |
+          mkdir quickstart
+          cd quickstart
+          ../zig-out/bin/zero-init --git --submodule
+          zig build install
 
   build-macos:
     runs-on: macos-latest
@@ -48,6 +55,13 @@ jobs:
 
       - name: Build (native) desktop + WASM
         run: zig build install
+      
+      - name: Kickstart project template
+        run: |
+          mkdir quickstart
+          cd quickstart
+          ../zig-out/bin/zero-init --git --submodule
+          zig build install
   
   build-windows:
     runs-on: windows-latest
@@ -95,3 +109,10 @@ jobs:
 
       - name: Build (native) desktop + WASM
         run: zig build install
+      
+      - name: Kickstart project template
+        run: |
+          mkdir quickstart
+          cd quickstart
+          ../zig-out/bin/zero-init --git --submodule
+          zig build install
