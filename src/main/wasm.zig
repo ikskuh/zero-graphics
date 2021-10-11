@@ -112,7 +112,7 @@ export fn app_init() u32 {
     return 0;
 }
 
-fn logInputError(err: error{OutOfMemory}) void {
+fn logInputError(err: error{ OutOfMemory, Utf8CannotEncodeSurrogateHalf, CodepointTooLarge }) void {
     std.log.err("Failed to process input event: {s}", .{@errorName(err)});
 }
 
@@ -393,6 +393,25 @@ export fn app_input_sendKeyUp(js_scancode: u32) void {
     if (translateJsScancode(js_scancode)) |scancode| {
         input_handler.pushEvent(.{ .key_up = scancode }) catch |err| logInputError(err);
     }
+}
+
+export fn app_input_sendTextInput(codepoint: u32, shift: bool, alt: bool, ctrl: bool, super: bool) void {
+    var buf_str: [8]u8 = undefined;
+
+    const buf_len = std.unicode.utf8Encode(@truncate(u21, codepoint), &buf_str) catch |err| {
+        logInputError(err);
+        return;
+    };
+
+    input_handler.pushEvent(.{ .text_input = .{
+        .text = buf_str[0..buf_len],
+        .modifiers = .{
+            .shift = shift,
+            .alt = alt,
+            .ctrl = ctrl,
+            .super = super,
+        },
+    } }) catch |err| logInputError(err);
 }
 
 export fn app_update() u32 {

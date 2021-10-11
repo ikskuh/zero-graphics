@@ -137,7 +137,14 @@ pub fn update(app: *Application) !bool {
                     .secondary => .secondary,
                 }),
 
-                .text_input => |text| try ui_input.enterText(text.text),
+                .text_input => |text| {
+                    std.log.info("text_input: '{}' ({})", .{
+                        std.fmt.fmtSliceEscapeUpper(text.text), // escape special chars here
+                        text.modifiers,
+                    });
+                    try ui_input.enterText(text.text);
+                },
+
                 .key_down => |scancode| std.log.info("key_down: {s}", .{@tagName(scancode)}),
                 .key_up => |scancode| std.log.info("key_up: {s}", .{@tagName(scancode)}),
             }

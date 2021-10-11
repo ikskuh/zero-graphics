@@ -264,8 +264,6 @@ function translateKeyEventToScancode(ev) {
 }
 
 function createInputModule(canvas_element, getInstance, stop_fn) {
-  console.log('hi')
-
   // we don't want to have the default context menu on our canvas.
   // this event handler will prevent the default menu from opening:
   canvas_element.addEventListener('contextmenu', (ev) => ev.preventDefault())
@@ -305,15 +303,31 @@ function createInputModule(canvas_element, getInstance, stop_fn) {
       let sc = translateKeyEventToScancode(ev)
       if (sc !== null) {
         inst.exports.app_input_sendKeyDown(sc)
-        ev.preventDefault()
       } else {
         console.log('untranslated key code:', ev.code, ev)
       }
+    }
+  })
+
+  canvas_element.addEventListener('keypress', (ev) => {
+    let inst = getInstance()
+    if (inst === undefined) {
+      return
     }
 
     if (ev.isComposing || ev.keyCode === 229) {
       // this is a pure key-down event
       return
+    }
+
+    if (ev.charCode != 0) {
+      inst.exports.app_input_sendTextInput(
+        ev.charCode,
+        ev.shiftKey,
+        ev.altKey,
+        ev.ctrlKey,
+        ev.metaKey,
+      )
     }
   })
 
@@ -327,7 +341,6 @@ function createInputModule(canvas_element, getInstance, stop_fn) {
       let sc = translateKeyEventToScancode(ev)
       if (sc !== null) {
         inst.exports.app_input_sendKeyUp(sc)
-        ev.preventDefault()
       } else {
         console.log('untranslated key code:', ev.code, ev)
       }
