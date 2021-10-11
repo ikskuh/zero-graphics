@@ -46,7 +46,7 @@ jobs:
         run: |
           mkdir quickstart
           cd quickstart
-          ../zig-out/bin/zero-init --git --submodule
+          ../zig-out/bin/zero-init --git submodule
           zig build install
 
       - name: Convert model
@@ -88,7 +88,7 @@ jobs:
         run: |
           mkdir quickstart
           cd quickstart
-          ../zig-out/bin/zero-init --git --submodule
+          ../zig-out/bin/zero-init --git submodule
           zig build install
 
       - name: Convert model
@@ -180,7 +180,7 @@ jobs:
       - name: Kickstart project template
         run: |
           cd quickstart
-          ../zig-out/bin/zero-init --git --submodule
+          ../zig-out/bin/zero-init --git submodule
           zig build install
 
       - name: Convert model
