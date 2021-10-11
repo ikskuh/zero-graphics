@@ -149,6 +149,7 @@ jobs:
       - name: Kickstart project template
         run: |
           mkdir quickstart
+          cp -r .build_config quickstart/
           cd quickstart
           ../zig-out/bin/zero-init --git --submodule
           zig build install
