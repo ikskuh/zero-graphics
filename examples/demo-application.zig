@@ -129,12 +129,14 @@ pub fn update(app: *Application) !bool {
         while (app.input.pollEvent()) |event| {
             switch (event) {
                 .quit => return false,
+
                 .pointer_motion => |pt| ui_input.setPointer(pt),
                 .pointer_press => ui_input.pointerDown(),
                 .pointer_release => |cursor| ui_input.pointerUp(switch (cursor) {
                     .primary => zero_graphics.UserInterface.Pointer.primary,
                     .secondary => .secondary,
                 }),
+
                 .text_input => |text| try ui_input.enterText(text.text),
                 .key_down => {},
                 .key_up => {},

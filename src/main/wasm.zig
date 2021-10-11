@@ -110,6 +110,41 @@ export fn app_init() u32 {
     return 0;
 }
 
+fn logInputError(err: error{OutOfMemory}) void {
+    std.log.err("Failed to process input event: {s}", .{@errorName(err)});
+}
+
+const JS_BUTTON_LEFT = 0;
+const JS_BUTTON_MIDDLE = 1;
+const JS_BUTTON_RIGHT = 2;
+
+export fn app_input_sendMouseDown(x: i16, y: i16, button: u8) void {
+    _ = x;
+    _ = y;
+    switch (button) {
+        JS_BUTTON_LEFT => input_handler.pushEvent(.{ .pointer_press = .primary }) catch |e| logInputError(e),
+        JS_BUTTON_RIGHT => input_handler.pushEvent(.{ .pointer_press = .secondary }) catch |e| logInputError(e),
+        else => {},
+    }
+}
+
+export fn app_input_sendMouseUp(x: i16, y: i16, button: u8) void {
+    _ = x;
+    _ = y;
+    switch (button) {
+        JS_BUTTON_LEFT => input_handler.pushEvent(.{ .pointer_release = .primary }) catch |e| logInputError(e),
+        JS_BUTTON_RIGHT => input_handler.pushEvent(.{ .pointer_release = .secondary }) catch |e| logInputError(e),
+        else => {},
+    }
+}
+
+export fn app_input_sendMouseMotion(x: i16, y: i16) void {
+    input_handler.pushEvent(.{ .pointer_motion = .{
+        .x = @floatToInt(i16, @intToFloat(f32, x)),
+        .y = @floatToInt(i16, @intToFloat(f32, y)),
+    } }) catch |e| logInputError(e);
+}
+
 export fn app_update() u32 {
     app_instance.resize(@intCast(u15, meta_getScreenW()), @intCast(u15, meta_getScreenH())) catch return 2;
 

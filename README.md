@@ -51,7 +51,7 @@ Work-in-progress, but works quite well already. There is one [big project](https
 - [ ] Support the following platforms
   - [ ] Wasm
     - [x] Create OpenGL ES 2.0 context
-    - [ ] Input Mouse
+    - [x] Input Mouse
     - [ ] Input Keyboard
   - [ ] Linux Desktop
     - [x] Create OpenGL ES 2.0 context
