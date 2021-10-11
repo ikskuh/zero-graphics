@@ -146,10 +146,31 @@ jobs:
       - name: Build Android application
         run: zig build -Denable-android init-keystore install
 
+      - name: Prepare Kickstart template
+        run: |
+          mkdir -p quickstart/.build_config
+
+      - name: Create quickstart SDK file
+        uses: DamianReeves/write-file-action@v1.0
+        with:
+          path: quickstart/.build_config/sdl.json
+          contents: |
+            {
+              "i386-windows-gnu": {
+                "include": "../SDL2-2.0.14/i686-w64-mingw32/include",
+                "libs": "../SDL2-2.0.14/i686-w64-mingw32/lib",
+                "bin": "../SDL2-2.0.14/i686-w64-mingw32/bin"
+              },
+              "x86_64-windows-gnu": {
+                "include": "../SDL2-2.0.14/x86_64-w64-mingw32/include",
+                "libs": "../SDL2-2.0.14/x86_64-w64-mingw32/lib",
+                "bin": "../SDL2-2.0.14/x86_64-w64-mingw32/bin"
+              }
+            }
+          write-mode: overwrite
+
       - name: Kickstart project template
         run: |
-          mkdir quickstart
-          cp -r .build_config quickstart/
           cd quickstart
           ../zig-out/bin/zero-init --git --submodule
           zig build install
