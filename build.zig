@@ -98,10 +98,10 @@ pub fn build(b: *std.build.Builder) !void {
         });
 
         const serve = server.run();
+        serve.addArg(app.name);
         serve.step.dependOn(&wasm_build.data.web.install_step.?.step);
 
         const run_step = b.step("run-wasm", "Serves the wasm app");
-
         run_step.dependOn(&serve.step);
     }
 

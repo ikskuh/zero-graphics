@@ -117,7 +117,7 @@ Includes a teeny tiny web server for debugging.
 zig build install run-wasm
 ```
 
-Now visit http://127.0.0.1:8000/index.htm to see the demo.
+Now visit http://127.0.0.1:8000/demo_application.htm to see the demo.
 
 ### Android
 
