@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [master]
   schedule:
-    - cron: "0 5 * * *" # run at 5 AM UTC
+    - cron: '0 5 * * *' # run at 5 AM UTC
 
 jobs:
   build-linux:
@@ -15,10 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
 
       - name: Install dependencies
-        run:  |
+        run: |
           sudo apt-get update
           sudo apt-get install libsdl2-dev
 
@@ -27,9 +27,21 @@ jobs:
         with:
           version: master
 
+      - name: Setup Android SDK Tools
+        uses: android-actions/setup-android@v2.0.2
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager --install "platforms;android-28"
+          sdkmanager --install "build-tools;28.0.3"
+          sdkmanager --install "ndk;21.1.6352462"
+
       - name: Build (native) desktop + WASM
         run: zig build install
-      
+
+      - name: Build Android application
+        run: zig build -Denable-android install
+
       - name: Kickstart project template
         run: |
           mkdir quickstart
@@ -43,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
 
       - name: Install dependencies
         run: brew install sdl2
@@ -53,28 +65,49 @@ jobs:
         with:
           version: master
 
+      - name: Setup Android SDK Tools
+        uses: android-actions/setup-android@v2.0.2
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager --install "platforms;android-28"
+          sdkmanager --install "build-tools;28.0.3"
+          sdkmanager --install "ndk;21.1.6352462"
+
       - name: Build (native) desktop + WASM
         run: zig build install
-      
+
+      - name: Build Android application
+        run: zig build -Denable-android install
+
       - name: Kickstart project template
         run: |
           mkdir quickstart
           cd quickstart
           ../zig-out/bin/zero-init --git --submodule
           zig build install
-  
+
   build-windows:
     runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v2
         with:
-          submodules: "recursive"
+          submodules: 'recursive'
 
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
+
+      - name: Setup Android SDK Tools
+        uses: android-actions/setup-android@v2.0.2
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager --install "platforms;android-28"
+          sdkmanager --install "build-tools;28.0.3"
+          sdkmanager --install "ndk;21.1.6352462"
 
       - name: Download SDL2 (MinGW)
         uses: carlosperate/download-file-action@v1.0.3
@@ -87,7 +120,7 @@ jobs:
         uses: brunoborges/justextract@v1
         with:
           file: SDL2.tar.gz
-    
+
       - name: Create SDK file
         uses: DamianReeves/write-file-action@v1.0
         with:
@@ -109,7 +142,10 @@ jobs:
 
       - name: Build (native) desktop + WASM
         run: zig build install
-      
+
+      - name: Build Android application
+        run: zig build -Denable-android install
+
       - name: Kickstart project template
         run: |
           mkdir quickstart
