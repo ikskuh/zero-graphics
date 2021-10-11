@@ -15,6 +15,8 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
   - Primitives (line, rectangle, triangle, ...)
   - Text / TTF fonts
   - Textures
+- Basic 3D rendering
+  - Multi-mesh models with flat textures
 - Zig-style immediate-mode user interface
 - Proper DPI scaling support in renderer
 
@@ -74,6 +76,8 @@ Work-in-progress, but works quite well already. There is one [big project](https
 ### 3D Rendering library
 
 - [ ] Tool based on Assimp to convert models into loadable format
+  - [x] static geometry
+  - [ ] dynamic/animated geometry
 - [ ] Blender export script
 - [x] Draw static geometry
 - [ ] Draw animated geometry
@@ -89,11 +93,12 @@ Work-in-progress, but works quite well already. There is one [big project](https
 
 ### Desktop
 
-- SDL2
+- [SDL2](https://www.libsdl.org/)
 
 ### Web
 
-- [js glue code](www/binding.js)
+- [js glue code](www/zero-graphics.js)
+- [root page](www/application.ztt)
 
 ### Android
 
@@ -107,13 +112,13 @@ Work-in-progress, but works quite well already. There is one [big project](https
 
 This project uses [submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules), so to get started, clone the repo with submodules recursively:
 
-```shell-session
+```sh-session
 [user@computer work]$ git clone https://github.com/MasterQ32/zero-graphics --recurse-submodules
 ```
 
 or, if you already cloned the repository:
 
-```shell-session
+```sh-session
 [user@computer work]$ git clone https://github.com/MasterQ32/zero-graphics
 [user@computer work]$ cd zero-graphics/
 [user@computer zero-graphics]$ git submodule update --init --recursive
@@ -123,7 +128,7 @@ or, if you already cloned the repository:
 
 Requires `SDL2` to be installed.
 
-```shell-session
+```sh-session
 [user@computer zero-graphics]$ zig build run
 ```
 
@@ -133,7 +138,7 @@ A window should open with the application in fullscreen.
 
 Includes a teeny tiny web server for debugging.
 
-```shell-session
+```sh-session
 [user@computer zero-graphics]$ zig build install run-wasm
 ```
 
@@ -144,7 +149,7 @@ Now visit http://127.0.0.1:8000/demo_application.htm to see the demo.
 Connect your phone first and install both a JDK as well as the Android SDK with NDK included. The ZeroGraphics build system will tell you if
 it couldn't auto-detect the SDK paths.
 
-```shell-session
+```sh-session
 [user@computer zero-graphics]$ zig build -Denable-android run-app
 ```
 
