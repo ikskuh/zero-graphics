@@ -8,13 +8,13 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 ## Features
 
 - Multi-platform support
-    - Desktop (Linux, MacOS, Windows, ...)
-    - WebAssembly
-    - Android
+  - Desktop (Linux, MacOS, Windows, ...)
+  - WebAssembly
+  - Android
 - Pixel perfect 2D rendering
-    - Primitives (line, rectangle, triangle, ...)
-    - Text / TTF fonts
-    - Textures
+  - Primitives (line, rectangle, triangle, ...)
+  - Text / TTF fonts
+  - Textures
 - Zig-style immediate-mode user interface
 - Proper DPI scaling support in renderer
 
@@ -22,7 +22,7 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 
 [![Nightly Build](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml/badge.svg)](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml)
 
-Work-in-progress, but works quite well already. There is one [big project](https://github.com/Dunstwolke/core) depending on it and is used as a *real-world application* driver behind *Zero Graphics*.
+Work-in-progress, but works quite well already. There is one [big project](https://github.com/Dunstwolke/core) depending on it and is used as a _real-world application_ driver behind _Zero Graphics_.
 
 ![Preview screenshot for SDL2](documentation/screen01.png)
 
@@ -31,6 +31,7 @@ Work-in-progress, but works quite well already. There is one [big project](https
 ## Project Goals
 
 ### Basic Framework
+
 - [ ] Support the following platforms
   - [ ] Wasm
     - [x] Create OpenGL ES 2.0 context
@@ -59,6 +60,7 @@ Work-in-progress, but works quite well already. There is one [big project](https
   - [ ] Embedded resources
 
 ### 2D Rendering library
+
 - [ ] Pixel perfect drawing of
   - [x] Lines
   - [x] Rectangles
@@ -70,6 +72,7 @@ Work-in-progress, but works quite well already. There is one [big project](https
 - [ ] Stack based/nested scissoring
 
 ### 3D Rendering library
+
 - [ ] Tool based on Assimp to convert models into loadable format
 - [ ] Blender export script
 - [x] Draw static geometry
@@ -85,12 +88,15 @@ Work-in-progress, but works quite well already. There is one [big project](https
 ## Dependencies
 
 ### Desktop
+
 - SDL2
 
 ### Web
+
 - [js glue code](www/binding.js)
 
 ### Android
+
 - Android SDK
 - Android NDK
 - Android Build Tools
@@ -99,12 +105,26 @@ Work-in-progress, but works quite well already. There is one [big project](https
 
 ## Building / Running
 
+This project uses [submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules), so to get started, clone the repo with submodules recursively:
+
+```shell-session
+[user@computer work]$ git clone https://github.com/MasterQ32/zero-graphics --recurse-submodules
+```
+
+or, if you already cloned the repository:
+
+```shell-session
+[user@computer work]$ git clone https://github.com/MasterQ32/zero-graphics
+[user@computer work]$ cd zero-graphics/
+[user@computer zero-graphics]$ git submodule update --init --recursive
+```
+
 ### Desktop PC
 
 Requires `SDL2` to be installed.
 
-```sh
-zig build run
+```shell-session
+[user@computer zero-graphics]$ zig build run
 ```
 
 A window should open with the application in fullscreen.
@@ -113,8 +133,8 @@ A window should open with the application in fullscreen.
 
 Includes a teeny tiny web server for debugging.
 
-```sh
-zig build install run-wasm
+```shell-session
+[user@computer zero-graphics]$ zig build install run-wasm
 ```
 
 Now visit http://127.0.0.1:8000/demo_application.htm to see the demo.
@@ -124,8 +144,8 @@ Now visit http://127.0.0.1:8000/demo_application.htm to see the demo.
 Connect your phone first and install both a JDK as well as the Android SDK with NDK included. The ZeroGraphics build system will tell you if
 it couldn't auto-detect the SDK paths.
 
-```sh
-zig build -Denable-android run-app
+```shell-session
+[user@computer zero-graphics]$ zig build -Denable-android run-app
 ```
 
 The app should now be installed and started on your phone.
@@ -135,6 +155,7 @@ The app should now be installed and started on your phone.
 ### Getting started
 
 To create a new project, copy this application skeleton:
+
 ```zig
 const std = @import("std");
 const zero_graphics = @import("zero-graphics");
@@ -195,14 +216,14 @@ The functions are roughly called in this order:
 
 ![Application workflow](documentation/app_flow.svg)
 
-The separation between *application init* and *graphics init* is relevant for Android apps which will destroy their window when you send it into the background and will recreate it when it is selected again. This means that all GPU content will be lost then and must be restored.
+The separation between _application init_ and _graphics init_ is relevant for Android apps which will destroy their window when you send it into the background and will recreate it when it is selected again. This means that all GPU content will be lost then and must be restored.
 
 Your application state will not be destroyed, so the rendering can render the same data as before.
 
 ### Architecture
 
 `zero-graphics` follows a somewhat unusual architecture for Zig applications.
-Your applications is a *package* that will be consumed by a `zero-graphics` host. This host is implementing the "main loop" and will invoke both `update` and `render` periodically. It will also initialize and open the window and pump events.
+Your applications is a _package_ that will be consumed by a `zero-graphics` host. This host is implementing the "main loop" and will invoke both `update` and `render` periodically. It will also initialize and open the window and pump events.
 
 This design allows `zero-graphics` to run on several different platforms, including most desktop PCs, Android and even web browsers via WebAssembly.
 
