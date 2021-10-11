@@ -22,7 +22,21 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 
 ## Project status
 
-[![Nightly Build](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml/badge.svg)](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml)
+### CI
+
+The CI coverage currently looks like this:
+
+| ·           | Windows | macOS | Linux |
+| ----------- | ------- | ----- | ----- |
+| Desktop     | ✅      | ✅    | ✅    |
+| WebAssembly | ✅      | ✅    | ✅    |
+| Android     | ✅      | ✅    | ✅    |
+| `zero-init` | ✅      | ✅    | ✅    |
+| `mconv`     | ✅      | ✅    | ✅    |
+
+Status: [![Nightly Build](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml/badge.svg)](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml)
+
+### Previews
 
 Work-in-progress, but works quite well already. There is one [big project](https://github.com/Dunstwolke/core) depending on it and is used as a _real-world application_ driver behind _Zero Graphics_.
 

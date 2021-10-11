@@ -49,6 +49,10 @@ jobs:
           ../zig-out/bin/zero-init --git --submodule
           zig build install
 
+      - name: Convert model
+        run: |
+          zig-out/bin/mconv examples/data/twocubes.obj
+
   build-macos:
     runs-on: macos-latest
 
@@ -86,6 +90,10 @@ jobs:
           cd quickstart
           ../zig-out/bin/zero-init --git --submodule
           zig build install
+
+      - name: Convert model
+        run: |
+          zig-out/bin/mconv examples/data/twocubes.obj
 
   build-windows:
     runs-on: windows-latest
@@ -174,3 +182,7 @@ jobs:
           cd quickstart
           ../zig-out/bin/zero-init --git --submodule
           zig build install
+
+      - name: Convert model
+        run: |
+          zig-out/bin/mconv examples/data/twocubes.obj
