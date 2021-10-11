@@ -49,10 +49,10 @@ Work-in-progress, but works quite well already. There is one [big project](https
 ### Basic Framework
 
 - [ ] Support the following platforms
-  - [ ] Wasm
+  - [x] Wasm
     - [x] Create OpenGL ES 2.0 context
     - [x] Input Mouse
-    - [ ] Input Keyboard
+    - [x] Input Keyboard
   - [ ] Linux Desktop
     - [x] Create OpenGL ES 2.0 context
     - [x] Input Mouse
