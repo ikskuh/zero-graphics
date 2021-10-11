@@ -138,8 +138,8 @@ pub fn update(app: *Application) !bool {
                 }),
 
                 .text_input => |text| try ui_input.enterText(text.text),
-                .key_down => {},
-                .key_up => {},
+                .key_down => |scancode| std.log.info("key_down: {s}", .{@tagName(scancode)}),
+                .key_up => |scancode| std.log.info("key_up: {s}", .{@tagName(scancode)}),
             }
         }
         ui_input.finish();
