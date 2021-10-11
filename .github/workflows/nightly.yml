@@ -40,7 +40,7 @@ jobs:
         run: zig build install
 
       - name: Build Android application
-        run: zig build -Denable-android install
+        run: zig build -Denable-android init-keystore install
 
       - name: Kickstart project template
         run: |
@@ -78,7 +78,7 @@ jobs:
         run: zig build install
 
       - name: Build Android application
-        run: zig build -Denable-android install
+        run: zig build -Denable-android init-keystore install
 
       - name: Kickstart project template
         run: |
@@ -144,7 +144,7 @@ jobs:
         run: zig build install
 
       - name: Build Android application
-        run: zig build -Denable-android install
+        run: zig build -Denable-android init-keystore install
 
       - name: Kickstart project template
         run: |
