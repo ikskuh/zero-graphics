@@ -9,6 +9,7 @@
 //!
 
 const std = @import("std");
+const builtin = @import("builtin");
 const zlm = @import("zlm");
 const zero_graphics = @import("zero-graphics");
 
@@ -74,7 +75,7 @@ pub fn setupGraphics(app: *Application) !void {
     logger.info("Display density: {d:.3} DPI", .{zero_graphics.getDisplayDPI()});
 
     // If possible, install the debug callback in debug builds
-    if (std.builtin.mode == .Debug) {
+    if (builtin.mode == .Debug) {
         zero_graphics.gles_utils.enableDebugOutput() catch {};
     }
 
@@ -406,7 +407,7 @@ pub fn render(app: *Application) !void {
         gles.frontFace(gles.CCW);
         gles.cullFace(gles.BACK);
 
-        const perspective_mat = zlm.specializeOn(f32).Mat4.createPerspective(
+        const perspective_mat = zlm.SpecializeOn(f32).Mat4.createPerspective(
             zlm.toRadians(60.0),
             aspect,
             0.1,
@@ -415,15 +416,15 @@ pub fn render(app: *Application) !void {
 
         const ts = @intToFloat(f32, zero_graphics.milliTimestamp() - app.startup_time) / 1000.0;
 
-        const lookat_mat = zlm.specializeOn(f32).Mat4.createLookAt(
+        const lookat_mat = zlm.SpecializeOn(f32).Mat4.createLookAt(
             // zlm.specializeOn(f32).vec3(0, 0, -10),
-            zlm.specializeOn(f32).vec3(
+            zlm.SpecializeOn(f32).vec3(
                 4.0 * std.math.sin(ts),
                 3.0,
                 4.0 * std.math.cos(ts),
             ),
-            zlm.specializeOn(f32).Vec3.zero,
-            zlm.specializeOn(f32).Vec3.unitY,
+            zlm.SpecializeOn(f32).Vec3.zero,
+            zlm.SpecializeOn(f32).Vec3.unitY,
         );
 
         const view_projection_matrix = lookat_mat.mul(perspective_mat);
@@ -433,7 +434,7 @@ pub fn render(app: *Application) !void {
         renderer.render(zero_graphics.Size{ .width = app.screen_width, .height = app.screen_height });
     }
 
-    if (std.builtin.os.tag != .freestanding) {
+    if (builtin.os.tag != .freestanding) {
         if (take_screenshot) {
             take_screenshot = false;
 

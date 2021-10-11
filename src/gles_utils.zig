@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const zerog = @import("zero-graphics.zig");
 const logger = std.log.scoped(.zero_graphics);
 
@@ -25,7 +26,7 @@ fn QueryExtension(comptime query: []const []const u8) type {
 
 pub fn queryExtensions(comptime query: []const []const u8) QueryExtension(query) {
     var exts = std.mem.zeroes(QueryExtension(query));
-    if (std.builtin.cpu.arch != .wasm32) {
+    if (builtin.cpu.arch != .wasm32) {
         const extension_list = std.mem.span(zerog.gles.getString(zerog.gles.EXTENSIONS)) orelse return exts;
         var iterator = std.mem.split(u8, extension_list, " ");
         while (iterator.next()) |extension| {

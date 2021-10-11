@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const zero_graphics = @import("zero-graphics");
 
 const logger = std.log.scoped(.demo);
@@ -30,7 +31,7 @@ pub fn setupGraphics(app: *Application) !void {
     logger.info("OpenGL GLSL:          {s}", .{std.mem.span(gl.getString(gl.SHADING_LANGUAGE_VERSION))});
 
     // If possible, install the debug callback in debug builds
-    if (std.builtin.mode == .Debug) {
+    if (builtin.mode == .Debug) {
         zero_graphics.gles_utils.enableDebugOutput() catch {};
     }
 
