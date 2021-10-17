@@ -173,63 +173,32 @@ The app should now be installed and started on your phone.
 
 ### Getting started
 
-To create a new project, copy this application skeleton:
+To create a new project, build this repository with `zig build` first. Then use the tool `zero-init` from `zig-out/bin` to initialize a new project:
 
-```zig
-const std = @import("std");
-const zero_graphics = @import("zero-graphics");
-
-/// This implements your application with all state
-const Application = @This();
-
-allocator: *std.mem.Allocator,
-input: *zero_graphics.Input,
-
-pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
-    // Initialize the app and all non-gpu logic here
-    app.* = Application{
-        .allocator = allocator,
-        .input = input,
-    };
-}
-
-pub fn deinit(app: *Application) void {
-    // destroy application data here
-    app.* = undefined;
-}
-
-pub fn setupGraphics(app: *Application) !void {
-    // initialize all OpenGL objects here
-}
-
-pub fn teardownGraphics(app: *Application) void {
-    // destroy all OpenGL objects here
-}
-
-pub fn update(app: *Application) !bool {
-    while (app.input.pollEvent()) |event| {
-        switch (event) {
-            .quit => return false,
-            else => std.log.info("unhandled input event: {}", .{event}),
-        }
-    }
-
-    // return false to exit the application
-    return true;
-}
-
-pub fn resize(app: *Application, width: u15, height: u15) !void {
-    // handle application resize logic here
-}
-
-pub fn render(app: *Application) !void {
-    // OpenGL is already loaded, so we can just use it :)
-    // render will never be called before `setupGraphics` is called and never
-    // after `teardownGraphics` was called.
-    zero_graphics.gles.clearColor(0.3, 0.3, 0.3, 1.0);
-    zero_graphics.gles.clear(gles.COLOR_BUFFER_BIT);
-}
+```sh-session
+[felix@denkplatte-v2 ~]$ mkdir game
+[felix@denkplatte-v2 ~]$ cd game
+[felix@denkplatte-v2 game]$ /path/to/zero-graphics/zig-out/bin/zero-init symlink # initialize via symlink, quickest option. use zero-init -h to see all options
+[felix@denkplatte-v2 game]$ ls
+src  vendor  build.zig
+[felix@denkplatte-v2 game]$ zig build
+[felix@denkplatte-v2 game]$ zig build run
+info(sdl): SDL Video Driver:     x11
+info(sdl): Render resolution:  1280×720
+info(sdl): Virtual resolution: 1280×720
+info(demo): OpenGL Version:       OpenGL ES 3.2 Mesa 21.2.3
+info(demo): OpenGL Vendor:        AMD
+info(demo): OpenGL Renderer:      AMD Radeon(TM) Vega 10 Graphics (RAVEN, DRM 3.41.0, 5.13.19_1, LLVM 12.0.1)
+info(demo): OpenGL GLSL:          OpenGL ES GLSL ES 3.20
+info(zero_graphics): [shader compiler] [other] Shader Stats: SGPRS: 16 VGPRS: 8 Code Size: 212 LDS: 0 Scratch: 0 Max Waves: 10 Spilled SGPRs: 0 Spilled VGPRs: 0 PrivMem VGPRs: 0
+info(zero_graphics): [shader compiler] [other] Shader Stats: SGPRS: 16 VGPRS: 8 Code Size: 40 LDS: 0 Scratch: 0 Max Waves: 10 Spilled SGPRs: 0 Spilled VGPRs: 0 PrivMem VGPRs: 0
+info(zero_graphics): [shader compiler] [other] Shader Stats: SGPRS: 8 VGPRS: 24 Code Size: 52 LDS: 0 Scratch: 0 Max Waves: 10 Spilled SGPRs: 0 Spilled VGPRs: 0 PrivMem VGPRs: 0
+info(zero_graphics): [shader compiler] [other] Shader Stats: SGPRS: 8 VGPRS: 24 Code Size: 24 LDS: 0 Scratch: 0 Max Waves: 10 Spilled SGPRs: 0 Spilled VGPRs: 0 PrivMem VGPRs: 0
+info(zero_graphics): [shader compiler] [other] Shader Stats: SGPRS: 8 VGPRS: 8 Code Size: 60 LDS: 0 Scratch: 0 Max Waves: 10 Spilled SGPRs: 0 Spilled VGPRs: 0 PrivMem VGPRs: 0
+info(zero_graphics): [shader compiler] [other] Shader Stats: SGPRS: 16 VGPRS: 20 Code Size: 392 LDS: 0 Scratch: 0 Max Waves: 10 Spilled SGPRs: 0 Spilled VGPRs: 0 PrivMem VGPRs: 0
 ```
+
+Check out the file [`src/main.zig`](tools/zero-init/template/src/main.zig) to see your app skeleton. You can also adjust the [`build.zig`](tools/zero-init/template/build.zig) to set your project name.
 
 The functions are roughly called in this order:
 
