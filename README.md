@@ -26,13 +26,13 @@ Comes with a pixel-perfect 2D renderer and maybe some day even with a bit of a 3
 
 The CI coverage currently looks like this:
 
-| ·           | Windows | macOS | Linux |
-| ----------- | ------- | ----- | ----- |
-| Desktop     | ✅      | ✅    | ✅    |
-| WebAssembly | ✅      | ✅    | ✅    |
-| Android     | ✅      | ✅    | ✅    |
-| `zero-init` | ✅      | ✅    | ✅    |
-| `mconv`     | ✅      | ✅    | ✅    |
+| ·              | Windows | macOS | Linux |
+| -------------- | ------- | ----- | ----- |
+| Desktop        | ✅      | ✅    | ✅    |
+| WebAssembly    | ✅      | ✅    | ✅    |
+| Android        | ✅      | ✅    | ✅    |
+| `zero-init`    | ✅      | ✅    | ✅    |
+| `zero-convert` | ✅      | ✅    | ✅    |
 
 Status: [![Nightly Build](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml/badge.svg)](https://github.com/MasterQ32/zero-graphics/actions/workflows/nightly.yml)
 

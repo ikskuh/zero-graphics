@@ -36,10 +36,10 @@ pub fn build(b: *std.build.Builder) !void {
     }
 
     {
-        const converter_api = b.addTranslateC(.{ .path = "tools/modelconv/api.h" });
+        const converter_api = b.addTranslateC(.{ .path = "tools/zero-convert/api.h" });
 
-        const converter = b.addExecutable("mconv", "tools/modelconv/main.zig");
-        converter.addCSourceFile("tools/modelconv/converter.cpp", &[_][]const u8{
+        const converter = b.addExecutable("zero-convert", "tools/zero-convert/main.zig");
+        converter.addCSourceFile("tools/zero-convert/converter.cpp", &[_][]const u8{
             "-std=c++17",
             "-Wall",
             "-Wextra",
