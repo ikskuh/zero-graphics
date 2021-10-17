@@ -99,11 +99,11 @@ pub fn main() !u8 {
 
     const extension = switch (cli.verb.?) {
         .help => unreachable, // we already printed the help text
-        .model => "z3d",
-        .texture => "ztex",
-        .sound => "zsnd",
-        .music => "zmus",
-        .animation => "zani",
+        .model => ".z3d",
+        .texture => ".ztex",
+        .sound => ".zsnd",
+        .music => ".zmus",
+        .animation => ".zani",
     };
 
     var dst_file = std.ArrayList(u8).init(allocator);
