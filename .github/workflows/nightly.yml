@@ -51,7 +51,7 @@ jobs:
 
       - name: Convert model
         run: |
-          zig-out/bin/mconv examples/data/twocubes.obj
+          zig-out/bin/zero-convert model examples/data/twocubes.obj
 
   build-macos:
     runs-on: macos-latest
@@ -93,7 +93,7 @@ jobs:
 
       - name: Convert model
         run: |
-          zig-out/bin/mconv examples/data/twocubes.obj
+          zig-out/bin/zero-convert model examples/data/twocubes.obj
 
   build-windows:
     runs-on: windows-latest
@@ -185,4 +185,4 @@ jobs:
 
       - name: Convert model
         run: |
-          zig-out/bin/mconv examples/data/twocubes.obj
+          zig-out/bin/zero-convert model examples/data/twocubes.obj
