@@ -8,7 +8,7 @@ pub const getDisplayDPI = @import("root").getDisplayDPI;
 // https://www.khronos.org/registry/OpenGL-Refpages/es2.0/
 pub const gles = @import("gl_es_2v0.zig");
 
-pub const gles_utils = @import("gles_utils.zig");
+pub const gles_utils = @import("rendering/gles-helper.zig");
 
 pub const Renderer2D = @import("rendering/Renderer2D.zig");
 pub const Renderer3D = @import("rendering/Renderer3D.zig");
