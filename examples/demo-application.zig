@@ -76,11 +76,11 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
     app.mesh = try app.resources.createGeometry(ResourceManager.StaticMesh{
         .vertices = &.{
             .{ .x = 0, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
-            .{ .x = 1, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
-            .{ .x = 0, .y = 0, .z = 1, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
+            .{ .x = 1, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 1, .v = 0 },
+            .{ .x = 0, .y = 0, .z = 1, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 1 },
         },
         .indices = &.{ 0, 1, 2 },
-        .texture = null,
+        .texture = app.texture_handle,
     });
 
     // app.mesh = try app.resources.loadGeometry(

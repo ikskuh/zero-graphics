@@ -125,27 +125,6 @@ const Uniforms = struct {
     uTexture: gles.GLint,
 };
 
-// const GeometryShader = struct {
-
-//     program: gles.GLuint,
-//     uniforms: Uniforms,
-
-//     pub fn create(vertex_source: []const u8, fragment_source: []const u8) !GeometryShader {
-//         const shader_program = try glesh.compileShaderProgram(attributes, vertex_source, fragment_source);
-//         errdefer gles.deleteProgram(shader_program);
-
-//         return GeometryShader{
-//             .program = shader_program,
-//             .uniforms = glesh.fetchUniforms(shader_program, Uniforms),
-//         };
-//     }
-
-//     pub fn destroy(self: *GeometryShader) void {
-//         gles.deleteProgram(self.program);
-//         self.* = undefined;
-//     }
-// };
-
 /// Resets the state of the renderer and prepares a fresh new frame.
 pub fn reset(self: *Self) void {
     // release all geometries.

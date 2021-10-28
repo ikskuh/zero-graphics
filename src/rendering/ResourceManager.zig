@@ -53,7 +53,7 @@ fn initGpu(self: *ResourceManager, pool: anytype) !void {
     var it = pool.list.first;
     while (it) |node| : (it = node.next) {
         const item = &node.data.resource;
-        try item.initGpu(self.allocator);
+        try item.initGpu(self);
     }
 }
 
@@ -72,7 +72,7 @@ fn destroyGpu(self: *ResourceManager, pool: anytype) void {
     var it = pool.list.first;
     while (it) |node| : (it = node.next) {
         const item = &node.data.resource;
-        item.destroyGpu();
+        item.destroyGpu(self);
     }
 }
 
@@ -258,17 +258,19 @@ pub const Texture = struct {
         tex.instance = id;
     }
 
-    fn initGpu(tex: *Texture, allocator: *std.mem.Allocator) !void {
+    fn initGpu(tex: *Texture, rm: *ResourceManager) !void {
         std.debug.assert(tex.instance == null);
 
-        var texture_data = try tex.source.create(allocator);
-        defer texture_data.deinit(allocator);
+        var texture_data = try tex.source.create(rm.allocator);
+        defer texture_data.deinit(rm.allocator);
 
         initGpuFromData(tex, texture_data);
     }
 
-    fn destroyGpu(tex: *Texture) void {
+    fn destroyGpu(tex: *Texture, rm: *ResourceManager) void {
         std.debug.assert(tex.instance != null);
+        _ = rm;
+        gl.deleteTextures(1, &tex.instance.?);
         tex.instance = null;
     }
 };
@@ -323,7 +325,7 @@ pub fn destroyTexture(self: *ResourceManager, texture: *Texture) void {
 
 fn destroyTextureInternal(ctx: *ResourceManager, tex: *Texture) void {
     if (ctx.is_gpu_available) {
-        tex.destroyGpu();
+        tex.destroyGpu(ctx);
     }
     tex.source.deinit(ctx.allocator);
     tex.* = undefined;
@@ -376,12 +378,12 @@ pub const Shader = struct {
 
     source: DataSource(ShaderData),
 
-    fn initGpu(shader: *Shader, allocator: *std.mem.Allocator) !void {
-        var data = try shader.source.create(allocator);
+    fn initGpu(shader: *Shader, rm: *ResourceManager) !void {
+        var data = try shader.source.create(rm.allocator);
         defer data.deinit();
 
-        var shaders = try allocator.alloc(gl.GLuint, data.sources.items.len);
-        defer allocator.free(shaders);
+        var shaders = try rm.allocator.alloc(gl.GLuint, data.sources.items.len);
+        defer rm.allocator.free(shaders);
 
         var index: usize = 0;
         errdefer for (shaders[0..index]) |sh| {
@@ -415,7 +417,8 @@ pub const Shader = struct {
         shader.instance = program;
     }
 
-    fn destroyGpu(shader: *Shader) void {
+    fn destroyGpu(shader: *Shader, rm: *ResourceManager) void {
+        _ = rm;
         std.debug.assert(shader.instance != null);
         gl.deleteProgram(shader.instance.?);
         shader.instance = null;
@@ -433,7 +436,7 @@ pub fn createShader(self: *ResourceManager, resource_data: anytype) !*Shader {
     errdefer self.shaders.release(self, shader);
 
     if (self.is_gpu_available) {
-        try shader.initGpu(self.allocator);
+        try shader.initGpu(self);
     }
 
     return shader;
@@ -445,7 +448,7 @@ pub fn destroyShader(self: *ResourceManager, shader: *Shader) void {
 
 fn destroyShaderInternal(ctx: *ResourceManager, shader: *Shader) void {
     if (ctx.is_gpu_available) {
-        shader.destroyGpu();
+        shader.destroyGpu(ctx);
     }
     shader.source.deinit(ctx.allocator);
     shader.* = undefined;
@@ -470,11 +473,11 @@ pub const Buffer = struct {
 
     source: DataSource(BufferData),
 
-    fn initGpu(buffer: *Buffer, allocator: *std.mem.Allocator) !void {
+    fn initGpu(buffer: *Buffer, rm: *ResourceManager) !void {
         std.debug.assert(buffer.instance == null);
 
-        var data = try buffer.source.create(allocator);
-        defer data.deinit(allocator);
+        var data = try buffer.source.create(rm.allocator);
+        defer data.deinit(rm.allocator);
 
         var instance: gl.GLuint = 0;
         gl.genBuffers(1, &instance); // TODO: Fix this
@@ -484,7 +487,8 @@ pub const Buffer = struct {
 
         buffer.instance = instance;
     }
-    fn destroyGpu(buffer: *Buffer) void {
+    fn destroyGpu(buffer: *Buffer, rm: *ResourceManager) void {
+        _ = rm;
         std.debug.assert(buffer.instance != null);
         gl.deleteBuffers(1, &buffer.instance.?);
         buffer.instance = null;
@@ -502,7 +506,7 @@ pub fn createBuffer(self: *ResourceManager, resource_data: anytype) !*Buffer {
     errdefer self.buffers.release(self, buffer);
 
     if (self.is_gpu_available) {
-        try buffer.initGpu(self.allocator);
+        try buffer.initGpu(self);
     }
 
     return buffer;
@@ -514,7 +518,7 @@ pub fn destroyBuffer(self: *ResourceManager, buffer: *Buffer) void {
 
 fn destroyBufferInternal(ctx: *ResourceManager, buffer: *Buffer) void {
     if (ctx.is_gpu_available) {
-        buffer.destroyGpu();
+        buffer.destroyGpu(ctx);
     }
     buffer.source.deinit(ctx.allocator);
     buffer.* = undefined;
@@ -583,21 +587,20 @@ pub const Geometry = struct {
 
     source: DataSource(GeometryData),
 
-    fn initGpu(geometry: *Geometry, allocator: *std.mem.Allocator) !void {
+    fn initGpu(geometry: *Geometry, rm: *ResourceManager) !void {
         std.debug.assert(geometry.vertex_buffer == null);
         std.debug.assert(geometry.index_buffer == null);
         std.debug.assert(geometry.meshes == null);
 
-        var data = try geometry.source.create(allocator);
-        defer data.deinit(allocator);
+        var data = try geometry.source.create(rm.allocator);
+        defer data.deinit(rm.allocator);
 
-        const meshes = try allocator.dupe(Mesh, data.meshes);
-        errdefer allocator.free(meshes);
+        const meshes = try rm.allocator.dupe(Mesh, data.meshes);
+        errdefer rm.allocator.free(meshes);
 
         for (meshes) |mesh| {
             if (mesh.texture) |texture| {
-                _ = texture;
-                @panic("TODO: Somehow retain texture here!");
+                rm.retainTexture(texture);
             }
         }
 
@@ -618,7 +621,7 @@ pub const Geometry = struct {
         geometry.meshes = meshes;
     }
 
-    fn destroyGpu(geometry: *Geometry) void {
+    fn destroyGpu(geometry: *Geometry, rm: *ResourceManager) void {
         std.debug.assert(geometry.vertex_buffer != null);
         std.debug.assert(geometry.index_buffer != null);
         std.debug.assert(geometry.meshes != null);
@@ -629,12 +632,11 @@ pub const Geometry = struct {
         if (geometry.meshes) |meshes| {
             for (meshes) |mesh| {
                 if (mesh.texture) |texture| {
-                    _ = texture;
-                    @panic("TODO: Somehow release texture here!");
+                    rm.destroyTexture(texture);
                 }
             }
+            rm.allocator.free(meshes);
         }
-        // TODO: Free meshes here!
 
         geometry.vertex_buffer = null;
         geometry.index_buffer = null;
@@ -658,58 +660,11 @@ pub fn createGeometry(self: *ResourceManager, data_source: anytype) !*Geometry {
     errdefer self.geometries.release(self, geometry);
 
     if (self.is_gpu_available) {
-        try geometry.initGpu(self.allocator);
+        try geometry.initGpu(self);
     }
 
     return geometry;
 }
-
-// /// Creates a new drawable geometry.
-// /// - `vertices` is an array of model vertices.
-// /// - `indices` is a the full index buffer, where each three consecutive indices describe a triangle.
-// /// - `meshes` is a list of ranges into `indices` with each range associated with a texture to be drawn
-// pub fn createGeometry(self: *ResourceManager, vertices: []const Vertex, indices: []const u16, meshes: []const Mesh) CreateGeometryError!*Geometry {
-//     for (indices) |idx| {
-//         std.debug.assert(idx < vertices.len);
-//     }
-
-//     const vertices_clone = try self.allocator.dupe(Vertex, vertices);
-//     errdefer self.allocator.free(vertices_clone);
-
-//     const indices_clone = try self.allocator.dupe(u16, indices);
-//     errdefer self.allocator.free(indices_clone);
-
-//     const meshes_clone = try self.allocator.dupe(Mesh, meshes);
-//     errdefer self.allocator.free(meshes_clone);
-
-//     var bufs: [2]gl.GLuint = undefined;
-//     gl.genBuffers(bufs.len, &bufs);
-//     errdefer gl.deleteBuffers(bufs.len, &bufs);
-
-//     var geom = Geometry{
-//         .vertex_buffer = bufs[0],
-//         .index_buffer = bufs[1],
-//         .vertices = vertices_clone,
-//         .indices = indices_clone,
-//         .meshes = meshes_clone,
-//     };
-
-//     gl.bindBuffer(gl.ARRAY_BUFFER, geom.vertex_buffer);
-//     gl.bufferData(gl.ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(Vertex) * geom.vertices.len), geom.vertices.ptr, gl.STATIC_DRAW);
-//     gl.bindBuffer(gl.ARRAY_BUFFER, 0);
-
-//     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geom.index_buffer);
-//     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(u16) * geom.indices.len), geom.indices.ptr, gl.STATIC_DRAW);
-//     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0);
-
-//     for (geom.meshes) |mesh| {
-//         if (mesh.texture) |tex| {
-//             self.textures.retain(tex);
-//         }
-//     }
-
-//     return try self.geometries.allocate(geom);
-// }
 
 pub fn retainGeometry(self: *ResourceManager, geometry: *Geometry) void {
     self.geometries.retain(geometry);
@@ -721,11 +676,11 @@ pub fn destroyGeometry(self: *ResourceManager, geometry: *Geometry) void {
     self.geometries.release(self, geometry);
 }
 
-fn destroyGeometryInternal(self: *ResourceManager, geometry: *Geometry) void {
-    if (self.is_gpu_available) {
-        geometry.destroyGpu();
+fn destroyGeometryInternal(ctx: *ResourceManager, geometry: *Geometry) void {
+    if (ctx.is_gpu_available) {
+        geometry.destroyGpu(ctx);
     }
-    geometry.source.deinit(self.allocator);
+    geometry.source.deinit(ctx.allocator);
     geometry.* = undefined;
 }
 
