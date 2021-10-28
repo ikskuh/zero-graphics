@@ -2,7 +2,6 @@ const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
 const types = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
-const z3d = @import("z3d-format.zig");
 
 const glesh = @import("gles-helper.zig");
 

@@ -129,13 +129,13 @@ const ResourceDataHandle = struct {
     }
 };
 
-pub const CreateResourceDataError = error{ OutOfMemory, InvalidFormat, IoError };
+pub const CreateResourceDataError = error{ OutOfMemory, InvalidFormat, IoError, FileNotFound };
 
 fn CreateResourceData(comptime ResourceData: type) type {
-    return fn (ResourceDataHandle, *std.mem.Allocator) CreateResourceDataError!ResourceData;
+    return fn (ResourceDataHandle, *ResourceManager) CreateResourceDataError!ResourceData;
 }
 
-const DestroyResourceData = fn (ResourceDataHandle, *std.mem.Allocator) void;
+const DestroyResourceData = fn (ResourceDataHandle, *ResourceManager) void;
 
 fn DataSource(comptime ResourceData: type) type {
     return struct {
@@ -150,11 +150,11 @@ fn DataSource(comptime ResourceData: type) type {
             resource_data_cpy.* = resource_data;
 
             const Wrapper = struct {
-                fn create(handle: ResourceDataHandle, sub_allocator: *std.mem.Allocator) !ResourceData {
-                    return try handle.convertTo(ActualDataType).create(sub_allocator);
+                fn create(handle: ResourceDataHandle, rm: *ResourceManager) CreateResourceDataError!ResourceData {
+                    return try handle.convertTo(ActualDataType).create(rm);
                 }
-                fn destroy(handle: ResourceDataHandle, sub_allocator: *std.mem.Allocator) void {
-                    sub_allocator.destroy(handle.convertTo(ActualDataType));
+                fn destroy(handle: ResourceDataHandle, rm: *ResourceManager) void {
+                    rm.allocator.destroy(handle.convertTo(ActualDataType));
                 }
             };
 
@@ -165,12 +165,12 @@ fn DataSource(comptime ResourceData: type) type {
             };
         }
 
-        pub fn create(self: Self, allocator: *std.mem.Allocator) !ResourceData {
-            return try self.create_data(self.pointer, allocator);
+        pub fn create(self: Self, rm: *ResourceManager) CreateResourceDataError!ResourceData {
+            return try self.create_data(self.pointer, rm);
         }
 
-        pub fn deinit(self: *Self, allocator: *std.mem.Allocator) void {
-            self.destroy_data(self.pointer, allocator);
+        pub fn deinit(self: *Self, rm: *ResourceManager) void {
+            self.destroy_data(self.pointer, rm);
             self.* = undefined;
         }
 
@@ -188,9 +188,9 @@ pub const TextureData = struct {
     height: u15,
     pixels: ?[]u8,
 
-    pub fn deinit(self: TextureData, allocator: *std.mem.Allocator) void {
+    pub fn deinit(self: TextureData, rm: *ResourceManager) void {
         if (self.pixels) |pixels| {
-            allocator.free(pixels);
+            rm.allocator.free(pixels);
         }
     }
 };
@@ -261,8 +261,8 @@ pub const Texture = struct {
     fn initGpu(tex: *Texture, rm: *ResourceManager) !void {
         std.debug.assert(tex.instance == null);
 
-        var texture_data = try tex.source.create(rm.allocator);
-        defer texture_data.deinit(rm.allocator);
+        var texture_data = try tex.source.create(rm);
+        defer texture_data.deinit(rm);
 
         initGpuFromData(tex, texture_data);
     }
@@ -277,11 +277,11 @@ pub const Texture = struct {
 
 pub fn createTexture(self: *ResourceManager, usage_hint: Texture.UsageHint, resource_data: anytype) !*Texture {
     var source = try DataSource(TextureData).init(self.allocator, resource_data);
-    errdefer source.deinit(self.allocator);
+    errdefer source.deinit(self);
 
     // We need to create the texture data anyway, as we want to know how big our texture will be
-    var texture_data = try source.create(self.allocator);
-    defer texture_data.deinit(self.allocator);
+    var texture_data = try source.create(self);
+    defer texture_data.deinit(self);
 
     const texture = Texture{
         .instance = null,
@@ -327,7 +327,7 @@ fn destroyTextureInternal(ctx: *ResourceManager, tex: *Texture) void {
     if (ctx.is_gpu_available) {
         tex.destroyGpu(ctx);
     }
-    tex.source.deinit(ctx.allocator);
+    tex.source.deinit(ctx);
     tex.* = undefined;
 }
 
@@ -379,7 +379,7 @@ pub const Shader = struct {
     source: DataSource(ShaderData),
 
     fn initGpu(shader: *Shader, rm: *ResourceManager) !void {
-        var data = try shader.source.create(rm.allocator);
+        var data = try shader.source.create(rm);
         defer data.deinit();
 
         var shaders = try rm.allocator.alloc(gl.GLuint, data.sources.items.len);
@@ -427,7 +427,7 @@ pub const Shader = struct {
 
 pub fn createShader(self: *ResourceManager, resource_data: anytype) !*Shader {
     var source = try DataSource(ShaderData).init(self.allocator, resource_data);
-    errdefer source.deinit(self.allocator);
+    errdefer source.deinit(self);
 
     const shader = try self.shaders.allocate(Shader{
         .instance = null,
@@ -450,7 +450,7 @@ fn destroyShaderInternal(ctx: *ResourceManager, shader: *Shader) void {
     if (ctx.is_gpu_available) {
         shader.destroyGpu(ctx);
     }
-    shader.source.deinit(ctx.allocator);
+    shader.source.deinit(ctx);
     shader.* = undefined;
 }
 
@@ -476,11 +476,11 @@ pub const Buffer = struct {
     fn initGpu(buffer: *Buffer, rm: *ResourceManager) !void {
         std.debug.assert(buffer.instance == null);
 
-        var data = try buffer.source.create(rm.allocator);
+        var data = try buffer.source.create(rm);
         defer data.deinit(rm.allocator);
 
         var instance: gl.GLuint = 0;
-        gl.genBuffers(1, &instance); // TODO: Fix this
+        gl.genBuffers(1, &instance);
         std.debug.assert(instance != 0);
 
         if (data.data != null) @panic("Initializing predefined buffers is not implemented yet!");
@@ -497,7 +497,7 @@ pub const Buffer = struct {
 
 pub fn createBuffer(self: *ResourceManager, resource_data: anytype) !*Buffer {
     var source = try DataSource(BufferData).init(self.allocator, resource_data);
-    errdefer source.deinit(self.allocator);
+    errdefer source.deinit(self);
 
     const buffer = try self.buffers.allocate(Buffer{
         .instance = null,
@@ -520,7 +520,7 @@ fn destroyBufferInternal(ctx: *ResourceManager, buffer: *Buffer) void {
     if (ctx.is_gpu_available) {
         buffer.destroyGpu(ctx);
     }
-    buffer.source.deinit(ctx.allocator);
+    buffer.source.deinit(ctx);
     buffer.* = undefined;
 }
 
@@ -570,10 +570,10 @@ pub const GeometryData = struct {
     indices: []u16,
     meshes: []Mesh,
 
-    pub fn deinit(self: *@This(), allocator: *std.mem.Allocator) void {
-        allocator.free(self.vertices);
-        allocator.free(self.indices);
-        allocator.free(self.meshes);
+    pub fn deinit(self: *@This(), rm: *ResourceManager) void {
+        rm.allocator.free(self.vertices);
+        rm.allocator.free(self.indices);
+        rm.allocator.free(self.meshes);
         self.* = undefined;
     }
 };
@@ -592,8 +592,8 @@ pub const Geometry = struct {
         std.debug.assert(geometry.index_buffer == null);
         std.debug.assert(geometry.meshes == null);
 
-        var data = try geometry.source.create(rm.allocator);
-        defer data.deinit(rm.allocator);
+        var data = try geometry.source.create(rm);
+        defer data.deinit(rm);
 
         const meshes = try rm.allocator.dupe(Mesh, data.meshes);
         errdefer rm.allocator.free(meshes);
@@ -644,12 +644,9 @@ pub const Geometry = struct {
     }
 };
 
-// pub const CreateGeometryError = error{ OutOfMemory, GraphicsApiFailure };
-// pub const LoadGeometryError = CreateGeometryError || error{InvalidGeometryData};
-
 pub fn createGeometry(self: *ResourceManager, data_source: anytype) !*Geometry {
     var source = try DataSource(GeometryData).init(self.allocator, data_source);
-    errdefer source.deinit(self.allocator);
+    errdefer source.deinit(self);
 
     const geometry = try self.geometries.allocate(Geometry{
         .vertex_buffer = null,
@@ -680,7 +677,7 @@ fn destroyGeometryInternal(ctx: *ResourceManager, geometry: *Geometry) void {
     if (ctx.is_gpu_available) {
         geometry.destroyGpu(ctx);
     }
-    geometry.source.deinit(ctx.allocator);
+    geometry.source.deinit(ctx);
     geometry.* = undefined;
 }
 
@@ -695,7 +692,7 @@ pub const StaticMesh = struct {
     indices: []const u16,
     texture: ?*Texture,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !GeometryData {
+    pub fn create(self: @This(), allocator: *std.mem.Allocator) CreateResourceDataError!GeometryData {
         const vertices = try allocator.dupe(Vertex, self.vertices);
         errdefer allocator.free(vertices);
         const indices = try allocator.dupe(u16, self.indices);
@@ -723,13 +720,13 @@ pub const StaticGeometry = struct {
     indices: []const u16,
     meshes: []const Mesh,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !GeometryData {
-        const vertices = try allocator.dupe(Vertex, self.vertices);
-        errdefer allocator.free(vertices);
-        const indices = try allocator.dupe(u16, self.indices);
-        errdefer allocator.free(indices);
-        const meshes = try allocator.dupe(Mesh, self.meshes);
-        errdefer allocator.free(meshes);
+    pub fn create(self: @This(), rm: *ResourceManager) !GeometryData {
+        const vertices = try rm.allocator.dupe(Vertex, self.vertices);
+        errdefer rm.allocator.free(vertices);
+        const indices = try rm.allocator.dupe(u16, self.indices);
+        errdefer rm.allocator.free(indices);
+        const meshes = try rm.allocator.dupe(Mesh, self.meshes);
+        errdefer rm.allocator.free(meshes);
 
         return GeometryData{
             .vertices = vertices,
@@ -739,111 +736,116 @@ pub const StaticGeometry = struct {
     }
 };
 
-// pub const DecodeZ3D = struct {
-//     data: []const u8,
+pub fn Z3DGeometry(comptime TextureLoader: type) type {
+    return struct {
+        const z3d = @import("z3d-format.zig");
 
-//     pub fn create(self: @This(), allocator: *std.mem.Allocator) !GeometryData {
+        data: []const u8,
+        loader: ?TextureLoader = null,
 
-//         // pub fn loadGeometry(self: *ResourceManager, geometry_data: []const u8, loader_context: anytype, loadTextureFile: fn (*Self, @TypeOf(loader_context), name: []const u8) LoadTextureFileError!*const Texture) LoadGeometryError!*const Geometry {
+        pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!GeometryData {
+            const geometry_data = self.data;
 
-//         const geometry_data = self.data;
+            if (geometry_data.len < @sizeOf(z3d.CommonHeader))
+                return error.InvalidFormat;
 
-//         if (geometry_data.len < @sizeOf(z3d.CommonHeader))
-//             return error.InvalidGeometryData;
+            const common_header = @ptrCast(*align(1) const z3d.CommonHeader, &geometry_data[0]);
 
-//         const common_header = @ptrCast(*align(1) const z3d.CommonHeader, &geometry_data[0]);
+            if (!std.mem.eql(u8, &common_header.magic, &z3d.magic_number))
+                return error.InvalidFormat;
+            if (std.mem.littleToNative(u16, common_header.version) != 1)
+                return error.InvalidFormat;
 
-//         if (!std.mem.eql(u8, &common_header.magic, &z3d.magic_number))
-//             return error.InvalidGeometryData;
-//         if (std.mem.littleToNative(u16, common_header.version) != 1)
-//             return error.InvalidGeometryData;
+            var loader_arena = std.heap.ArenaAllocator.init(rm.allocator);
+            defer loader_arena.deinit();
 
-//         var loader_arena = std.heap.ArenaAllocator.init(self.allocator);
-//         defer loader_arena.deinit();
+            switch (common_header.type) {
+                .static => {
+                    const header = @ptrCast(*align(1) const z3d.static_model.Header, &geometry_data[0]);
+                    const vertex_count = std.mem.littleToNative(u32, header.vertex_count);
+                    const index_count = std.mem.littleToNative(u32, header.index_count);
+                    const mesh_count = std.mem.littleToNative(u32, header.mesh_count);
+                    if (vertex_count == 0)
+                        return error.InvalidFormat;
+                    if (index_count == 0)
+                        return error.InvalidFormat;
+                    if (mesh_count == 0)
+                        return error.InvalidFormat;
 
-//         const allocator = &loader_arena.allocator;
+                    const vertex_offset = 24;
+                    const index_offset = vertex_offset + 32 * vertex_count;
+                    const mesh_offset = index_offset + 2 * index_count;
 
-//         switch (common_header.type) {
-//             .static => {
-//                 const header = @ptrCast(*align(1) const z3d.static_model.Header, &geometry_data[0]);
-//                 const vertex_count = std.mem.littleToNative(u32, header.vertex_count);
-//                 const index_count = std.mem.littleToNative(u32, header.index_count);
-//                 const mesh_count = std.mem.littleToNative(u32, header.mesh_count);
-//                 if (vertex_count == 0)
-//                     return error.InvalidGeometryData;
-//                 if (index_count == 0)
-//                     return error.InvalidGeometryData;
-//                 if (mesh_count == 0)
-//                     return error.InvalidGeometryData;
+                    const src_vertices = @ptrCast([*]align(1) const z3d.static_model.Vertex, &geometry_data[vertex_offset]);
+                    const src_indices = @ptrCast([*]align(1) const z3d.static_model.Index, &geometry_data[index_offset]);
+                    const src_meshes = @ptrCast([*]align(1) const z3d.static_model.Mesh, &geometry_data[mesh_offset]);
 
-//                 const vertex_offset = 24;
-//                 const index_offset = vertex_offset + 32 * vertex_count;
-//                 const mesh_offset = index_offset + 2 * index_count;
+                    const dst_vertices = try rm.allocator.alloc(Vertex, vertex_count);
+                    errdefer rm.allocator.free(dst_vertices);
+                    const dst_indices = try rm.allocator.alloc(u16, index_count);
+                    errdefer rm.allocator.free(dst_indices);
+                    const dst_meshes = try rm.allocator.alloc(Mesh, mesh_count);
+                    errdefer rm.allocator.free(dst_meshes);
 
-//                 const src_vertices = @ptrCast([*]align(1) const z3d.static_model.Vertex, &geometry_data[vertex_offset]);
-//                 const src_indices = @ptrCast([*]align(1) const z3d.static_model.Index, &geometry_data[index_offset]);
-//                 const src_meshes = @ptrCast([*]align(1) const z3d.static_model.Mesh, &geometry_data[mesh_offset]);
+                    for (dst_vertices) |*vtx, i| {
+                        const src = src_vertices[i];
+                        vtx.* = Vertex{
+                            .x = src.x,
+                            .y = src.y,
+                            .z = src.z,
+                            .nx = src.nx,
+                            .ny = src.ny,
+                            .nz = src.nz,
+                            .u = src.u,
+                            .v = src.v,
+                        };
+                    }
+                    for (dst_indices) |*idx, i| {
+                        idx.* = std.mem.littleToNative(u16, src_indices[i]);
+                    }
 
-//                 const dst_vertices = try allocator.alloc(Vertex, vertex_count);
-//                 const dst_indices = try allocator.alloc(u16, index_count);
-//                 const dst_meshes = try allocator.alloc(Mesh, mesh_count);
+                    for (dst_meshes) |*mesh, i| {
+                        const src_mesh = src_meshes[i];
+                        mesh.* = Mesh{
+                            .offset = std.mem.littleToNative(u32, src_mesh.offset),
+                            .count = std.mem.littleToNative(u32, src_mesh.length),
+                            .texture = null,
+                        };
 
-//                 for (dst_vertices) |*vtx, i| {
-//                     const src = src_vertices[i];
-//                     vtx.* = Vertex{
-//                         .x = src.x,
-//                         .y = src.y,
-//                         .z = src.z,
-//                         .nx = src.nx,
-//                         .ny = src.ny,
-//                         .nz = src.nz,
-//                         .u = src.u,
-//                         .v = src.v,
-//                     };
-//                 }
-//                 for (dst_indices) |*idx, i| {
-//                     idx.* = std.mem.littleToNative(u16, src_indices[i]);
-//                 }
+                        const texture_file_len = std.mem.indexOfScalar(u8, &src_mesh.texture_file, 0) orelse src_mesh.texture_file.len;
+                        const texture_file = src_mesh.texture_file[0..texture_file_len];
 
-//                 for (dst_meshes) |*mesh, i| {
-//                     const src_mesh = src_meshes[i];
-//                     mesh.* = Mesh{
-//                         .offset = std.mem.littleToNative(u32, src_mesh.offset),
-//                         .count = std.mem.littleToNative(u32, src_mesh.length),
-//                         .texture = null,
-//                     };
+                        if (texture_file.len > 0) {
+                            if (self.loader) |loader| {
+                                mesh.texture = try loader.load(rm, texture_file);
+                                //
+                            } else {
+                                std.log.warn("Z3D file contains textures, but no texture loader was given. The texture '{s}' is missing.", .{texture_file});
+                            }
+                        }
+                    }
 
-//                     const texture_file_len = std.mem.indexOfScalar(u8, &src_mesh.texture_file, 0) orelse src_mesh.texture_file.len;
-//                     const texture_file = src_mesh.texture_file[0..texture_file_len];
-
-//                     if (texture_file.len > 0) {
-//                         mesh.texture = try loadTextureFile(self, loader_context, texture_file);
-//                     }
-//                 }
-
-//                 _ = loader_context;
-//                 _ = loadTextureFile;
-
-//                 return try self.createGeometry(
-//                     dst_vertices,
-//                     dst_indices,
-//                     dst_meshes,
-//                 );
-//             },
-//             .dynamic => @panic("dynamic model loading not supported yet!"),
-//             _ => return error.InvalidGeometryData,
-//         }
-//     }
-// };
+                    return GeometryData{
+                        .vertices = dst_vertices,
+                        .indices = dst_indices,
+                        .meshes = dst_meshes,
+                    };
+                },
+                .dynamic => @panic("dynamic model loading not supported yet!"),
+                _ => return error.InvalidFormat,
+            }
+        }
+    };
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Builtin buffer loaders
 
 pub const EmptyBuffer = struct {
     dummy: u1 = 0,
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !BufferData {
+    pub fn create(self: @This(), rm: *ResourceManager) !BufferData {
         _ = self;
-        _ = allocator;
+        _ = rm;
         return BufferData{ .data = null };
     }
 };
@@ -858,8 +860,8 @@ pub const BasicShader = struct {
     fragment_shader: []const u8,
     attributes: []const ShaderAttribute,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !ShaderData {
-        var shader = ShaderData.init(allocator);
+    pub fn create(self: @This(), rm: *ResourceManager) !ShaderData {
+        var shader = ShaderData.init(rm.allocator);
         errdefer shader.deinit();
 
         try shader.appendShader(gl.VERTEX_SHADER, self.vertex_shader);
@@ -880,8 +882,8 @@ pub const UninitializedTexture = struct {
     width: u15,
     height: u15,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !TextureData {
-        _ = allocator;
+    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+        _ = rm;
         return TextureData{
             .width = self.width,
             .height = self.height,
@@ -897,9 +899,9 @@ pub const FlatTexture = struct {
     height: u15,
     color: Color,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !TextureData {
-        const buffer = try allocator.alloc(u8, Texture.computeByteSize(self.width, self.height));
-        errdefer allocator.free(buffer);
+    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+        const buffer = try rm.allocator.alloc(u8, Texture.computeByteSize(self.width, self.height));
+        errdefer rm.allocator.free(buffer);
 
         var i: usize = 0;
         while (i < buffer.len) : (i += 4) {
@@ -922,11 +924,11 @@ pub const RawRgbaTexture = struct {
     height: u15,
     pixels: []const u8,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !TextureData {
+    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
         return TextureData{
             .width = self.width,
             .height = self.height,
-            .pixels = try allocator.dupe(u8, self.pixels),
+            .pixels = try rm.allocator.dupe(u8, self.pixels),
         };
     }
 };
@@ -934,15 +936,15 @@ pub const RawRgbaTexture = struct {
 pub const DecodePng = struct {
     source_data: []const u8,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) !TextureData {
-        var image = zigimg.image.Image.fromMemory(allocator, self.source_data) catch {
+    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+        var image = zigimg.image.Image.fromMemory(rm.allocator, self.source_data) catch {
             // logger.debug("failed to load texture: {s}", .{@errorName(err)});
             return error.InvalidFormat;
         };
         defer image.deinit();
 
-        var buffer = try allocator.alloc(u8, 4 * image.width * image.height);
-        errdefer allocator.free(buffer);
+        var buffer = try rm.allocator.alloc(u8, 4 * image.width * image.height);
+        errdefer rm.allocator.free(buffer);
 
         var i: usize = 0;
         var pixels = image.iterator();

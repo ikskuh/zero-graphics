@@ -73,30 +73,30 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
 
     try app.ui.setRenderer(&app.renderer);
 
-    app.mesh = try app.resources.createGeometry(ResourceManager.StaticMesh{
-        .vertices = &.{
-            .{ .x = 0, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
-            .{ .x = 1, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 1, .v = 0 },
-            .{ .x = 0, .y = 0, .z = 1, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 1 },
-        },
-        .indices = &.{ 0, 1, 2 },
-        .texture = app.texture_handle,
-    });
+    // app.mesh = try app.resources.createGeometry(ResourceManager.StaticMesh{
+    //     .vertices = &.{
+    //         .{ .x = 0, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
+    //         .{ .x = 1, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 1, .v = 0 },
+    //         .{ .x = 0, .y = 0, .z = 1, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 1 },
+    //     },
+    //     .indices = &.{ 0, 1, 2 },
+    //     .texture = app.texture_handle,
+    // });
 
-    // app.mesh = try app.resources.loadGeometry(
-    //     @embedFile("twocubes.z3d"),
-    //     {},
-    //     struct {
-    //         fn f(ren: *Renderer3D, ctx: void, file_name: []const u8) !*const Renderer3D.Texture {
-    //             _ = ctx;
-    //             if (std.mem.eql(u8, file_name, "metal-01.png"))
-    //                 return try ren.loadTexture(@embedFile("data/metal-01.png"));
-    //             if (std.mem.eql(u8, file_name, "metal-02.png"))
-    //                 return try ren.loadTexture(@embedFile("data/metal-02.png"));
-    //             return error.FileNotFound;
-    //         }
-    //     }.f,
-    // );
+    const TextureLoader = struct {
+        pub fn load(self: @This(), rm: *ResourceManager, file_name: []const u8) !*ResourceManager.Texture {
+            _ = self;
+            if (std.mem.eql(u8, file_name, "metal-01.png"))
+                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .source_data = @embedFile("data/metal-01.png") });
+            if (std.mem.eql(u8, file_name, "metal-02.png"))
+                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .source_data = @embedFile("data/metal-02.png") });
+            return error.FileNotFound;
+        }
+    };
+    app.mesh = try app.resources.createGeometry(ResourceManager.Z3DGeometry(TextureLoader){
+        .data = @embedFile("twocubes.z3d"),
+        .loader = .{},
+    });
 }
 
 pub fn deinit(app: *Application) void {
