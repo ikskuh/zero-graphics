@@ -204,8 +204,11 @@ pub fn main() !void {
 
                         try zerog.gles.load({}, loadOpenGlFunction);
 
+                        const begin = std.time.milliTimestamp();
                         app.teardownGraphics();
                         try app.setupGraphics();
+                        const end = std.time.milliTimestamp();
+                        logger.info("GPU context reload took {} ms", .{end - begin});
                     }
 
                     if (translateSdlScancode(event.key.keysym.scancode)) |scancode| {
