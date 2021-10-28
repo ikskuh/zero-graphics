@@ -16,6 +16,7 @@ const zero_graphics = @import("zero-graphics");
 const logger = std.log.scoped(.demo);
 const gles = zero_graphics.gles;
 
+const ResourceManager = zero_graphics.ResourceManager;
 const Renderer = zero_graphics.Renderer2D;
 const Renderer3D = zero_graphics.Renderer3D;
 
@@ -23,8 +24,9 @@ const Application = @This();
 
 screen_width: u15,
 screen_height: u15,
+resources: ResourceManager,
 renderer: Renderer,
-texture_handle: *const Renderer.Texture,
+texture_handle: *ResourceManager.Texture,
 allocator: *std.mem.Allocator,
 font: *const Renderer.Font,
 input: *zero_graphics.Input,
@@ -34,7 +36,7 @@ ui: zero_graphics.UserInterface,
 gui_data: DemoGuiData = .{},
 
 renderer3d: Renderer3D,
-mesh: *const Renderer3D.Geometry,
+mesh: *ResourceManager.Geometry,
 
 startup_time: i64,
 
@@ -43,6 +45,7 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
         .allocator = allocator,
         .screen_width = 0,
         .screen_height = 0,
+        .resources = ResourceManager.init(allocator),
         .texture_handle = undefined,
         .renderer = undefined,
         .ui = undefined,
@@ -54,9 +57,46 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
 
         .startup_time = zero_graphics.milliTimestamp(),
     };
+    errdefer app.resources.deinit();
 
     app.ui = try zero_graphics.UserInterface.init(app.allocator, null);
     errdefer app.ui.deinit();
+
+    app.renderer = try app.resources.createRenderer2D();
+    errdefer app.renderer.deinit();
+
+    app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodePng{ .source_data = @embedFile("ziggy.png") });
+    app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
+
+    app.renderer3d = try app.resources.createRenderer3D();
+    errdefer app.renderer3d.deinit();
+
+    try app.ui.setRenderer(&app.renderer);
+
+    app.mesh = try app.resources.createGeometry(ResourceManager.StaticMesh{
+        .vertices = &.{
+            .{ .x = 0, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
+            .{ .x = 1, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
+            .{ .x = 0, .y = 0, .z = 1, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
+        },
+        .indices = &.{ 0, 1, 2 },
+        .texture = null,
+    });
+
+    // app.mesh = try app.resources.loadGeometry(
+    //     @embedFile("twocubes.z3d"),
+    //     {},
+    //     struct {
+    //         fn f(ren: *Renderer3D, ctx: void, file_name: []const u8) !*const Renderer3D.Texture {
+    //             _ = ctx;
+    //             if (std.mem.eql(u8, file_name, "metal-01.png"))
+    //                 return try ren.loadTexture(@embedFile("data/metal-01.png"));
+    //             if (std.mem.eql(u8, file_name, "metal-02.png"))
+    //                 return try ren.loadTexture(@embedFile("data/metal-02.png"));
+    //             return error.FileNotFound;
+    //         }
+    //     }.f,
+    // );
 }
 
 pub fn deinit(app: *Application) void {
@@ -79,40 +119,11 @@ pub fn setupGraphics(app: *Application) !void {
         zero_graphics.gles_utils.enableDebugOutput() catch {};
     }
 
-    app.renderer = try Renderer.init(app.allocator);
-    errdefer app.renderer.deinit();
-
-    // app.texture_handle = try app.renderer.createTexture(128, 128, @embedFile("cat.rgba"));
-    app.texture_handle = try app.renderer.loadTexture(@embedFile("ziggy.png"));
-    app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
-
-    try app.ui.setRenderer(&app.renderer);
-
-    app.renderer3d = try Renderer3D.init(app.allocator);
-    errdefer app.renderer3d.deinit();
-
-    app.mesh = try app.renderer3d.loadGeometry(
-        @embedFile("twocubes.z3d"),
-        {},
-        struct {
-            fn f(ren: *Renderer3D, ctx: void, file_name: []const u8) !*const Renderer3D.Texture {
-                _ = ctx;
-                if (std.mem.eql(u8, file_name, "metal-01.png"))
-                    return try ren.loadTexture(@embedFile("data/metal-01.png"));
-                if (std.mem.eql(u8, file_name, "metal-02.png"))
-                    return try ren.loadTexture(@embedFile("data/metal-02.png"));
-                return error.FileNotFound;
-            }
-        }.f,
-    );
+    try app.resources.initializeGpuData();
 }
 
 pub fn teardownGraphics(app: *Application) void {
-    app.ui.setRenderer(null) catch unreachable;
-    app.renderer.deinit();
-
-    app.renderer3d.destroyGeometry(app.mesh);
-    app.renderer3d.deinit();
+    app.resources.destroyGpuData();
 }
 
 pub fn resize(app: *Application, width: u15, height: u15) !void {

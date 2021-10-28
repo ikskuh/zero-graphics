@@ -117,26 +117,68 @@ pub fn fetchUniforms(program: gles.GLuint, comptime T: type) T {
     return t;
 }
 
+pub fn enableAttributes(attribs: anytype) void {
+    enableAttributesSlice(attributes(attribs));
+}
+
 /// Enables all attributes from the given attribute set
 /// - `attributes`: A tuple of name-index values for the different vertex attributes
-pub fn enableAttributes(comptime attributes: anytype) void {
-    inline for (std.meta.fields(@TypeOf(attributes))) |attrib| {
-        gles.enableVertexAttribArray(@field(attributes, attrib.name));
+pub fn enableAttributesSlice(attribs: []const Attribute) void {
+    for (attribs) |attr| {
+        gles.enableVertexAttribArray(attr.index);
     }
+}
+
+pub fn disableAttributes(attribs: anytype) void {
+    disableAttributesSlice(attributes(attribs));
 }
 
 /// Disables all attributes from the given attribute set
 /// - `attributes`: A tuple of name-index values for the different vertex attributes
-pub fn disableAttributes(comptime attributes: anytype) void {
-    inline for (std.meta.fields(@TypeOf(attributes))) |attrib| {
-        gles.disableVertexAttribArray(@field(attributes, attrib.name));
+pub fn disableAttributesSlice(attribs: []const Attribute) void {
+    for (attribs) |attr| {
+        gles.disableVertexAttribArray(attr.index);
     }
+}
+
+/// A shader attribute.
+pub const Attribute = struct {
+    name: [:0]const u8,
+    index: gles.GLuint,
+};
+
+/// Computes a list of attributes from a anonymous tuple in the form of
+/// ```
+/// attributes(.{
+///   position:  0,
+///   normal:    1,
+///   tex_coord: 2,
+/// });
+/// ```
+pub fn attributes(comptime list: anytype) []const Attribute {
+    const T = @TypeOf(list);
+    const fields = std.meta.fields(T);
+
+    comptime var items: [fields.len]Attribute = undefined;
+    comptime {
+        inline for (fields) |attrib, i| {
+            items[i] = Attribute{
+                .name = attrib.name[0.. :0],
+                .index = @field(list, attrib.name),
+            };
+        }
+    }
+    return &items;
 }
 
 /// - `attributes`: A tuple of name-index values for the different vertex attributes
 /// - `vertex_source`: GLSL vertex shader source code
 /// - `fragment_source`: GLSL fragment shader source code
-pub fn compileShaderProgram(comptime attributes: anytype, vertex_source: []const u8, fragment_source: []const u8) !gles.GLuint {
+pub fn compileShaderProgram(comptime attribs: anytype, vertex_source: []const u8, fragment_source: []const u8) !gles.GLuint {
+    return compileShaderProgramSlice(attributes(attribs), vertex_source, fragment_source);
+}
+
+pub fn compileShaderProgramSlice(attribs: []const Attribute, vertex_source: []const u8, fragment_source: []const u8) !gles.GLuint {
     // Create and compile vertex shader
     const vertex_shader = createAndCompileShader(gles.VERTEX_SHADER, vertex_source) catch return error.GraphicsApiFailure;
     defer gles.deleteShader(vertex_shader);
@@ -146,9 +188,8 @@ pub fn compileShaderProgram(comptime attributes: anytype, vertex_source: []const
 
     const program = gles.createProgram();
 
-    inline for (std.meta.fields(@TypeOf(attributes))) |attrib| {
-        const name = comptime attrib.name[0.. :0];
-        gles.bindAttribLocation(program, @field(attributes, attrib.name), name.ptr);
+    for (attribs) |attrib| {
+        gles.bindAttribLocation(program, attrib.index, attrib.name.ptr);
     }
 
     gles.attachShader(program, vertex_shader);

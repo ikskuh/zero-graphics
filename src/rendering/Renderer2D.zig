@@ -11,6 +11,8 @@ const c = @cImport({
 
 const zigimg = @import("zigimg");
 
+const ResourceManager = @import("ResourceManager.zig");
+
 const Self = @This();
 
 const Color = types.Color;
@@ -18,17 +20,12 @@ const Rectangle = types.Rectangle;
 const Size = types.Size;
 const Point = types.Point;
 
-const TextureList = std.TailQueue(Texture);
-const TextureItem = std.TailQueue(Texture).Node;
-
 const FontList = std.TailQueue(Font);
 const FontItem = std.TailQueue(Font).Node;
 
 pub const DrawError = error{OutOfMemory};
-pub const CreateTextureError = error{ OutOfMemory, GraphicsApiFailure };
-pub const LoadTextureError = CreateTextureError || error{InvalidImageData};
 pub const CreateFontError = error{ OutOfMemory, InvalidFontFile };
-pub const InitError = error{ OutOfMemory, GraphicsApiFailure };
+pub const InitError = error{ OutOfMemory, GraphicsApiFailure } || ResourceManager.CreateResourceDataError;
 
 /// Vertex attributes used in this renderer
 const vertex_attributes = .{
@@ -42,66 +39,71 @@ const Uniforms = struct {
     uTexture: gles.GLint,
 };
 
-shader_program: gles.GLuint,
-uniforms: Uniforms,
+shader_program: *ResourceManager.Shader,
+// uniforms: Uniforms,
 
-vertex_buffer: gles.GLuint,
+vertex_buffer: *ResourceManager.Buffer,
 
 /// list of CCW triangles that will be rendered 
 vertices: std.ArrayList(Vertex),
 draw_calls: std.ArrayList(DrawCall),
 
 allocator: *std.mem.Allocator,
-textures: TextureList,
+
 fonts: FontList,
 
-white_texture: *const Texture,
+resources: *ResourceManager,
+white_texture: *ResourceManager.Texture,
 
 /// Scales all input coordinates with this factor.
 /// This can be used for DPI scaling.
 /// A value of `2.0` means that `1 unit` is equal to `2 pixels`
 unit_to_pixel_ratio: f32 = 1.0,
 
-pub fn init(allocator: *std.mem.Allocator) InitError!Self {
-    const shader_program = try glesh.compileShaderProgram(vertex_attributes, vertexSource, fragmentSource);
-    errdefer gles.deleteProgram(shader_program);
+pub fn init(resources: *ResourceManager, allocator: *std.mem.Allocator) InitError!Self {
+    const shader_program = try resources.createShader(ResourceManager.BasicShader{
+        .vertex_shader = vertexSource,
+        .fragment_shader = fragmentSource,
+        .attributes = glesh.attributes(vertex_attributes),
+    });
+    errdefer resources.destroyShader(shader_program);
 
-    // Create vertex buffer object and copy vertex data into it
-    var vertex_buffer: gles.GLuint = 0;
-    gles.genBuffers(1, &vertex_buffer);
-    if (vertex_buffer == 0)
-        return error.GraphicsApiFailure;
-    errdefer gles.deleteBuffers(1, &vertex_buffer);
+    const vertex_buffer = try resources.createBuffer(ResourceManager.EmptyBuffer{});
+    errdefer resources.destroyBuffer(vertex_buffer);
 
     var self = Self{
+        .resources = resources,
         .shader_program = shader_program,
-        .uniforms = glesh.fetchUniforms(shader_program, Uniforms),
+        // .uniforms = glesh.fetchUniforms(shader_program.instance.?, Uniforms),
         .vertices = std.ArrayList(Vertex).init(allocator),
         .vertex_buffer = vertex_buffer,
 
         .allocator = allocator,
-        .textures = .{},
         .fonts = .{},
         .draw_calls = std.ArrayList(DrawCall).init(allocator),
         .white_texture = undefined,
     };
 
-    self.white_texture = try self.createTexture(2, 2, &([1]u8{0xFF} ** 16));
+    self.white_texture = try self.resources.createTexture(.@"3d", ResourceManager.FlatTexture{
+        .width = 2,
+        .height = 2,
+        .color = .{ .r = 0xFF, .g = 0xFF, .b = 0xFF },
+    });
 
     return self;
 }
 
 pub fn deinit(self: *Self) void {
+    self.reset();
+
     // Fonts must be destroyed before textures
     // as fonts store textures internally
     while (self.fonts.first) |font| {
         self.destroyFontInternal(font);
     }
-    while (self.textures.first) |tex| {
-        self.destroyTextureInternal(tex);
-    }
-    gles.deleteBuffers(1, &self.vertex_buffer);
-    gles.deleteProgram(self.shader_program);
+
+    self.resources.destroyBuffer(self.vertex_buffer);
+    self.resources.destroyShader(self.shader_program);
     self.draw_calls.deinit();
     self.vertices.deinit();
     self.* = undefined;
@@ -151,113 +153,6 @@ fn scaleRectangle(self: Self, rect: Rectangle) Rectangle {
         .width = self.scaleDimension(rect.width),
         .height = self.scaleDimension(rect.height),
     };
-}
-
-/// Creates a new texture for this renderer with the size `width`×`height`.
-/// The texture is only valid as long as the renderer is valid *or* `destroyTexture` is called,
-/// whichever happens first.
-/// If `initial_data` is given, the data is encoded as BGRA pixels.
-pub fn createTexture(self: *Self, width: u15, height: u15, initial_data: ?[]const u8) CreateTextureError!*const Texture {
-    const tex_node = try self.allocator.create(TextureItem);
-    errdefer self.allocator.destroy(tex_node);
-
-    var id: gles.GLuint = undefined;
-    gles.genTextures(1, &id);
-    if (id == 0)
-        return error.GraphicsApiFailure;
-
-    gles.bindTexture(gles.TEXTURE_2D, id);
-    if (initial_data) |data| {
-        std.debug.assert(data.len == 4 * @as(usize, width) * @as(usize, height));
-        gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, width, height, 0, gles.RGBA, gles.UNSIGNED_BYTE, data.ptr);
-    } else {
-        gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, width, height, 0, gles.RGBA, gles.UNSIGNED_BYTE, null);
-    }
-    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MIN_FILTER, gles.LINEAR);
-    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_MAG_FILTER, gles.LINEAR);
-
-    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_WRAP_S, gles.CLAMP_TO_EDGE);
-    gles.texParameteri(gles.TEXTURE_2D, gles.TEXTURE_WRAP_T, gles.CLAMP_TO_EDGE);
-
-    tex_node.* = .{
-        .data = Texture{
-            .handle = id,
-            .refcount = 1,
-            .width = width,
-            .height = height,
-        },
-    };
-    self.textures.append(tex_node);
-    return &tex_node.data;
-}
-
-/// Loads a texture from the given `image_data`. It should contain the file data as it would
-/// be on disk, encoded as PNG. Other file formats might be supported,
-/// but only PNG has official support.
-pub fn loadTexture(self: *Self, image_data: []const u8) LoadTextureError!*const Texture {
-    var image = zigimg.image.Image.fromMemory(self.allocator, image_data) catch |err| {
-        logger.debug("failed to load texture: {s}", .{@errorName(err)});
-        return LoadTextureError.InvalidImageData;
-    };
-    defer image.deinit();
-
-    var buffer = try self.allocator.alloc(u8, 4 * image.width * image.height);
-    defer self.allocator.free(buffer);
-
-    var i: usize = 0;
-    var pixels = image.iterator();
-    while (pixels.next()) |pix| {
-        const p8 = pix.toIntegerColor8();
-        buffer[4 * i + 0] = p8.R;
-        buffer[4 * i + 1] = p8.G;
-        buffer[4 * i + 2] = p8.B;
-        buffer[4 * i + 3] = p8.A;
-        i += 1;
-    }
-    std.debug.assert(i == image.width * image.height);
-
-    return try self.createTexture(
-        @intCast(u15, image.width),
-        @intCast(u15, image.height),
-        buffer,
-    );
-}
-
-fn makeTextureMut(ptr: *const Texture) *Texture {
-    return @intToPtr(*Texture, @ptrToInt(ptr));
-}
-
-/// Destroys a texture and releases all of its memory.
-/// The texture passed here must be created with `createTexture`.
-pub fn destroyTexture(self: *Self, texture: *const Texture) void {
-    // we can do this as texture handles are only given out via `createTexture` which
-    // returns a immutable reference.
-    const mut_texture = makeTextureMut(texture);
-    std.debug.assert(mut_texture.refcount > 0);
-    const node = @fieldParentPtr(TextureItem, "data", mut_texture);
-    destroyTextureInternal(self, node);
-}
-
-fn destroyTextureInternal(self: *Self, node: *TextureItem) void {
-    node.data.refcount -= 1;
-    if (node.data.refcount > 0)
-        return;
-
-    self.textures.remove(node);
-
-    gles.deleteTextures(1, &node.data.handle);
-    node.* = undefined;
-
-    self.allocator.destroy(node);
-}
-
-/// Updates the texture data of the given texture.
-/// `data` is encoded as BGRA pixels.
-pub fn updateTexture(self: *Self, texture: *Texture, data: []const u8) void {
-    _ = self;
-    std.debug.assert(data.len == 4 * @as(usize, texture.width) * @as(usize, texture.height));
-    gles.bindTexture(gles.TEXTURE_2D, texture.handle);
-    gles.texImage2D(gles.TEXTURE_2D, 0, gles.RGBA, texture.width, texture.height, 0, gles.RGBA, gles.UNSIGNED_BYTE, data.ptr);
 }
 
 /// Creates a new font from `ttf_bytes`. The bytes passed must be a valid TTF
@@ -323,7 +218,7 @@ fn destroyFontInternal(self: *Self, node: *FontItem) void {
 
     var iter = node.data.glyphs.iterator();
     while (iter.next()) |glyph| {
-        self.destroyTexture(glyph.value_ptr.texture);
+        self.resources.destroyTexture(glyph.value_ptr.texture);
     }
 
     node.data.glyphs.deinit();
@@ -383,8 +278,8 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u21) !Glyph {
         var left_side_bearing: c_int = undefined;
         c.stbtt_GetCodepointHMetrics(&font.font, codepoint, &advance_width, &left_side_bearing);
 
-        const texture_data = try self.allocator.alloc(u8, 4 * @as(usize, width) * height);
-        defer self.allocator.free(texture_data);
+        const texture_data = try font.arena.allocator.alloc(u8, 4 * @as(usize, width) * height);
+        errdefer font.arena.allocator.free(texture_data);
 
         for (bitmap) |a, i| {
             const o = 4 * i;
@@ -394,7 +289,11 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u21) !Glyph {
             texture_data[o + 3] = a;
         }
 
-        var texture = try self.createTexture(width, height, texture_data);
+        var texture = try self.resources.createTexture(.ui, ResourceManager.RawRgbaTexture{
+            .width = width,
+            .height = height,
+            .pixels = texture_data,
+        });
         errdefer self.destroyTexture(texture);
 
         // std.debug.print("{d} ({},{}) ({},{}) {}×{} {} {}\n", .{
@@ -425,7 +324,7 @@ fn getGlyph(self: *Self, font: *Font, codepoint: u21) !Glyph {
 
         if (gop.found_existing) {
             // logger.info("regenerate glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
-            self.destroyTexture(gop.value_ptr.texture);
+            self.resources.destroyTexture(gop.value_ptr.texture);
         } else {
             // logger.info("render glyph '{s}' to {}×{}", .{ codepoint_str, width, height });
         }
@@ -503,7 +402,7 @@ const GlyphIterator = struct {
 
     const GlyphCmd = struct {
         codepoint: u21,
-        texture: *const Texture,
+        texture: *ResourceManager.Texture,
 
         // coordinates are in physical screen space
         x: i16,
@@ -622,7 +521,7 @@ pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i
 pub fn reset(self: *Self) void {
     for (self.draw_calls.items) |draw_call| {
         if (draw_call.texture) |tex| {
-            self.destroyTexture(tex);
+            self.resources.destroyTexture(tex);
         }
     }
     self.draw_calls.shrinkRetainingCapacity(0);
@@ -637,16 +536,18 @@ pub fn render(self: Self, screen_size: Size) void {
     gles.disable(gles.DEPTH_TEST);
     gles.enable(gles.BLEND);
 
-    gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer);
+    gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer.instance.?);
     gles.bufferData(gles.ARRAY_BUFFER, @intCast(gles.GLsizeiptr, @sizeOf(Vertex) * self.vertices.items.len), self.vertices.items.ptr, gles.STATIC_DRAW);
 
     gles.vertexAttribPointer(vertex_attributes.vPosition, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
     gles.vertexAttribPointer(vertex_attributes.vColor, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "r")));
     gles.vertexAttribPointer(vertex_attributes.vUV, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
 
-    gles.useProgram(self.shader_program);
-    gles.uniform2i(self.uniforms.uScreenSize, screen_size.width, screen_size.height);
-    gles.uniform1i(self.uniforms.uTexture, 0);
+    var uniforms = glesh.fetchUniforms(self.shader_program.instance.?, Uniforms);
+
+    gles.useProgram(self.shader_program.instance.?);
+    gles.uniform2i(uniforms.uScreenSize, screen_size.width, screen_size.height);
+    gles.uniform1i(uniforms.uTexture, 0);
 
     gles.blendFunc(gles.SRC_ALPHA, gles.ONE_MINUS_SRC_ALPHA);
     gles.blendEquation(gles.FUNC_ADD);
@@ -655,7 +556,7 @@ pub fn render(self: Self, screen_size: Size) void {
     for (self.draw_calls.items) |draw_call| {
         const tex_handle = draw_call.texture orelse self.white_texture;
 
-        gles.bindTexture(gles.TEXTURE_2D, tex_handle.handle);
+        gles.bindTexture(gles.TEXTURE_2D, tex_handle.instance orelse 0);
 
         gles.drawArrays(
             gles.TRIANGLES,
@@ -666,7 +567,7 @@ pub fn render(self: Self, screen_size: Size) void {
 }
 
 /// Appends a set of triangles to the renderer with the given `texture`. 
-pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const [3]Vertex) DrawError!void {
+pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex) DrawError!void {
     const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1].texture != texture) blk: {
         const dc = try self.draw_calls.addOne();
         dc.* = DrawCall{
@@ -675,7 +576,7 @@ pub fn appendTriangles(self: *Self, texture: ?*const Texture, triangles: []const
             .count = 0,
         };
         if (texture) |tex_ptr| {
-            makeTextureMut(tex_ptr).refcount += 1;
+            self.resources.retainTexture(tex_ptr);
         }
         break :blk dc;
     } else &self.draw_calls.items[self.draw_calls.items.len - 1];
@@ -748,11 +649,11 @@ pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
 }
 
 /// Copies the given texture to the screen
-pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *const Texture, tint: ?Color) DrawError!void {
+pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
     return self.fillTexturedRectanglePixels(self.scaleRectangle(rectangle), texture, tint);
 }
 
-pub fn fillTexturedRectanglePixels(self: *Self, real_rect: Rectangle, texture: *const Texture, tint: ?Color) DrawError!void {
+pub fn fillTexturedRectanglePixels(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
     if (real_rect.size().isEmpty())
         return;
 
@@ -906,27 +807,10 @@ pub const Vertex = extern struct {
     }
 };
 
-pub const Texture = struct {
-    /// private texture handle
-    handle: gles.GLuint,
-
-    /// private reference counter.
-    /// This is required as texture references are held in the internal draw 
-    /// queue when passing them into a draw command and will be released after
-    /// the `render()` call
-    refcount: usize,
-
-    /// width of the texture in pixels
-    width: u15,
-
-    /// height of the texture in pixels
-    height: u15,
-};
-
 const DrawCall = struct {
     offset: usize,
     count: usize,
-    texture: ?*const Texture,
+    texture: ?*ResourceManager.Texture,
 };
 
 pub const Font = struct {
@@ -982,7 +866,7 @@ pub const Glyph = struct {
     /// leftSideBearing is the offset from the current horizontal position to the left edge of the character
     left_side_bearing: i16,
 
-    texture: *const Texture,
+    texture: *ResourceManager.Texture,
 
     fn getAlpha(self: Glyph, x: u15, y: u15) u8 {
         if (x >= self.width or y >= self.height)

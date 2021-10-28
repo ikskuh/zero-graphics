@@ -141,9 +141,6 @@ pub fn main() !void {
 
     logger.info("SDL Video Driver:     {s}", .{std.mem.span(c.SDL_GetCurrentVideoDriver())});
 
-    const gl_context = c.SDL_GL_CreateContext(window) orelse sdlPanic();
-    defer c.SDL_GL_DeleteContext(gl_context);
-
     const dpi_scale: f32 = blk: {
         var drawbable_width: c_int = undefined;
         var drawbable_height: c_int = undefined;
@@ -160,6 +157,9 @@ pub fn main() !void {
         std.debug.assert(std.math.approxEqAbs(f32, scale_x, scale_y, 1e-3)); // assert uniform
         break :blk scale_x;
     };
+
+    var gl_context = c.SDL_GL_CreateContext(window) orelse sdlPanic();
+    defer c.SDL_GL_DeleteContext(gl_context);
 
     try zerog.gles.load({}, loadOpenGlFunction);
 
@@ -196,6 +196,18 @@ pub fn main() !void {
                     }
                 },
                 c.SDL_KEYDOWN => if (event.key.repeat == 0) {
+
+                    // Shift-F12 will recreate the opengl context
+                    if (builtin.mode == .Debug and ((event.key.keysym.mod & c.KMOD_SHIFT) != 0) and event.key.keysym.sym == c.SDLK_F12) {
+                        c.SDL_GL_DeleteContext(gl_context);
+                        gl_context = c.SDL_GL_CreateContext(window) orelse sdlPanic();
+
+                        try zerog.gles.load({}, loadOpenGlFunction);
+
+                        app.teardownGraphics();
+                        try app.setupGraphics();
+                    }
+
                     if (translateSdlScancode(event.key.keysym.scancode)) |scancode| {
                         try input_queue.pushEvent(.{ .key_down = scancode });
                     }

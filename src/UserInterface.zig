@@ -7,7 +7,10 @@ const Size = types.Size;
 const Rectangle = types.Rectangle;
 const Color = types.Color;
 
+const ResourceManager = @import("rendering/ResourceManager.zig");
 const Renderer = @import("rendering/Renderer2D.zig");
+
+const Texture = ResourceManager.Texture;
 
 // layout helpers
 
@@ -228,7 +231,7 @@ const Widget = struct {
             hit_test_visible: bool = true,
         };
         text: StringBuffer,
-        icon: ?*const Renderer.Texture,
+        icon: ?*Texture,
         config: Config = .{},
         clickable: Clickable = .{},
     };
@@ -256,7 +259,7 @@ const Widget = struct {
             tint: ?types.Color = null,
             hit_test_visible: bool = true,
         };
-        image: *const Renderer.Texture,
+        image: *Texture,
         config: Config = .{},
     };
     const TextBox = struct {
@@ -344,10 +347,10 @@ const UserInterface = @This();
 const ProcessingMode = enum { default, updating, building };
 
 const Icons = struct {
-    checkbox_unchecked: *const Renderer.Texture,
-    checkbox_checked: *const Renderer.Texture,
-    radiobutton_unchecked: *const Renderer.Texture,
-    radiobutton_checked: *const Renderer.Texture,
+    checkbox_unchecked: *Texture,
+    checkbox_checked: *Texture,
+    radiobutton_unchecked: *Texture,
+    radiobutton_checked: *Texture,
 };
 
 allocator: *std.mem.Allocator,
@@ -430,10 +433,10 @@ pub fn setRenderer(self: *UserInterface, new_renderer: ?*Renderer) !void {
         return;
 
     if (self.renderer) |renderer| {
-        renderer.destroyTexture(self.icons.checkbox_checked);
-        renderer.destroyTexture(self.icons.checkbox_unchecked);
-        renderer.destroyTexture(self.icons.radiobutton_checked);
-        renderer.destroyTexture(self.icons.radiobutton_unchecked);
+        renderer.resources.destroyTexture(self.icons.checkbox_checked);
+        renderer.resources.destroyTexture(self.icons.checkbox_unchecked);
+        renderer.resources.destroyTexture(self.icons.radiobutton_checked);
+        renderer.resources.destroyTexture(self.icons.radiobutton_unchecked);
         renderer.destroyFont(self.default_font);
     }
 
@@ -452,17 +455,25 @@ pub fn setRenderer(self: *UserInterface, new_renderer: ?*Renderer) !void {
             .radiobutton_checked = undefined,
         };
 
-        icons.checkbox_checked = try renderer.loadTexture(@embedFile("ui-data/checkbox-marked.png"));
-        errdefer renderer.destroyTexture(icons.checkbox_checked);
+        icons.checkbox_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+            .source_data = @embedFile("ui-data/checkbox-marked.png"),
+        });
+        errdefer renderer.resources.destroyTexture(icons.checkbox_checked);
 
-        icons.checkbox_unchecked = try renderer.loadTexture(@embedFile("ui-data/checkbox-blank.png"));
-        errdefer renderer.destroyTexture(icons.checkbox_unchecked);
+        icons.checkbox_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+            .source_data = @embedFile("ui-data/checkbox-blank.png"),
+        });
+        errdefer renderer.resources.destroyTexture(icons.checkbox_unchecked);
 
-        icons.radiobutton_checked = try renderer.loadTexture(@embedFile("ui-data/radiobox-marked.png"));
-        errdefer renderer.destroyTexture(icons.radiobutton_checked);
+        icons.radiobutton_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+            .source_data = @embedFile("ui-data/radiobox-marked.png"),
+        });
+        errdefer renderer.resources.destroyTexture(icons.radiobutton_checked);
 
-        icons.radiobutton_unchecked = try renderer.loadTexture(@embedFile("ui-data/radiobox-blank.png"));
-        errdefer renderer.destroyTexture(icons.radiobutton_unchecked);
+        icons.radiobutton_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+            .source_data = @embedFile("ui-data/radiobox-blank.png"),
+        });
+        errdefer renderer.resources.destroyTexture(icons.radiobutton_unchecked);
 
         self.default_font = default_font;
         self.icons = icons;
@@ -654,7 +665,7 @@ pub const Builder = struct {
     }
 
     /// Creates a button at the provided position that will display `text` as 
-    pub fn button(self: Self, rectangle: Rectangle, text: ?[]const u8, icon: ?*const Renderer.Texture, config: anytype) Error!bool {
+    pub fn button(self: Self, rectangle: Rectangle, text: ?[]const u8, icon: ?*Texture, config: anytype) Error!bool {
         const info = try self.initOrUpdateWidget(.button, rectangle, config);
         if (info.needs_init) {
             info.control.* = .{
