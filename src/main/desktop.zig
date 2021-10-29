@@ -6,6 +6,8 @@ const c = @import("sdl2");
 const Application = @import("application");
 const app_meta = @import("application-meta");
 
+pub const backend: zerog.Backend = .desktop;
+
 comptime {
     // enforce inclusion of "extern  c" implementations
     const common = @import("common.zig");

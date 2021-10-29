@@ -12,6 +12,8 @@ comptime {
     common.verifyApplication(Application);
 }
 
+pub const backend: zerog.Backend = .android;
+
 const Point = zerog.Point;
 
 /// Exported "android" package so the user can access it via @import("root").android

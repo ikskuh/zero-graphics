@@ -13,6 +13,8 @@ comptime {
     common.verifyApplication(Application);
 }
 
+pub const backend: zerog.Backend = .wasm;
+
 extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*c_void;
 
 extern fn wasm_quit() void;

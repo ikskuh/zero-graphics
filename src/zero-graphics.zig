@@ -18,6 +18,14 @@ pub const Input = @import("Input.zig");
 
 pub const UserInterface = @import("UserInterface.zig");
 
+pub const Backend = union(enum) {
+    android,
+    wasm,
+    desktop,
+};
+
+pub const backend: Backend = @import("root").backend;
+
 pub const Point = struct {
     pub const zero = Point{ .x = 0, .y = 0 };
 
