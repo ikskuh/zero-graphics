@@ -60,12 +60,8 @@ pub fn log(
     args: anytype,
 ) void {
     const level_txt = switch (message_level) {
-        .emerg => "emergency",
-        .alert => "alert",
-        .crit => "critical",
         .err => "error",
         .warn => "warning",
-        .notice => "notice",
         .info => "info",
         .debug => "debug",
     };
