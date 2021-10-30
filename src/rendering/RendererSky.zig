@@ -25,12 +25,7 @@ const Mat4 = [4][4]f32;
 pub const DrawError = error{OutOfMemory};
 pub const InitError = ResourceManager.CreateResourceDataError || error{ OutOfMemory, GraphicsApiFailure };
 
-/// Vertex attributes used in this renderer
-const attributes = .{
-    .vPosition = 0,
-    .vNormal = 1,
-    .vUV = 2,
-};
+const attributes = Geometry.attributes;
 
 static_geometry_shader: *ResourceManager.Shader,
 
@@ -134,14 +129,6 @@ pub fn reset(self: *Self) void {
     self.draw_calls.shrinkRetainingCapacity(0);
 }
 
-fn bindGeometry(self: *const Geometry) void {
-    gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer.?);
-    gles.vertexAttribPointer(attributes.vPosition, 3, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
-    gles.vertexAttribPointer(attributes.vNormal, 3, gles.FLOAT, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "nx")));
-    gles.vertexAttribPointer(attributes.vUV, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
-    gles.bindBuffer(gles.ELEMENT_ARRAY_BUFFER, self.index_buffer.?);
-}
-
 /// Renders the currently contained data to the screen.
 pub fn render(self: Self, sky_cube: *types.ResourceManager.EnvironmentMap, viewProjectionMatrix: [4][4]f32) void {
     glesh.enableAttributes(attributes);
@@ -160,7 +147,7 @@ pub fn render(self: Self, sky_cube: *types.ResourceManager.EnvironmentMap, viewP
 
     gles.activeTexture(gles.TEXTURE0);
 
-    bindGeometry(self.sky_cube);
+    self.sky_cube.bind();
 
     gles.bindTexture(gles.TEXTURE_CUBE_MAP, sky_cube.instance.?);
     defer gles.bindTexture(gles.TEXTURE_CUBE_MAP, 0);

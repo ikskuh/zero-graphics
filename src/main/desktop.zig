@@ -40,6 +40,14 @@ const PROCESS_DPI_AWARENESS = enum(c_int) {
 extern "user32" fn SetProcessDPIAware() callconv(std.os.windows.WINAPI) std.os.windows.BOOL;
 // extern "shcore" fn SetProcessDpiAwareness(value: PROCESS_DPI_AWARENESS) callconv(std.os.windows.WINAPI) std.os.windows.HRESULT;
 
+fn logAppError(context: []const u8, trace: ?*std.builtin.StackTrace, err: anytype) @TypeOf(err) {
+    if (trace) |st| {
+        std.debug.dumpStackTrace(st.*);
+    }
+    std.log.scoped(.application).err("Application failed in {s}: {s}", .{ context, @errorName(err) });
+    return err;
+}
+
 // Desktop entry point
 pub fn main() !void {
     // Must happen before *any* SDL calls!
@@ -128,7 +136,7 @@ pub fn main() !void {
     defer input_queue.deinit();
 
     var app: Application = undefined;
-    try app.init(std.heap.c_allocator, &input_queue);
+    app.init(std.heap.c_allocator, &input_queue) catch |e| return logAppError("init", @errorReturnTrace(), e);
     defer app.deinit();
 
     window = c.SDL_CreateWindow(
@@ -165,7 +173,7 @@ pub fn main() !void {
 
     try zerog.gles.load({}, loadOpenGlFunction);
 
-    try app.setupGraphics();
+    app.setupGraphics() catch |e| return logAppError("setupGraphics", @errorReturnTrace(), e);
     defer app.teardownGraphics();
 
     // resize application
@@ -208,7 +216,7 @@ pub fn main() !void {
 
                         const begin = std.time.milliTimestamp();
                         app.teardownGraphics();
-                        try app.setupGraphics();
+                        app.setupGraphics() catch |e| return logAppError("setupGraphics", @errorReturnTrace(), e);
                         const end = std.time.milliTimestamp();
                         logger.info("GPU context reload took {} ms", .{end - begin});
                     }
@@ -248,7 +256,7 @@ pub fn main() !void {
 
                         c.SDL_GL_GetDrawableSize(window, &width, &height);
 
-                        try app.resize(@intCast(u15, width), @intCast(u15, height));
+                        app.resize(@intCast(u15, width), @intCast(u15, height)) catch |e| return logAppError("resize", @errorReturnTrace(), e);
                     } else {
                         // logger.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                     }
@@ -258,10 +266,10 @@ pub fn main() !void {
             }
         }
 
-        const still_running = try app.update();
+        const still_running = app.update() catch |e| return logAppError("update", @errorReturnTrace(), e);
         if (still_running == false)
             break;
-        try app.render();
+        app.render() catch |e| return logAppError("render", @errorReturnTrace(), e);
         c.SDL_GL_SwapWindow(window);
     }
 }

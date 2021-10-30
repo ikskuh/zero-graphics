@@ -25,12 +25,7 @@ const Mat4 = [4][4]f32;
 pub const DrawError = error{OutOfMemory};
 pub const InitError = ResourceManager.CreateResourceDataError || error{ OutOfMemory, GraphicsApiFailure };
 
-/// Vertex attributes used in this renderer
-const attributes = .{
-    .vPosition = 0,
-    .vNormal = 1,
-    .vUV = 2,
-};
+const attributes = Geometry.attributes;
 
 static_geometry_shader: *ResourceManager.Shader,
 
@@ -149,14 +144,6 @@ pub fn drawGeometry(self: *Self, geometry: *Geometry, transform: Mat4) !void {
     self.resources.retainGeometry(geometry);
 }
 
-fn bindGeometry(self: *const Geometry) void {
-    gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer.?);
-    gles.vertexAttribPointer(attributes.vPosition, 3, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
-    gles.vertexAttribPointer(attributes.vNormal, 3, gles.FLOAT, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "nx")));
-    gles.vertexAttribPointer(attributes.vUV, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
-    gles.bindBuffer(gles.ELEMENT_ARRAY_BUFFER, self.index_buffer.?);
-}
-
 /// Renders the currently contained data to the screen.
 pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
     glesh.enableAttributes(attributes);
@@ -176,7 +163,7 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
     gles.activeTexture(gles.TEXTURE0);
 
     for (self.draw_calls.items) |draw_call| {
-        bindGeometry(draw_call.geometry);
+        draw_call.geometry.bind();
 
         gles.uniformMatrix4fv(uniforms.uWorldMatrix, 1, gles.FALSE, @ptrCast([*]const f32, &draw_call.transform));
 

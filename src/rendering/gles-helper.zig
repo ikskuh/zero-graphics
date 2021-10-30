@@ -210,19 +210,26 @@ pub fn compileShaderProgramSlice(attribs: []const Attribute, vertex_source: []co
 
 /// Compiles a shader of type `shader_type` with the given GLSL `source` code.
 pub fn createAndCompileShader(shader_type: gles.GLenum, source: []const u8) !gles.GLuint {
-    const source_ptr = source.ptr;
-    const source_len = @intCast(gles.GLint, source.len);
+    return try createAndCompileShaderSources(shader_type, &[_][]const u8{source});
+}
+
+/// Compiles a shader of type `shader_type` with the given GLSL `source` code.
+pub fn createAndCompileShaderSources(shader_type: gles.GLenum, sources: []const []const u8) !gles.GLuint {
+    const max_sources = 32;
+
+    var shader_ptrs: [max_sources][*]const u8 = undefined;
+    var shader_lens: [max_sources]gles.GLint = undefined;
+
+    for (sources) |source, i| {
+        shader_ptrs[i] = source.ptr;
+        shader_lens[i] = @intCast(gles.GLint, source.len);
+    }
 
     // Create and compile vertex shader
     const shader = gles.createShader(shader_type);
     errdefer gles.deleteShader(shader);
 
-    gles.shaderSource(
-        shader,
-        1,
-        @ptrCast([*]const [*c]const u8, &source_ptr),
-        @ptrCast([*]const gles.GLint, &source_len),
-    );
+    gles.shaderSource(shader, @intCast(gles.GLsizei, sources.len), &shader_ptrs, &shader_lens);
     gles.compileShader(shader);
 
     var status: gles.GLint = undefined;

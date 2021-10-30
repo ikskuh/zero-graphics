@@ -87,11 +87,11 @@ pub fn destroyGpuData(self: *ResourceManager) void {
     std.debug.assert(self.is_gpu_available == true);
     self.is_gpu_available = false;
 
+    self.destroyGpu(&self.geometries);
     self.destroyGpu(&self.textures);
     self.destroyGpu(&self.shaders);
-    self.destroyGpu(&self.buffers);
-    self.destroyGpu(&self.geometries);
     self.destroyGpu(&self.envmaps);
+    self.destroyGpu(&self.buffers);
 }
 
 pub fn createRenderer2D(self: *ResourceManager) !Renderer2D {
@@ -534,21 +534,30 @@ pub const Shader = struct {
 
     source: DataSource(ShaderData),
 
+    fn compile(sources: *std.ArrayList([]const u8), data: ShaderData, shader_type: gl.GLenum) !gl.GLuint {
+        sources.shrinkRetainingCapacity(0);
+
+        for (data.sources.items) |src| {
+            if (src.shader_type == shader_type) {
+                try sources.append(src.source);
+            }
+        }
+
+        return try zero_graphics.gles_utils.createAndCompileShaderSources(shader_type, sources.items);
+    }
+
     fn initGpu(shader: *Shader, rm: *ResourceManager) !void {
         var data = try shader.source.create(rm);
         defer data.deinit();
 
-        var shaders = try rm.allocator.alloc(gl.GLuint, data.sources.items.len);
-        defer rm.allocator.free(shaders);
+        var sources = std.ArrayList([]const u8).init(rm.allocator);
+        defer sources.deinit();
 
-        var index: usize = 0;
-        errdefer for (shaders[0..index]) |sh| {
-            gl.deleteShader(sh);
-        };
+        var fragment_shader = compile(&sources, data, gl.FRAGMENT_SHADER) catch return error.InvalidFormat;
+        defer gl.deleteShader(fragment_shader);
 
-        while (index < shaders.len) : (index += 1) {
-            shaders[index] = zero_graphics.gles_utils.createAndCompileShader(data.sources.items[index].shader_type, data.sources.items[index].source) catch return error.InvalidFormat;
-        }
+        var vertex_shader = compile(&sources, data, gl.VERTEX_SHADER) catch return error.InvalidFormat;
+        defer gl.deleteShader(vertex_shader);
 
         const program = gl.createProgram();
 
@@ -556,19 +565,35 @@ pub const Shader = struct {
             gl.bindAttribLocation(program, attrib.index, attrib.name.ptr);
         }
 
-        for (shaders) |sh| {
-            gl.attachShader(program, sh);
+        gl.attachShader(program, fragment_shader);
+        gl.attachShader(program, vertex_shader);
+        defer {
+            gl.detachShader(program, fragment_shader);
+            gl.detachShader(program, vertex_shader);
         }
-        defer for (shaders) |sh| {
-            gl.detachShader(program, sh);
-        };
 
         gl.linkProgram(program);
 
         var status: gl.GLint = undefined;
         gl.getProgramiv(program, gl.LINK_STATUS, &status);
-        if (status != gl.TRUE)
+        if (status != gl.TRUE) {
+            var len: gl.GLint = 0;
+            gl.getProgramiv(program, gl.INFO_LOG_LENGTH, &len);
+
+            if (len > 0) {
+                var arr = std.ArrayList(u8).init(rm.allocator);
+                defer arr.deinit();
+
+                try arr.resize(@intCast(usize, len));
+
+                var total_len: gl.GLint = 0;
+                gl.getProgramInfoLog(program, len, &total_len, arr.items.ptr);
+
+                std.debug.print("{s}\n", .{arr.items[0..@intCast(usize, total_len)]});
+            }
+
             return error.InvalidFormat;
+        }
 
         shader.instance = program;
     }
@@ -736,6 +761,13 @@ pub const GeometryData = struct {
 
 /// A 3D model with one or more textures.
 pub const Geometry = struct {
+    /// Vertex attributes used in this renderer
+    pub const attributes = .{
+        .vPosition = 0,
+        .vNormal = 1,
+        .vUV = 2,
+    };
+
     vertex_buffer: ?gl.GLuint,
     index_buffer: ?gl.GLuint,
 
@@ -797,6 +829,14 @@ pub const Geometry = struct {
         geometry.vertex_buffer = null;
         geometry.index_buffer = null;
         geometry.meshes = null;
+    }
+
+    pub fn bind(self: Geometry) void {
+        gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer.?);
+        gl.vertexAttribPointer(attributes.vPosition, 3, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
+        gl.vertexAttribPointer(attributes.vNormal, 3, gl.FLOAT, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "nx")));
+        gl.vertexAttribPointer(attributes.vUV, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer.?);
     }
 };
 
@@ -1031,6 +1071,30 @@ pub const BasicShader = struct {
 
         try shader.appendShader(gl.VERTEX_SHADER, self.vertex_shader);
         try shader.appendShader(gl.FRAGMENT_SHADER, self.fragment_shader);
+
+        for (self.attributes) |attrib| {
+            try shader.setAttribute(attrib.name, attrib.index);
+        }
+
+        return shader;
+    }
+};
+
+pub const CompoundShader = struct {
+    vertex_shaders: []const []const u8,
+    fragment_shaders: []const []const u8,
+    attributes: []const ShaderAttribute,
+
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!ShaderData {
+        var shader = ShaderData.init(rm.allocator);
+        errdefer shader.deinit();
+
+        for (self.vertex_shaders) |vertex_shader| {
+            try shader.appendShader(gl.VERTEX_SHADER, vertex_shader);
+        }
+        for (self.fragment_shaders) |fragment_shader| {
+            try shader.appendShader(gl.FRAGMENT_SHADER, fragment_shader);
+        }
 
         for (self.attributes) |attrib| {
             try shader.setAttribute(attrib.name, attrib.index);
