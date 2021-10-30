@@ -9,12 +9,14 @@ const gl = zero_graphics.gles;
 
 const Renderer2D = @import("Renderer2D.zig");
 const Renderer3D = @import("Renderer3D.zig");
+const RendererSky = @import("RendererSky.zig");
 
 const ResourcePool = @import("resource_pool.zig").ResourcePool;
 const TexturePool = ResourcePool(Texture, *ResourceManager, destroyTextureInternal);
 const ShaderPool = ResourcePool(Shader, *ResourceManager, destroyShaderInternal);
 const BufferPool = ResourcePool(Buffer, *ResourceManager, destroyBufferInternal);
 const GeometryPool = ResourcePool(Geometry, *ResourceManager, destroyGeometryInternal);
+const EnvMapPool = ResourcePool(EnvironmentMap, *ResourceManager, destroyEnvironmentMapInternal);
 const ResourceManager = @This();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,6 +27,7 @@ textures: TexturePool,
 shaders: ShaderPool,
 buffers: BufferPool,
 geometries: GeometryPool,
+envmaps: EnvMapPool,
 
 is_gpu_available: bool,
 
@@ -35,6 +38,7 @@ pub fn init(allocator: *std.mem.Allocator) ResourceManager {
         .shaders = ShaderPool.init(allocator),
         .buffers = BufferPool.init(allocator),
         .geometries = GeometryPool.init(allocator),
+        .envmaps = EnvMapPool.init(allocator),
         .is_gpu_available = false,
     };
 }
@@ -43,8 +47,10 @@ pub fn deinit(self: *ResourceManager) void {
     if (self.is_gpu_available) {
         self.destroyGpuData();
     }
-    self.shaders.deinit(self);
+    self.envmaps.deinit(self);
+    self.geometries.deinit(self);
     self.buffers.deinit(self);
+    self.shaders.deinit(self);
     self.textures.deinit(self);
     self.* = undefined;
 }
@@ -65,6 +71,7 @@ pub fn initializeGpuData(self: *ResourceManager) !void {
     try self.initGpu(&self.shaders);
     try self.initGpu(&self.buffers);
     try self.initGpu(&self.geometries);
+    try self.initGpu(&self.envmaps);
 }
 
 fn destroyGpu(self: *ResourceManager, pool: anytype) void {
@@ -84,6 +91,7 @@ pub fn destroyGpuData(self: *ResourceManager) void {
     self.destroyGpu(&self.shaders);
     self.destroyGpu(&self.buffers);
     self.destroyGpu(&self.geometries);
+    self.destroyGpu(&self.envmaps);
 }
 
 pub fn createRenderer2D(self: *ResourceManager) !Renderer2D {
@@ -92,6 +100,10 @@ pub fn createRenderer2D(self: *ResourceManager) !Renderer2D {
 
 pub fn createRenderer3D(self: *ResourceManager) !Renderer3D {
     return try Renderer3D.init(self, self.allocator);
+}
+
+pub fn createRendererSky(self: *ResourceManager) !RendererSky {
+    return try RendererSky.init(self, self.allocator);
 }
 
 const ResourceDataHandle = struct {
@@ -151,9 +163,11 @@ fn DataSource(comptime ResourceData: type) type {
 
             const Wrapper = struct {
                 fn create(handle: ResourceDataHandle, rm: *ResourceManager) CreateResourceDataError!ResourceData {
+                    std.log.debug("create {s}", .{@typeName(ActualDataType)});
                     return try handle.convertTo(ActualDataType).create(rm);
                 }
                 fn destroy(handle: ResourceDataHandle, rm: *ResourceManager) void {
+                    std.log.debug("destroy {s}", .{@typeName(ActualDataType)});
                     rm.allocator.destroy(handle.convertTo(ActualDataType));
                 }
             };
@@ -329,6 +343,144 @@ fn destroyTextureInternal(ctx: *ResourceManager, tex: *Texture) void {
     }
     tex.source.deinit(ctx);
     tex.* = undefined;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Textures
+
+pub const EnvironmentMapSide = enum(gl.GLenum) {
+    x_plus = gl.TEXTURE_CUBE_MAP_POSITIVE_X,
+    y_plus = gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
+    z_plus = gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
+    x_minus = gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
+    y_minus = gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
+    z_minus = gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
+};
+
+pub const EnvironmentMapData = struct {
+    const Sides = std.EnumArray(EnvironmentMapSide, []u8);
+
+    arena: std.heap.ArenaAllocator,
+    width: u15,
+    height: u15,
+    sides: Sides,
+
+    pub fn deinit(self: *EnvironmentMapData, rm: *ResourceManager) void {
+        for (self.sides.values) |val| {
+            rm.allocator.free(val);
+        }
+        self.* = undefined;
+    }
+};
+
+pub const EnvironmentMap = struct {
+    fn computePixelSize(width: u15, height: u15) usize {
+        return @as(usize, width) * @as(usize, height);
+    }
+
+    fn computeByteSize(width: u15, height: u15) usize {
+        return 4 * computePixelSize(width, height);
+    }
+
+    /// private texture handle
+    instance: ?gl.GLuint,
+
+    // width of the environment map in pixels
+    width: u15,
+
+    // height of the environment map in pixels
+    height: u15,
+
+    source: DataSource(EnvironmentMapData),
+
+    fn initGpuFromData(tex: *EnvironmentMap, env_data: EnvironmentMapData) void {
+        var id: gl.GLuint = undefined;
+        gl.genTextures(1, &id);
+        std.debug.assert(id != 0);
+
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, id);
+        defer gl.bindTexture(gl.TEXTURE_CUBE_MAP, 0);
+
+        {
+            for (env_data.sides.values) |buffer, i| {
+                const key = EnvironmentMapData.Sides.Indexer.keyForIndex(i);
+
+                std.debug.assert(buffer.len == computeByteSize(env_data.width, env_data.height));
+                gl.texImage2D(@enumToInt(key), 0, gl.RGBA, env_data.width, env_data.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, buffer.ptr);
+            }
+        }
+
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+        gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+
+        tex.instance = id;
+    }
+
+    fn initGpu(tex: *EnvironmentMap, rm: *ResourceManager) !void {
+        std.debug.assert(tex.instance == null);
+
+        var texture_data = try tex.source.create(rm);
+        defer texture_data.deinit(rm);
+
+        initGpuFromData(tex, texture_data);
+    }
+
+    fn destroyGpu(tex: *EnvironmentMap, rm: *ResourceManager) void {
+        std.debug.assert(tex.instance != null);
+        _ = rm;
+        gl.deleteTextures(1, &tex.instance.?);
+        tex.instance = null;
+    }
+};
+
+pub fn createEnvironmentMap(self: *ResourceManager, resource_data: anytype) !*EnvironmentMap {
+    var source = try DataSource(EnvironmentMapData).init(self.allocator, resource_data);
+    errdefer source.deinit(self);
+
+    // We need to create the texture data anyway, as we want to know how big our texture will be
+    var envmap_data = try source.create(self);
+    defer envmap_data.deinit(self);
+
+    const env_map = EnvironmentMap{
+        .instance = null,
+
+        .width = envmap_data.width,
+        .height = envmap_data.height,
+
+        .source = source,
+    };
+
+    const env_map_ptr = try self.envmaps.allocate(env_map);
+    errdefer self.envmaps.release(self, env_map_ptr);
+
+    if (self.is_gpu_available) {
+        env_map_ptr.initGpuFromData(envmap_data);
+    }
+
+    return env_map_ptr;
+}
+
+pub fn retainEnvironmentMap(self: *ResourceManager, envmap: *EnvironmentMap) void {
+    self.envmaps.retain(envmap);
+}
+
+/// Destroys a texture and releases all of its memory.
+/// The texture passed here must be created with `createTexture`.
+pub fn destroyEnvironmentMap(self: *ResourceManager, envmap: *EnvironmentMap) void {
+    self.envmaps.release(self, envmap);
+}
+
+fn destroyEnvironmentMapInternal(ctx: *ResourceManager, envmap: *EnvironmentMap) void {
+    if (ctx.is_gpu_available) {
+        envmap.destroyGpu(ctx);
+    }
+    envmap.source.deinit(ctx);
+    envmap.* = undefined;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -647,6 +799,8 @@ pub const Geometry = struct {
 pub fn createGeometry(self: *ResourceManager, data_source: anytype) !*Geometry {
     var source = try DataSource(GeometryData).init(self.allocator, data_source);
     errdefer source.deinit(self);
+    std.debug.print("foo: {}\n", .{data_source});
+    std.debug.print("foo: {}\n", .{source});
 
     const geometry = try self.geometries.allocate(Geometry{
         .vertex_buffer = null,
@@ -692,14 +846,14 @@ pub const StaticMesh = struct {
     indices: []const u16,
     texture: ?*Texture,
 
-    pub fn create(self: @This(), allocator: *std.mem.Allocator) CreateResourceDataError!GeometryData {
-        const vertices = try allocator.dupe(Vertex, self.vertices);
-        errdefer allocator.free(vertices);
-        const indices = try allocator.dupe(u16, self.indices);
-        errdefer allocator.free(indices);
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!GeometryData {
+        const vertices = try rm.allocator.dupe(Vertex, self.vertices);
+        errdefer rm.allocator.free(vertices);
+        const indices = try rm.allocator.dupe(u16, self.indices);
+        errdefer rm.allocator.free(indices);
 
-        const meshes = try allocator.alloc(Mesh, 1);
-        errdefer allocator.free(meshes);
+        const meshes = try rm.allocator.alloc(Mesh, 1);
+        errdefer rm.allocator.free(meshes);
 
         meshes[0] = Mesh{
             .offset = 0,
@@ -720,7 +874,7 @@ pub const StaticGeometry = struct {
     indices: []const u16,
     meshes: []const Mesh,
 
-    pub fn create(self: @This(), rm: *ResourceManager) !GeometryData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!GeometryData {
         const vertices = try rm.allocator.dupe(Vertex, self.vertices);
         errdefer rm.allocator.free(vertices);
         const indices = try rm.allocator.dupe(u16, self.indices);
@@ -843,7 +997,7 @@ pub fn Z3DGeometry(comptime TextureLoader: type) type {
 
 pub const EmptyBuffer = struct {
     dummy: u1 = 0,
-    pub fn create(self: @This(), rm: *ResourceManager) !BufferData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!BufferData {
         _ = self;
         _ = rm;
         return BufferData{ .data = null };
@@ -860,7 +1014,7 @@ pub const BasicShader = struct {
     fragment_shader: []const u8,
     attributes: []const ShaderAttribute,
 
-    pub fn create(self: @This(), rm: *ResourceManager) !ShaderData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!ShaderData {
         var shader = ShaderData.init(rm.allocator);
         errdefer shader.deinit();
 
@@ -882,7 +1036,7 @@ pub const UninitializedTexture = struct {
     width: u15,
     height: u15,
 
-    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
         _ = rm;
         return TextureData{
             .width = self.width,
@@ -899,7 +1053,7 @@ pub const FlatTexture = struct {
     height: u15,
     color: Color,
 
-    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
         const buffer = try rm.allocator.alloc(u8, Texture.computeByteSize(self.width, self.height));
         errdefer rm.allocator.free(buffer);
 
@@ -924,7 +1078,7 @@ pub const RawRgbaTexture = struct {
     height: u15,
     pixels: []const u8,
 
-    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
         return TextureData{
             .width = self.width,
             .height = self.height,
@@ -936,7 +1090,7 @@ pub const RawRgbaTexture = struct {
 pub const DecodePng = struct {
     source_data: []const u8,
 
-    pub fn create(self: @This(), rm: *ResourceManager) !TextureData {
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
         var image = zigimg.image.Image.fromMemory(rm.allocator, self.source_data) catch {
             // logger.debug("failed to load texture: {s}", .{@errorName(err)});
             return error.InvalidFormat;
@@ -963,5 +1117,76 @@ pub const DecodePng = struct {
             .height = @intCast(u15, image.height),
             .pixels = buffer,
         };
+    }
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Builtin environment map loaders
+
+pub const DecodeCompoundPng = struct {
+    data: []const u8,
+
+    const offsets = [6]EnvironmentMapSide{
+        .x_plus, // 0
+        .z_plus, // 1
+        .x_minus, // 2
+        .z_minus, // 3
+        .y_minus, // 4
+        .y_plus, // 5
+    };
+
+    pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!EnvironmentMapData {
+        var image = zigimg.image.Image.fromMemory(rm.allocator, self.data) catch {
+            // logger.debug("failed to load texture: {s}", .{@errorName(err)});
+            return error.InvalidFormat;
+        };
+        defer image.deinit();
+
+        std.debug.assert(image.width == 6 * image.height);
+
+        var data = EnvironmentMapData{
+            .arena = std.heap.ArenaAllocator.init(rm.allocator),
+            .width = @intCast(u15, image.height),
+            .height = @intCast(u15, image.height),
+            .sides = EnvironmentMapData.Sides.initUndefined(),
+        };
+        errdefer data.deinit(rm);
+
+        for (data.sides.values) |*val| {
+            val.* = try rm.allocator.alloc(u8, Texture.computeByteSize(data.width, data.height));
+        }
+
+        var x: usize = 0;
+        var y: usize = 0;
+        var side: usize = 0;
+        var pixels = image.iterator();
+        while (pixels.next()) |pix| {
+            // iterates row-major, with all 6 rows of each side first,
+            // then all the next columns
+
+            const p8 = pix.toIntegerColor8();
+            const dst_buf = data.sides.get(offsets[side]);
+
+            const offset = y * data.width + x;
+            dst_buf[4 * offset + 0] = p8.R;
+            dst_buf[4 * offset + 1] = p8.G;
+            dst_buf[4 * offset + 2] = p8.B;
+            dst_buf[4 * offset + 3] = p8.A;
+
+            x += 1;
+            if (x >= data.width) {
+                x = 0;
+                side += 1;
+                if (side >= offsets.len) {
+                    side = 0;
+                    y += 1;
+                }
+            }
+        }
+        std.debug.assert(x == 0);
+        std.debug.assert(y == image.height);
+        std.debug.assert(side == 0);
+
+        return data;
     }
 };

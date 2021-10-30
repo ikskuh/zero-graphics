@@ -12,6 +12,7 @@ pub const gles_utils = @import("rendering/gles-helper.zig");
 
 pub const Renderer2D = @import("rendering/Renderer2D.zig");
 pub const Renderer3D = @import("rendering/Renderer3D.zig");
+pub const RendererSky = @import("rendering/RendererSky.zig");
 pub const ResourceManager = @import("rendering/ResourceManager.zig");
 
 pub const Input = @import("Input.zig");
