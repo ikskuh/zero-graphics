@@ -180,7 +180,11 @@ fn DataSource(comptime ResourceData: type) type {
         }
 
         pub fn create(self: Self, rm: *ResourceManager) CreateResourceDataError!ResourceData {
-            return try self.create_data(self.pointer, rm);
+            return self.create_data(self.pointer, rm) catch |err| {
+                if (@errorReturnTrace()) |trace| std.debug.dumpStackTrace(trace.*);
+                std.log.debug("failed to create resource {s}: {s}", .{ @typeName(ResourceData), @errorName(err) });
+                return err;
+            };
         }
 
         pub fn deinit(self: *Self, rm: *ResourceManager) void {
