@@ -152,9 +152,11 @@ pub fn render(self: Self, sky_cube: *types.ResourceManager.EnvironmentMap, viewP
 
     var uniforms = glesh.fetchUniforms(self.static_geometry_shader.instance.?, Uniforms);
 
+    var untranslated_trafo = viewProjectionMatrix;
+
     gles.useProgram(self.static_geometry_shader.instance.?);
     gles.uniform1i(uniforms.uTexture, 0);
-    gles.uniformMatrix4fv(uniforms.uViewProjMatrix, 1, gles.FALSE, @ptrCast([*]const f32, &viewProjectionMatrix));
+    gles.uniformMatrix4fv(uniforms.uViewProjMatrix, 1, gles.FALSE, @ptrCast([*]const f32, &untranslated_trafo));
 
     gles.activeTexture(gles.TEXTURE0);
 

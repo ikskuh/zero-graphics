@@ -456,22 +456,22 @@ pub fn setRenderer(self: *UserInterface, new_renderer: ?*Renderer) !void {
         };
 
         icons.checkbox_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
-            .source_data = @embedFile("ui-data/checkbox-marked.png"),
+            .data = @embedFile("ui-data/checkbox-marked.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.checkbox_checked);
 
         icons.checkbox_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
-            .source_data = @embedFile("ui-data/checkbox-blank.png"),
+            .data = @embedFile("ui-data/checkbox-blank.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.checkbox_unchecked);
 
         icons.radiobutton_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
-            .source_data = @embedFile("ui-data/radiobox-marked.png"),
+            .data = @embedFile("ui-data/radiobox-marked.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.radiobutton_checked);
 
         icons.radiobutton_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
-            .source_data = @embedFile("ui-data/radiobox-blank.png"),
+            .data = @embedFile("ui-data/radiobox-blank.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.radiobutton_unchecked);
 

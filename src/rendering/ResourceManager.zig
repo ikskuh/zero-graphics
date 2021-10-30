@@ -163,11 +163,11 @@ fn DataSource(comptime ResourceData: type) type {
 
             const Wrapper = struct {
                 fn create(handle: ResourceDataHandle, rm: *ResourceManager) CreateResourceDataError!ResourceData {
-                    std.log.debug("create {s}", .{@typeName(ActualDataType)});
+                    // std.log.debug("create {s}", .{@typeName(ActualDataType)});
                     return try handle.convertTo(ActualDataType).create(rm);
                 }
                 fn destroy(handle: ResourceDataHandle, rm: *ResourceManager) void {
-                    std.log.debug("destroy {s}", .{@typeName(ActualDataType)});
+                    // std.log.debug("destroy {s}", .{@typeName(ActualDataType)});
                     rm.allocator.destroy(handle.convertTo(ActualDataType));
                 }
             };
@@ -799,8 +799,6 @@ pub const Geometry = struct {
 pub fn createGeometry(self: *ResourceManager, data_source: anytype) !*Geometry {
     var source = try DataSource(GeometryData).init(self.allocator, data_source);
     errdefer source.deinit(self);
-    std.debug.print("foo: {}\n", .{data_source});
-    std.debug.print("foo: {}\n", .{source});
 
     const geometry = try self.geometries.allocate(Geometry{
         .vertex_buffer = null,
@@ -890,12 +888,17 @@ pub const StaticGeometry = struct {
     }
 };
 
-pub fn Z3DGeometry(comptime TextureLoader: type) type {
+pub fn Z3DGeometry(comptime TextureLoader: ?type) type {
+    const ActualTextureLoader = TextureLoader orelse struct {};
+    if (TextureLoader) |Loader| {
+        if (!@hasDecl(Loader, "load"))
+            @compileError(@typeName(Loader) ++ " requires a pub fn load()!");
+    }
     return struct {
         const z3d = @import("z3d-format.zig");
 
         data: []const u8,
-        loader: ?TextureLoader = null,
+        loader: ?ActualTextureLoader = null,
 
         pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!GeometryData {
             const geometry_data = self.data;
@@ -970,11 +973,15 @@ pub fn Z3DGeometry(comptime TextureLoader: type) type {
                         const texture_file = src_mesh.texture_file[0..texture_file_len];
 
                         if (texture_file.len > 0) {
-                            if (self.loader) |loader| {
-                                mesh.texture = try loader.load(rm, texture_file);
-                                //
+                            if (comptime TextureLoader != null) {
+                                if (self.loader) |loader| {
+                                    mesh.texture = try loader.load(rm, texture_file);
+                                    //
+                                } else {
+                                    std.log.warn("Z3D file contains textures, but no texture loader was given. The texture '{s}' is missing.", .{texture_file});
+                                }
                             } else {
-                                std.log.warn("Z3D file contains textures, but no texture loader was given. The texture '{s}' is missing.", .{texture_file});
+                                std.log.warn("Z3D file contains textures, but the texture loader cannot load textures. The texture '{s}' is missing.", .{texture_file});
                             }
                         }
                     }
@@ -1088,10 +1095,11 @@ pub const RawRgbaTexture = struct {
 };
 
 pub const DecodePng = struct {
-    source_data: []const u8,
+    data: []const u8,
+    flip_y: bool = false,
 
     pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
-        var image = zigimg.image.Image.fromMemory(rm.allocator, self.source_data) catch {
+        var image = zigimg.image.Image.fromMemory(rm.allocator, self.data) catch {
             // logger.debug("failed to load texture: {s}", .{@errorName(err)});
             return error.InvalidFormat;
         };
@@ -1100,17 +1108,30 @@ pub const DecodePng = struct {
         var buffer = try rm.allocator.alloc(u8, 4 * image.width * image.height);
         errdefer rm.allocator.free(buffer);
 
-        var i: usize = 0;
+        var x: usize = 0;
+        var y: usize = if (self.flip_y) image.height - 1 else 0;
         var pixels = image.iterator();
         while (pixels.next()) |pix| {
             const p8 = pix.toIntegerColor8();
-            buffer[4 * i + 0] = p8.R;
-            buffer[4 * i + 1] = p8.G;
-            buffer[4 * i + 2] = p8.B;
-            buffer[4 * i + 3] = p8.A;
-            i += 1;
+
+            const offset = image.width * y + x;
+
+            buffer[4 * offset + 0] = p8.R;
+            buffer[4 * offset + 1] = p8.G;
+            buffer[4 * offset + 2] = p8.B;
+            buffer[4 * offset + 3] = p8.A;
+
+            x += 1;
+            if (x >= image.width) {
+                x = 0;
+                if (self.flip_y) {
+                    if (y > 0) y -= 1;
+                } else {
+                    y += 1;
+                }
+            }
         }
-        std.debug.assert(i == image.width * image.height);
+        // std.debug.assert(i == image.width * image.height);
 
         return TextureData{
             .width = @intCast(u15, image.width),
@@ -1127,9 +1148,9 @@ pub const DecodeCompoundPng = struct {
     data: []const u8,
 
     const offsets = [6]EnvironmentMapSide{
-        .x_plus, // 0
+        .x_minus, // 0
         .z_plus, // 1
-        .x_minus, // 2
+        .x_plus, // 2
         .z_minus, // 3
         .y_minus, // 4
         .y_plus, // 5

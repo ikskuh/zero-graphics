@@ -97,7 +97,6 @@ pub fn init(resources: *ResourceManager, allocator: *std.mem.Allocator) InitErro
 
         .draw_calls = std.ArrayList(DrawCall).init(allocator),
         .white_texture = undefined,
-        .sky_cube = undefined,
     };
 
     self.white_texture = try self.resources.createTexture(.@"3d", ResourceManager.FlatTexture{
@@ -195,7 +194,7 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
     }
 }
 
-const DrawCall = union(enum) {
+const DrawCall = struct {
     transform: Mat4,
     geometry: *Geometry,
 };
