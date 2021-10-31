@@ -771,6 +771,8 @@ pub const Geometry = struct {
     vertex_buffer: ?gl.GLuint,
     index_buffer: ?gl.GLuint,
 
+    vertices: ?[]Vertex,
+    indices: ?[]u16,
     meshes: ?[]Mesh,
 
     source: DataSource(GeometryData),
@@ -778,19 +780,12 @@ pub const Geometry = struct {
     fn initGpu(geometry: *Geometry, rm: *ResourceManager) !void {
         std.debug.assert(geometry.vertex_buffer == null);
         std.debug.assert(geometry.index_buffer == null);
+        std.debug.assert(geometry.vertices == null);
+        std.debug.assert(geometry.indices == null);
         std.debug.assert(geometry.meshes == null);
 
         var data = try geometry.source.create(rm);
-        defer data.deinit(rm);
-
-        const meshes = try rm.allocator.dupe(Mesh, data.meshes);
-        errdefer rm.allocator.free(meshes);
-
-        for (meshes) |mesh| {
-            if (mesh.texture) |texture| {
-                rm.retainTexture(texture);
-            }
-        }
+        errdefer data.deinit(rm);
 
         var bufs: [2]gl.GLuint = undefined;
         gl.genBuffers(bufs.len, &bufs);
@@ -806,12 +801,23 @@ pub const Geometry = struct {
 
         geometry.vertex_buffer = bufs[0];
         geometry.index_buffer = bufs[1];
-        geometry.meshes = meshes;
+        geometry.meshes = data.meshes;
+        geometry.vertices = data.vertices;
+        geometry.indices = data.indices;
+        geometry.meshes = data.meshes;
+
+        for (geometry.meshes.?) |mesh| {
+            if (mesh.texture) |texture| {
+                rm.retainTexture(texture);
+            }
+        }
     }
 
     fn destroyGpu(geometry: *Geometry, rm: *ResourceManager) void {
         std.debug.assert(geometry.vertex_buffer != null);
         std.debug.assert(geometry.index_buffer != null);
+        std.debug.assert(geometry.vertices != null);
+        std.debug.assert(geometry.indices != null);
         std.debug.assert(geometry.meshes != null);
 
         var bufs = [2]gl.GLuint{ geometry.vertex_buffer.?, geometry.index_buffer.? };
@@ -825,9 +831,17 @@ pub const Geometry = struct {
             }
             rm.allocator.free(meshes);
         }
+        if (geometry.vertices) |verts| {
+            rm.allocator.free(verts);
+        }
+        if (geometry.indices) |inds| {
+            rm.allocator.free(inds);
+        }
 
         geometry.vertex_buffer = null;
         geometry.index_buffer = null;
+        geometry.vertices = null;
+        geometry.indices = null;
         geometry.meshes = null;
     }
 
@@ -847,6 +861,8 @@ pub fn createGeometry(self: *ResourceManager, data_source: anytype) !*Geometry {
     const geometry = try self.geometries.allocate(Geometry{
         .vertex_buffer = null,
         .index_buffer = null,
+        .vertices = null,
+        .indices = null,
         .meshes = null,
         .source = source,
     });

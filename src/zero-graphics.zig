@@ -166,4 +166,7 @@ pub const Color = extern struct {
     pub const red = Color{ .r = 0xFF, .g = 0x00, .b = 0x00 };
     pub const lime = Color{ .r = 0x00, .g = 0xFF, .b = 0x00 };
     pub const blue = Color{ .r = 0x00, .g = 0x00, .b = 0xFF };
+    pub const magenta = Color{ .r = 0xFF, .g = 0x00, .b = 0xFF };
+    pub const yellow = Color{ .r = 0xFF, .g = 0xFF, .b = 0x00 };
+    pub const cyan = Color{ .r = 0x00, .g = 0xFF, .b = 0xFF };
 };
