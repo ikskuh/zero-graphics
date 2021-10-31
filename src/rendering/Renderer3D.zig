@@ -167,7 +167,7 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
 
         gles.uniformMatrix4fv(uniforms.uWorldMatrix, 1, gles.FALSE, @ptrCast([*]const f32, &draw_call.transform));
 
-        for (draw_call.geometry.meshes.?) |mesh| {
+        for (draw_call.geometry.meshes) |mesh| {
             const tex_handle = mesh.texture orelse self.white_texture;
 
             gles.bindTexture(gles.TEXTURE_2D, tex_handle.instance.?);

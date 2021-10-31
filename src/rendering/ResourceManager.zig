@@ -771,78 +771,43 @@ pub const Geometry = struct {
     vertex_buffer: ?gl.GLuint,
     index_buffer: ?gl.GLuint,
 
-    vertices: ?[]Vertex,
-    indices: ?[]u16,
-    meshes: ?[]Mesh,
+    vertices: []Vertex,
+    indices: []u16,
+    meshes: []Mesh,
 
     source: DataSource(GeometryData),
 
     fn initGpu(geometry: *Geometry, rm: *ResourceManager) !void {
+        _ = rm;
         std.debug.assert(geometry.vertex_buffer == null);
         std.debug.assert(geometry.index_buffer == null);
-        std.debug.assert(geometry.vertices == null);
-        std.debug.assert(geometry.indices == null);
-        std.debug.assert(geometry.meshes == null);
-
-        var data = try geometry.source.create(rm);
-        errdefer data.deinit(rm);
 
         var bufs: [2]gl.GLuint = undefined;
         gl.genBuffers(bufs.len, &bufs);
         errdefer gl.deleteBuffers(bufs.len, &bufs);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, bufs[0]);
-        gl.bufferData(gl.ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(Vertex) * data.vertices.len), data.vertices.ptr, gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(Vertex) * geometry.vertices.len), geometry.vertices.ptr, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, 0);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufs[1]);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(u16) * data.indices.len), data.indices.ptr, gl.STATIC_DRAW);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(u16) * geometry.indices.len), geometry.indices.ptr, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0);
 
         geometry.vertex_buffer = bufs[0];
         geometry.index_buffer = bufs[1];
-        geometry.meshes = data.meshes;
-        geometry.vertices = data.vertices;
-        geometry.indices = data.indices;
-        geometry.meshes = data.meshes;
-
-        for (geometry.meshes.?) |mesh| {
-            if (mesh.texture) |texture| {
-                rm.retainTexture(texture);
-            }
-        }
     }
 
     fn destroyGpu(geometry: *Geometry, rm: *ResourceManager) void {
+        _ = rm;
         std.debug.assert(geometry.vertex_buffer != null);
         std.debug.assert(geometry.index_buffer != null);
-        std.debug.assert(geometry.vertices != null);
-        std.debug.assert(geometry.indices != null);
-        std.debug.assert(geometry.meshes != null);
 
         var bufs = [2]gl.GLuint{ geometry.vertex_buffer.?, geometry.index_buffer.? };
         gl.deleteBuffers(bufs.len, &bufs);
 
-        if (geometry.meshes) |meshes| {
-            for (meshes) |mesh| {
-                if (mesh.texture) |texture| {
-                    rm.destroyTexture(texture);
-                }
-            }
-            rm.allocator.free(meshes);
-        }
-        if (geometry.vertices) |verts| {
-            rm.allocator.free(verts);
-        }
-        if (geometry.indices) |inds| {
-            rm.allocator.free(inds);
-        }
-
         geometry.vertex_buffer = null;
         geometry.index_buffer = null;
-        geometry.vertices = null;
-        geometry.indices = null;
-        geometry.meshes = null;
     }
 
     pub fn bind(self: Geometry) void {
@@ -858,18 +823,27 @@ pub fn createGeometry(self: *ResourceManager, data_source: anytype) !*Geometry {
     var source = try DataSource(GeometryData).init(self.allocator, data_source);
     errdefer source.deinit(self);
 
+    var data = try source.create(self);
+    errdefer data.deinit(self);
+
     const geometry = try self.geometries.allocate(Geometry{
         .vertex_buffer = null,
         .index_buffer = null,
-        .vertices = null,
-        .indices = null,
-        .meshes = null,
+        .vertices = data.vertices,
+        .indices = data.indices,
+        .meshes = data.meshes,
         .source = source,
     });
     errdefer self.geometries.release(self, geometry);
 
     if (self.is_gpu_available) {
         try geometry.initGpu(self);
+    }
+
+    for (geometry.meshes) |mesh| {
+        if (mesh.texture) |tex| {
+            self.retainTexture(tex);
+        }
     }
 
     return geometry;
@@ -889,6 +863,17 @@ fn destroyGeometryInternal(ctx: *ResourceManager, geometry: *Geometry) void {
     if (ctx.is_gpu_available) {
         geometry.destroyGpu(ctx);
     }
+
+    for (geometry.meshes) |mesh| {
+        if (mesh.texture) |tex| {
+            ctx.destroyTexture(tex);
+        }
+    }
+
+    ctx.allocator.free(geometry.indices);
+    ctx.allocator.free(geometry.vertices);
+    ctx.allocator.free(geometry.meshes);
+
     geometry.source.deinit(ctx);
     geometry.* = undefined;
 }

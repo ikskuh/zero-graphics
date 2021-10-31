@@ -152,7 +152,7 @@ pub fn render(self: Self, sky_cube: *types.ResourceManager.EnvironmentMap, viewP
     gles.bindTexture(gles.TEXTURE_CUBE_MAP, sky_cube.instance.?);
     defer gles.bindTexture(gles.TEXTURE_CUBE_MAP, 0);
 
-    for (self.sky_cube.meshes.?) |mesh| {
+    for (self.sky_cube.meshes) |mesh| {
         gles.drawElements(
             gles.TRIANGLES,
             @intCast(gles.GLsizei, mesh.count),
