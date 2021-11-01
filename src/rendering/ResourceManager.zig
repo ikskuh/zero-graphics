@@ -9,6 +9,7 @@ const gl = zero_graphics.gles;
 
 const Renderer2D = @import("Renderer2D.zig");
 const Renderer3D = @import("Renderer3D.zig");
+const DebugRenderer3D = @import("DebugRenderer3D.zig");
 const RendererSky = @import("RendererSky.zig");
 
 const ResourcePool = @import("resource_pool.zig").ResourcePool;
@@ -100,6 +101,10 @@ pub fn createRenderer2D(self: *ResourceManager) !Renderer2D {
 
 pub fn createRenderer3D(self: *ResourceManager) !Renderer3D {
     return try Renderer3D.init(self, self.allocator);
+}
+
+pub fn createDebugRenderer3D(self: *ResourceManager) !DebugRenderer3D {
+    return try DebugRenderer3D.init(self, self.allocator);
 }
 
 pub fn createRendererSky(self: *ResourceManager) !RendererSky {

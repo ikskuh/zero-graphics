@@ -739,30 +739,6 @@ pub fn drawLinePixels(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Co
     });
 }
 
-fn createAndCompileShader(shader_type: gles.GLenum, source: []const u8) !gles.GLuint {
-    const source_ptr = source.ptr;
-    const source_len = @intCast(gles.GLint, source.len);
-
-    // Create and compile vertex shader
-    const shader = gles.createShader(shader_type);
-    errdefer gles.deleteShader(shader);
-
-    gles.shaderSource(
-        shader,
-        1,
-        @ptrCast([*]const [*c]const u8, &source_ptr),
-        @ptrCast([*]const gles.GLint, &source_len),
-    );
-    gles.compileShader(shader);
-
-    var status: gles.GLint = undefined;
-    gles.getShaderiv(shader, gles.COMPILE_STATUS, &status);
-    if (status != gles.TRUE)
-        return error.FailedToCompileShader;
-
-    return shader;
-}
-
 pub const Vertex = extern struct {
     // coordinates on the screen in pixels:
     x: f32,
