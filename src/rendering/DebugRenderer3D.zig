@@ -169,7 +169,7 @@ fn resetDrawCall(self: *Self, dc: DrawCall) void {
     self.vertices.shrinkRetainingCapacity(dc.offset);
 }
 
-pub fn drawTriangle(self: *Self, v0: Vec3, v1: Vec3, v2: Vec3, color: Color) !void {
+pub fn fillTriangle(self: *Self, v0: Vec3, v1: Vec3, v2: Vec3, color: Color) !void {
     var dc = self.beginDrawCall(gl.TRIANGLE_STRIP);
     errdefer self.resetDrawCall(dc);
 
@@ -186,6 +186,20 @@ pub fn drawLine(self: *Self, v0: Vec3, v1: Vec3, color: Color) !void {
 
     try self.vertices.append(vertex(v0, color));
     try self.vertices.append(vertex(v1, color));
+
+    try self.endDrawCall(dc);
+}
+
+pub fn drawTriangle(self: *Self, v0: Vec3, v1: Vec3, v2: Vec3, color: Color) !void {
+    var dc = self.beginDrawCall(gl.LINE_STRIP);
+    errdefer self.resetDrawCall(dc);
+
+    try self.vertices.append(vertex(v0, color));
+    try self.vertices.append(vertex(v1, color));
+    try self.vertices.append(vertex(v1, color));
+    try self.vertices.append(vertex(v2, color));
+    try self.vertices.append(vertex(v2, color));
+    try self.vertices.append(vertex(v0, color));
 
     try self.endDrawCall(dc);
 }
