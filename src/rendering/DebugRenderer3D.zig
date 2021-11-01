@@ -126,6 +126,11 @@ pub fn render(self: Self, viewProjectionMatrix: Mat4) void {
     gl.useProgram(self.shader_program.instance.?);
     gl.uniformMatrix4fv(uniforms.uViewProjMatrix, 1, gl.FALSE, @ptrCast([*]const f32, &viewProjectionMatrix));
 
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    defer gl.disable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(0.0, 15.0);
+    defer gl.polygonOffset(0.0, 0.0);
+
     for (self.draw_calls.items) |draw_call| {
         gl.drawArrays(
             draw_call.primitive_type,
