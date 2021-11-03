@@ -65,7 +65,7 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
     app.renderer = try app.resources.createRenderer2D();
     errdefer app.renderer.deinit();
 
-    app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodePng{ .source_data = @embedFile("ziggy.png") });
+    app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodePng{ .data = @embedFile("ziggy.png") });
     app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
     app.renderer3d = try app.resources.createRenderer3D();
@@ -87,9 +87,9 @@ pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graph
         pub fn load(self: @This(), rm: *ResourceManager, file_name: []const u8) !*ResourceManager.Texture {
             _ = self;
             if (std.mem.eql(u8, file_name, "metal-01.png"))
-                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .source_data = @embedFile("data/metal-01.png") });
+                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .data = @embedFile("data/metal-01.png") });
             if (std.mem.eql(u8, file_name, "metal-02.png"))
-                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .source_data = @embedFile("data/metal-02.png") });
+                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .data = @embedFile("data/metal-02.png") });
             return error.FileNotFound;
         }
     };

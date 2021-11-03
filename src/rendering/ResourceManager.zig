@@ -5,6 +5,8 @@ const std = @import("std");
 const zigimg = @import("zigimg");
 const zero_graphics = @import("../zero-graphics.zig");
 
+const logger = std.log.scoped(.zero_resources);
+
 const gl = zero_graphics.gles;
 
 const Renderer2D = @import("Renderer2D.zig");
@@ -168,11 +170,11 @@ fn DataSource(comptime ResourceData: type) type {
 
             const Wrapper = struct {
                 fn create(handle: ResourceDataHandle, rm: *ResourceManager) CreateResourceDataError!ResourceData {
-                    // std.log.debug("create {s}", .{@typeName(ActualDataType)});
+                    logger.debug("create {s}", .{@typeName(ActualDataType)});
                     return try handle.convertTo(ActualDataType).create(rm);
                 }
                 fn destroy(handle: ResourceDataHandle, rm: *ResourceManager) void {
-                    // std.log.debug("destroy {s}", .{@typeName(ActualDataType)});
+                    logger.debug("destroy {s}", .{@typeName(ActualDataType)});
                     rm.allocator.destroy(handle.convertTo(ActualDataType));
                 }
             };
@@ -186,8 +188,8 @@ fn DataSource(comptime ResourceData: type) type {
 
         pub fn create(self: Self, rm: *ResourceManager) CreateResourceDataError!ResourceData {
             return self.create_data(self.pointer, rm) catch |err| {
-                if (@errorReturnTrace()) |trace| std.debug.dumpStackTrace(trace.*);
-                std.log.debug("failed to create resource {s}: {s}", .{ @typeName(ResourceData), @errorName(err) });
+                // if (@errorReturnTrace()) |trace| std.debug.dumpStackTrace(trace.*);
+                logger.err("failed to create resource {s}: {s}", .{ @typeName(ResourceData), @errorName(err) });
                 return err;
             };
         }
@@ -594,7 +596,7 @@ pub const Shader = struct {
                 var total_len: gl.GLint = 0;
                 gl.getProgramInfoLog(program, len, &total_len, arr.items.ptr);
 
-                std.debug.print("{s}\n", .{arr.items[0..@intCast(usize, total_len)]});
+                logger.err("{s}\n", .{arr.items[0..@intCast(usize, total_len)]});
             }
 
             return error.InvalidFormat;
@@ -1028,10 +1030,10 @@ pub fn Z3DGeometry(comptime TextureLoader: ?type) type {
                                     mesh.texture = try loader.load(rm, texture_file);
                                     //
                                 } else {
-                                    std.log.warn("Z3D file contains textures, but no texture loader was given. The texture '{s}' is missing.", .{texture_file});
+                                    logger.warn("Z3D file contains textures, but no texture loader was given. The texture '{s}' is missing.", .{texture_file});
                                 }
                             } else {
-                                std.log.warn("Z3D file contains textures, but the texture loader cannot load textures. The texture '{s}' is missing.", .{texture_file});
+                                logger.warn("Z3D file contains textures, but the texture loader cannot load textures. The texture '{s}' is missing.", .{texture_file});
                             }
                         }
                     }
