@@ -344,7 +344,7 @@ const GlyphIterator = struct {
     codepoint_src: std.unicode.Utf8Iterator,
     scale: f32,
 
-    dx: i16,
+    dx: isize,
     dy: i16,
 
     previous_codepoint: ?u21 = null,

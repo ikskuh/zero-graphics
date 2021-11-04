@@ -224,6 +224,7 @@ pub const Texture = struct {
     pub const UsageHint = enum {
         ui,
         @"3d",
+        data,
     };
 
     fn computePixelSize(width: u15, height: u15) usize {
@@ -274,6 +275,13 @@ pub const Texture = struct {
             .ui => {
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            },
+            .data => {
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -331,9 +339,9 @@ pub fn createTexture(self: *ResourceManager, usage_hint: Texture.UsageHint, reso
 /// Updates the texture data of the given texture.
 /// `data` is encoded as BGRA pixels.
 pub fn updateTexture(self: *ResourceManager, texture: *Texture, data: []const u8) void {
-    _ = self;
+    std.debug.assert(self.is_gpu_available);
     std.debug.assert(data.len == Texture.computeByteSize(texture.width, texture.height));
-    gl.bindTexture(gl.TEXTURE_2D, texture.handle);
+    gl.bindTexture(gl.TEXTURE_2D, texture.instance.?);
     defer gl.bindTexture(gl.TEXTURE_2D, 0);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, texture.width, texture.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data.ptr);
 }
@@ -1130,7 +1138,7 @@ pub const UninitializedTexture = struct {
 };
 
 pub const FlatTexture = struct {
-    const Color = struct { r: u8, g: u8, b: u8, a: u8 = 0xFF };
+    const Color = zero_graphics.Color;
 
     width: u15,
     height: u15,
