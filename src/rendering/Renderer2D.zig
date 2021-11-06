@@ -233,7 +233,11 @@ fn getFontScale(self: Self, font: *const Font) f32 {
     return self.unit_to_pixel_ratio * c.stbtt_ScaleForPixelHeight(&font.font, @intToFloat(f32, font.font_size));
 }
 
-fn getGlyph(self: *Self, font: *Font, codepoint: u21) !Glyph {
+pub fn getGlyph(self: *Self, font: *const Font, codepoint: u21) !Glyph {
+    return self.getGlyphInternal(makeFontMut(font), codepoint);
+}
+
+fn getGlyphInternal(self: *Self, font: *Font, codepoint: u21) !Glyph {
     var ix0: c_int = undefined;
     var iy0: c_int = undefined;
     var ix1: c_int = undefined;
@@ -809,10 +813,17 @@ pub const Font = struct {
     descent: i16,
     line_gap: i16,
 
+    pub fn getScale(self: Font) f32 {
+        return c.stbtt_ScaleForPixelHeight(&self.font, @intToFloat(f32, self.font_size));
+    }
+
+    pub fn scaleValue(self: Font, v: i16) f32 {
+        return @intToFloat(f32, v) * self.getScale();
+    }
+
     /// Returns the height of a single text line of this font
     pub fn getLineHeight(self: Font) u15 {
-        const scale = c.stbtt_ScaleForPixelHeight(&self.font, @intToFloat(f32, self.font_size));
-        return @intCast(u15, scaleInt(self.ascent - self.descent + self.line_gap, scale));
+        return @intCast(u15, scaleInt(self.ascent - self.descent + self.line_gap, self.getScale()));
     }
 };
 
