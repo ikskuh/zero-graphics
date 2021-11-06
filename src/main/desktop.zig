@@ -205,7 +205,7 @@ pub fn main() !void {
                         else => {},
                     }
                 },
-                c.SDL_KEYDOWN => if (event.key.repeat == 0) {
+                c.SDL_KEYDOWN => { // if (event.key.repeat == 0)
 
                     // Shift-F12 will recreate the opengl context
                     if (builtin.mode == .Debug and ((event.key.keysym.mod & c.KMOD_SHIFT) != 0) and event.key.keysym.sym == c.SDLK_F12) {
