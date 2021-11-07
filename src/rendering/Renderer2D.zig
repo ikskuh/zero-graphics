@@ -608,10 +608,8 @@ pub fn render(self: Self, screen_size: Size) void {
                     clip_rect.width,
                     clip_rect.height,
                 );
-                // std.log.debug("setClipState({})", .{clip_rect});
             } else {
                 gles.disable(gles.SCISSOR_TEST);
-                // std.log.debug("setClipState(null)", .{});
             }
         }
     };
@@ -641,9 +639,6 @@ pub fn render(self: Self, screen_size: Size) void {
                 .set_clip_rect => |rectangle| {
                     stack.rectangles[stack.size] = rectangle;
                     stack.setClipState();
-
-                    gles.clearColor(1, 0, 0, 1);
-                    gles.clear(gles.COLOR_BUFFER_BIT);
                 },
                 .clear_clip_rect => {
                     stack.rectangles[stack.size] = Rectangle.init(Point.zero, screen_size);
