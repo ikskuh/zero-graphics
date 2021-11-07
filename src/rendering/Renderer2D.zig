@@ -571,7 +571,7 @@ pub fn render(self: Self, screen_size: Size) void {
             const full_screen = Rectangle.init(Point.zero, stack.screen_size);
 
             var clip_rect = full_screen;
-            for (stack.rectangles[0..stack.size]) |rect| {
+            for (stack.rectangles[0 .. stack.size + 1]) |rect| {
                 const clip_right = clip_rect.x + clip_rect.width;
                 const clip_bottom = clip_rect.y + clip_rect.height;
                 const rect_right = rect.x + rect.width;
@@ -604,12 +604,14 @@ pub fn render(self: Self, screen_size: Size) void {
                 gles.enable(gles.SCISSOR_TEST);
                 gles.scissor(
                     clip_rect.x,
-                    stack.screen_size.height - clip_rect.y - 1,
+                    clip_rect.y,
                     clip_rect.width,
                     clip_rect.height,
                 );
+                // std.log.debug("setClipState({})", .{clip_rect});
             } else {
                 gles.disable(gles.SCISSOR_TEST);
+                // std.log.debug("setClipState(null)", .{});
             }
         }
     };
@@ -639,6 +641,9 @@ pub fn render(self: Self, screen_size: Size) void {
                 .set_clip_rect => |rectangle| {
                     stack.rectangles[stack.size] = rectangle;
                     stack.setClipState();
+
+                    gles.clearColor(1, 0, 0, 1);
+                    gles.clear(gles.COLOR_BUFFER_BIT);
                 },
                 .clear_clip_rect => {
                     stack.rectangles[stack.size] = Rectangle.init(Point.zero, screen_size);
