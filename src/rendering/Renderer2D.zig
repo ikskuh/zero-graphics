@@ -524,8 +524,10 @@ pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i
 /// Resets the state of the renderer and prepares a fresh new frame.
 pub fn reset(self: *Self) void {
     for (self.draw_calls.items) |draw_call| {
-        if (draw_call.texture) |tex| {
-            self.resources.destroyTexture(tex);
+        if (draw_call == .draw_vertices) {
+            if (draw_call.draw_vertices.texture) |tex| {
+                self.resources.destroyTexture(tex);
+            }
         }
     }
     self.draw_calls.shrinkRetainingCapacity(0);
@@ -557,33 +559,124 @@ pub fn render(self: Self, screen_size: Size) void {
     gles.blendEquation(gles.FUNC_ADD);
 
     gles.activeTexture(gles.TEXTURE0);
-    for (self.draw_calls.items) |draw_call| {
-        const tex_handle = draw_call.texture orelse self.white_texture;
 
-        gles.bindTexture(gles.TEXTURE_2D, tex_handle.instance orelse 0);
+    const ClipStack = struct {
+        const ClipStack = @This();
 
-        gles.drawArrays(
-            gles.TRIANGLES,
-            @intCast(gles.GLsizei, draw_call.offset),
-            @intCast(gles.GLsizei, draw_call.count),
-        );
+        screen_size: Size,
+        rectangles: [16]Rectangle,
+        size: usize = 0,
+
+        fn actualClipRect(stack: ClipStack) ?Rectangle {
+            const full_screen = Rectangle.init(Point.zero, stack.screen_size);
+
+            var clip_rect = full_screen;
+            for (stack.rectangles[0..stack.size]) |rect| {
+                const clip_right = clip_rect.x + clip_rect.width;
+                const clip_bottom = clip_rect.y + clip_rect.height;
+                const rect_right = rect.x + rect.width;
+                const rect_bottom = rect.y + rect.height;
+
+                const left = std.math.max(clip_rect.x, rect.x);
+                const top = std.math.max(clip_rect.y, rect.y);
+                const right = std.math.min(clip_right, rect_right);
+                const bottom = std.math.min(clip_bottom, rect_bottom);
+
+                const width = @intCast(u15, if (right > left) right - left else 0);
+                const height = @intCast(u15, if (bottom > top) bottom - top else 0);
+
+                clip_rect = Rectangle{
+                    .x = left,
+                    .y = top,
+                    .width = width,
+                    .height = height,
+                };
+                if (clip_rect.area() == 0)
+                    break;
+            }
+            if (std.meta.eql(clip_rect, full_screen))
+                return null;
+            return clip_rect;
+        }
+
+        fn setClipState(stack: ClipStack) void {
+            if (stack.actualClipRect()) |clip_rect| {
+                gles.enable(gles.SCISSOR_TEST);
+                gles.scissor(
+                    clip_rect.x,
+                    stack.screen_size.height - clip_rect.y - 1,
+                    clip_rect.width,
+                    clip_rect.height,
+                );
+            } else {
+                gles.disable(gles.SCISSOR_TEST);
+            }
+        }
+    };
+
+    {
+        var stack = ClipStack{
+            .screen_size = screen_size,
+            .rectangles = undefined,
+        };
+        stack.rectangles[0] = Rectangle.init(Point.zero, screen_size);
+        defer gles.disable(gles.SCISSOR_TEST);
+        for (self.draw_calls.items) |draw_call| {
+            switch (draw_call) {
+                .push_clip_rect => |rectangle| {
+                    stack.size += 1;
+                    stack.rectangles[stack.size] = rectangle;
+                    stack.setClipState();
+                },
+                .pop_clip_rect => {
+                    if (stack.size > 0) {
+                        stack.size -= 1;
+                    } else {
+                        stack.rectangles[0] = Rectangle.init(Point.zero, screen_size);
+                    }
+                    stack.setClipState();
+                },
+                .set_clip_rect => |rectangle| {
+                    stack.rectangles[stack.size] = rectangle;
+                    stack.setClipState();
+                },
+                .clear_clip_rect => {
+                    stack.rectangles[stack.size] = Rectangle.init(Point.zero, screen_size);
+                    stack.setClipState();
+                },
+
+                .draw_vertices => |vertices| {
+                    const tex_handle = vertices.texture orelse self.white_texture;
+
+                    gles.bindTexture(gles.TEXTURE_2D, tex_handle.instance orelse 0);
+
+                    gles.drawArrays(
+                        gles.TRIANGLES,
+                        @intCast(gles.GLsizei, vertices.offset),
+                        @intCast(gles.GLsizei, vertices.count),
+                    );
+                },
+            }
+        }
     }
 }
 
 /// Appends a set of triangles to the renderer with the given `texture`. 
 pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex) DrawError!void {
-    const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1].texture != texture) blk: {
+    const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture) blk: {
         const dc = try self.draw_calls.addOne();
         dc.* = DrawCall{
-            .texture = texture,
-            .offset = self.vertices.items.len,
-            .count = 0,
+            .draw_vertices = DrawVertices{
+                .texture = texture,
+                .offset = self.vertices.items.len,
+                .count = 0,
+            },
         };
         if (texture) |tex_ptr| {
             self.resources.retainTexture(tex_ptr);
         }
-        break :blk dc;
-    } else &self.draw_calls.items[self.draw_calls.items.len - 1];
+        break :blk &dc.draw_vertices;
+    } else &self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices;
 
     std.debug.assert(draw_call.texture == texture);
 
@@ -743,6 +836,30 @@ pub fn drawLinePixels(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Co
     });
 }
 
+pub fn pushClipRectangle(self: *Self, rectangle: Rectangle) !void {
+    const draw_call = try self.draw_calls.addOne();
+    draw_call.* = DrawCall{
+        .push_clip_rect = rectangle,
+    };
+}
+
+pub fn popClipRectangle(self: *Self) !void {
+    const draw_call = try self.draw_calls.addOne();
+    draw_call.* = .pop_clip_rect;
+}
+
+pub fn setClipRectangle(self: *Self, rectangle: Rectangle) !void {
+    const draw_call = try self.draw_calls.addOne();
+    draw_call.* = DrawCall{
+        .set_clip_rect = rectangle,
+    };
+}
+
+pub fn clearClipRectangle(self: *Self) !void {
+    const draw_call = try self.draw_calls.addOne();
+    draw_call.* = .clear_clip_rect;
+}
+
 pub const Vertex = extern struct {
     // coordinates on the screen in pixels:
     x: f32,
@@ -787,7 +904,15 @@ pub const Vertex = extern struct {
     }
 };
 
-const DrawCall = struct {
+const DrawCall = union(enum) {
+    draw_vertices: DrawVertices,
+    push_clip_rect: Rectangle,
+    pop_clip_rect,
+    set_clip_rect: Rectangle,
+    clear_clip_rect,
+};
+
+const DrawVertices = struct {
     offset: usize,
     count: usize,
     texture: ?*ResourceManager.Texture,

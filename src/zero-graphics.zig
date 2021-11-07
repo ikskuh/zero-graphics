@@ -102,6 +102,11 @@ pub const Rectangle = struct {
             .height = height,
         };
     }
+
+    /// Returnst the area of the rectangle.
+    pub fn area(self: Rectangle) u32 {
+        return @as(u32, self.width) * @as(u32, self.height);
+    }
 };
 
 pub const Size = struct {
