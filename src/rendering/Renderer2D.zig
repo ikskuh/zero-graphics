@@ -604,7 +604,7 @@ pub fn render(self: Self, screen_size: Size) void {
                 gles.enable(gles.SCISSOR_TEST);
                 gles.scissor(
                     clip_rect.x,
-                    clip_rect.y,
+                    stack.screen_size.height - clip_rect.y - clip_rect.height - 1,
                     clip_rect.width,
                     clip_rect.height,
                 );
