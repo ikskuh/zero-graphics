@@ -725,7 +725,7 @@ pub const Builder = struct {
         updateWidgetConfig(&info.control.config, config);
     }
 
-    pub fn image(self: Self, rectangle: Rectangle, texture: *const Renderer.Texture, config: anytype) Error!void {
+    pub fn image(self: Self, rectangle: Rectangle, texture: *ResourceManager.Texture, config: anytype) Error!void {
         const info = try self.initOrUpdateWidget(.image, rectangle, config);
 
         if (info.needs_init) {
