@@ -121,16 +121,16 @@ pub const AndroidApp = struct {
 
     pub fn onNativeWindowCreated(self: *Self, window: *android.ANativeWindow) !void {
         logger.info("AndroidApp.onNativeWindowCreated()", .{});
-        var egl_held = self.egl_lock.acquire();
-        defer egl_held.release();
+        self.egl_lock.lock();
+        defer self.egl_lock.unlock();
 
         if (self.egl) |*old| {
-            egl_held.release();
+            self.egl_lock.unlock();
             @atomicStore(bool, &self.egl_deinit, true, .SeqCst);
             while (@atomicLoad(bool, &self.egl_deinit, .SeqCst) == true) {
                 std.time.sleep(100 * std.time.ns_per_us);
             }
-            egl_held = self.egl_lock.acquire();
+            self.egl_lock.lock();
 
             old.deinit();
         }
@@ -143,28 +143,38 @@ pub const AndroidApp = struct {
             break :blk null;
         };
         if (self.egl != null) {
-            egl_held.release();
+            self.egl_lock.unlock();
             @atomicStore(bool, &self.egl_init, true, .SeqCst);
             while (@atomicLoad(bool, &self.egl_init, .SeqCst) == true) {
                 std.time.sleep(100 * std.time.ns_per_us);
             }
-            egl_held = self.egl_lock.acquire();
+            self.egl_lock.lock();
         }
+    }
+
+    pub fn onNativeWindowResized(self: *Self, window: *android.ANativeWindow) !void {
+        logger.info("AndroidApp.onNativeWindowResized()", .{});
+
+        self.egl_lock.lock();
+        defer self.egl_lock.unlock();
+
+        self.screen_width = @intToFloat(f32, android.ANativeWindow_getWidth(window));
+        self.screen_height = @intToFloat(f32, android.ANativeWindow_getHeight(window));
     }
 
     pub fn onNativeWindowDestroyed(self: *Self, window: *android.ANativeWindow) !void {
         _ = window;
         logger.info("AndroidApp.onNativeWindowDestroyed()", .{});
-        var egl_held = self.egl_lock.acquire();
-        defer egl_held.release();
+        self.egl_lock.lock();
+        defer self.egl_lock.unlock();
 
         if (self.egl) |*old| {
-            egl_held.release();
+            self.egl_lock.unlock();
             @atomicStore(bool, &self.egl_deinit, true, .SeqCst);
             while (@atomicLoad(bool, &self.egl_deinit, .SeqCst) == true) {
                 std.time.sleep(100 * std.time.ns_per_us);
             }
-            egl_held = self.egl_lock.acquire();
+            self.egl_lock.lock();
 
             old.deinit();
         }
@@ -173,8 +183,8 @@ pub const AndroidApp = struct {
 
     pub fn onInputQueueCreated(self: *Self, input: *android.AInputQueue) void {
         logger.info("AndroidApp.onInputQueueCreated()", .{});
-        var held = self.input_lock.acquire();
-        defer held.release();
+        self.input_lock.lock();
+        defer self.input_lock.unlock();
 
         self.input = input;
     }
@@ -182,8 +192,8 @@ pub const AndroidApp = struct {
     pub fn onInputQueueDestroyed(self: *Self, input: *android.AInputQueue) void {
         _ = input;
         logger.info("AndroidApp.onInputQueueDestroyed()", .{});
-        var held = self.input_lock.acquire();
-        defer held.release();
+        self.input_lock.lock();
+        defer self.input_lock.unlock();
 
         self.input = null;
     }
@@ -243,8 +253,8 @@ pub const AndroidApp = struct {
             // Input process
             {
                 // we lock the handle of our input so we don't have a race condition
-                var held = self.input_lock.acquire();
-                defer held.release();
+                self.input_lock.lock();
+                defer self.input_lock.unlock();
                 if (self.input) |input| {
                     var event: ?*android.AInputEvent = undefined;
                     while (android.AInputQueue_getEvent(input, &event) >= 0) {
@@ -301,8 +311,8 @@ pub const AndroidApp = struct {
             // Render process
             if (self.egl_ready) {
                 // same for the EGL context
-                var held = self.egl_lock.acquire();
-                defer held.release();
+                self.egl_lock.lock();
+                defer self.egl_lock.unlock();
                 if (self.egl) |egl| {
                     try egl.makeCurrent();
 
