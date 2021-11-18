@@ -85,14 +85,6 @@ pub const AndroidApp = struct {
     /// the application gets destroyed.
     pub fn start(self: *Self) !void {
         logger.info("AndroidApp.start()", .{});
-        // This code somehow crashes yet. Needs more investigations
-        // {
-        //     var jni = JNI.init(self.activity);
-        //     defer jni.deinit();
-
-        //     // Must be called from main thread…
-        //     _ = jni.AndroidMakeFullscreen();
-        // }
 
         logger.info("spawn thread...", .{});
         self.thread = try std.Thread.spawn(.{}, mainLoop, .{self});
@@ -121,6 +113,7 @@ pub const AndroidApp = struct {
 
     pub fn onNativeWindowCreated(self: *Self, window: *android.ANativeWindow) !void {
         logger.info("AndroidApp.onNativeWindowCreated()", .{});
+        defer logger.info("~AndroidApp.onNativeWindowCreated()", .{});
         self.egl_lock.lock();
         defer self.egl_lock.unlock();
 
@@ -242,6 +235,20 @@ pub const AndroidApp = struct {
                     logger.warn("Unknown display density configuration ({d}). Using default DPI!", .{density});
                 },
             }
+        }
+
+        // The window is now sucessfully initialized, we can
+        // now remove the navigation buttons on the bottom.
+        {
+            var jni = JNI.init(self.activity);
+            defer jni.deinit();
+
+            logger.info("jni ready.", .{});
+
+            // Must be called from main thread…
+            _ = jni.AndroidMakeFullscreen();
+
+            logger.info("fullscreen ready.", .{});
         }
 
         logger.info("Init application...", .{});

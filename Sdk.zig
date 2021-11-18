@@ -115,6 +115,7 @@ pub fn createApplicationSource(sdk: *Sdk, name: []const u8, root_file: std.build
             .name = "application-meta",
             .path = std.build.FileSource{ .generated = &create_meta_step.outfile },
         },
+        .permissions = std.ArrayList([]const u8).init(sdk.builder.allocator),
     };
     app.addPackage(zero_graphics_package);
 
@@ -131,6 +132,8 @@ pub const InitialResolution = union(enum) {
     windowed: Size,
 };
 
+pub const Permission = AndroidSdk.Permission;
+
 pub const Application = struct {
     sdk: *Sdk,
     packages: std.ArrayList(std.build.Pkg),
@@ -141,7 +144,14 @@ pub const Application = struct {
     name: []const u8,
     display_name: ?[]const u8 = null,
     package_name: ?[]const u8 = null,
+    icon: ?[]const u8 = null,
     resolution: InitialResolution = .{ .windowed = Size{ .width = 1280, .height = 720 } },
+
+    permissions: std.ArrayList([]const u8),
+
+    pub fn addPermission(app: *Application, perm: Permission) void {
+        app.permissions.append(perm.toString()) catch @panic("out of memory!");
+    }
 
     pub fn addPackage(app: *Application, pkg: std.build.Pkg) void {
         app.packages.append(app.sdk.builder.dupePkg(pkg)) catch @panic("out of memory!");
@@ -161,6 +171,11 @@ pub const Application = struct {
     pub fn setPackageName(app: *Application, name: []const u8) void {
         validateName(name, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.");
         app.package_name = app.sdk.builder.dupe(name);
+    }
+
+    /// Path to the application icon, must be a PNG file.
+    pub fn setIcon(app: *Application, icon: []const u8) void {
+        app.icon = app.sdk.builder.dupe(icon);
     }
 
     /// Sets the initial preferred resolution for the application.
@@ -223,6 +238,11 @@ pub const Application = struct {
                 });
             },
             .android => {
+                const icon =
+                    if (app.icon) |str|
+                    app.sdk.builder.pathFromRoot(str)
+                else
+                    sdkRoot() ++ "/design/app-icon.png";
                 const asdk = app.sdk.android_sdk orelse @panic("Android build support is disabled!");
                 const android_app = asdk.createApp(
                     app.sdk.builder.getInstallPath(.bin, app.sdk.builder.fmt("{s}.apk", .{app.name})), // apk_file: []const u8,
@@ -232,8 +252,9 @@ pub const Application = struct {
                         .app_name = app.name,
                         .package_name = app.package_name orelse @panic("Package name is required for Android"),
                         .resources = &[_]AndroidSdk.Resource{
-                            .{ .path = "mipmap/icon.png", .content = .{ .path = sdkRoot() ++ "/design/app-icon.png" } },
+                            .{ .path = "mipmap/icon.png", .content = .{ .path = icon } },
                         },
+                        .permissions = app.permissions.items,
                         .fullscreen = true,
                     }, // app_config: AppConfig,
                     app.build_mode, // mode: std.builtin.Mode,
