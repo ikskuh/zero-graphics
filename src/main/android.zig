@@ -463,71 +463,72 @@ pub const AndroidApp = struct {
             // }
         }
 
-        std.log.scoped(.input).debug(
-            \\Motion Event {}
-            \\Flags:        {}
-            \\MetaState:    {}
-            \\ButtonState:  {}
-            \\EdgeFlags:    {}
-            \\DownTime:     {}
-            \\EventTime:    {}
-            \\XOffset:      {}
-            \\YOffset:      {}
-            \\XPrecision:   {}
-            \\YPrecision:   {}
-            \\PointerCount: {}
-            \\
-        , .{
-            event_type,
-            android.AMotionEvent_getFlags(event),
-            android.AMotionEvent_getMetaState(event),
-            android.AMotionEvent_getButtonState(event),
-            android.AMotionEvent_getEdgeFlags(event),
-            android.AMotionEvent_getDownTime(event),
-            android.AMotionEvent_getEventTime(event),
-            android.AMotionEvent_getXOffset(event),
-            android.AMotionEvent_getYOffset(event),
-            android.AMotionEvent_getXPrecision(event),
-            android.AMotionEvent_getYPrecision(event),
-            android.AMotionEvent_getPointerCount(event),
-        });
+        // std.log.scoped(.input).debug(
+        //     \\Motion Event {}
+        //     \\Flags:        {}
+        //     \\MetaState:    {}
+        //     \\ButtonState:  {}
+        //     \\EdgeFlags:    {}
+        //     \\DownTime:     {}
+        //     \\EventTime:    {}
+        //     \\XOffset:      {}
+        //     \\YOffset:      {}
+        //     \\XPrecision:   {}
+        //     \\YPrecision:   {}
+        //     \\PointerCount: {}
+        //     \\
+        // , .{
+        //     event_type,
+        //     android.AMotionEvent_getFlags(event),
+        //     android.AMotionEvent_getMetaState(event),
+        //     android.AMotionEvent_getButtonState(event),
+        //     android.AMotionEvent_getEdgeFlags(event),
+        //     android.AMotionEvent_getDownTime(event),
+        //     android.AMotionEvent_getEventTime(event),
+        //     android.AMotionEvent_getXOffset(event),
+        //     android.AMotionEvent_getYOffset(event),
+        //     android.AMotionEvent_getXPrecision(event),
+        //     android.AMotionEvent_getYPrecision(event),
+        //     android.AMotionEvent_getPointerCount(event),
+        // });
 
-        var i: usize = 0;
         var cnt = android.AMotionEvent_getPointerCount(event);
-        while (i < cnt) : (i += 1) {
-            std.log.scoped(.input).debug(
-                \\Pointer {}:
-                \\  PointerId:   {}
-                \\  ToolType:    {}
-                \\  RawX:        {d}
-                \\  RawY:        {d}
-                \\  X:           {d}
-                \\  Y:           {d}
-                \\  Pressure:    {}
-                \\  Size:        {}
-                \\  TouchMajor:  {}
-                \\  TouchMinor:  {}
-                \\  ToolMajor:   {}
-                \\  ToolMinor:   {}
-                \\  Orientation: {}
-                \\
-            , .{
-                i,
-                android.AMotionEvent_getPointerId(event, i),
-                android.AMotionEvent_getToolType(event, i),
-                android.AMotionEvent_getRawX(event, i),
-                android.AMotionEvent_getRawY(event, i),
-                android.AMotionEvent_getX(event, i),
-                android.AMotionEvent_getY(event, i),
-                android.AMotionEvent_getPressure(event, i),
-                android.AMotionEvent_getSize(event, i),
-                android.AMotionEvent_getTouchMajor(event, i),
-                android.AMotionEvent_getTouchMinor(event, i),
-                android.AMotionEvent_getToolMajor(event, i),
-                android.AMotionEvent_getToolMinor(event, i),
-                android.AMotionEvent_getOrientation(event, i),
-            });
-        }
+
+        // var i: usize = 0;
+        // while (i < cnt) : (i += 1) {
+        //     std.log.scoped(.input).debug(
+        //         \\Pointer {}:
+        //         \\  PointerId:   {}
+        //         \\  ToolType:    {}
+        //         \\  RawX:        {d}
+        //         \\  RawY:        {d}
+        //         \\  X:           {d}
+        //         \\  Y:           {d}
+        //         \\  Pressure:    {}
+        //         \\  Size:        {}
+        //         \\  TouchMajor:  {}
+        //         \\  TouchMinor:  {}
+        //         \\  ToolMajor:   {}
+        //         \\  ToolMinor:   {}
+        //         \\  Orientation: {}
+        //         \\
+        //     , .{
+        //         i,
+        //         android.AMotionEvent_getPointerId(event, i),
+        //         android.AMotionEvent_getToolType(event, i),
+        //         android.AMotionEvent_getRawX(event, i),
+        //         android.AMotionEvent_getRawY(event, i),
+        //         android.AMotionEvent_getX(event, i),
+        //         android.AMotionEvent_getY(event, i),
+        //         android.AMotionEvent_getPressure(event, i),
+        //         android.AMotionEvent_getSize(event, i),
+        //         android.AMotionEvent_getTouchMajor(event, i),
+        //         android.AMotionEvent_getTouchMinor(event, i),
+        //         android.AMotionEvent_getToolMajor(event, i),
+        //         android.AMotionEvent_getToolMinor(event, i),
+        //         android.AMotionEvent_getOrientation(event, i),
+        //     });
+        // }
 
         if (cnt > 0) {
             const x = android.AMotionEvent_getX(event, 0);
