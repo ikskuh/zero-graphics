@@ -368,7 +368,7 @@ pub fn render(app: *Application) !void {
         try renderer.drawLine(34, 67, 65, 67, white);
         try renderer.drawLine(34, 98, 65, 98, white);
 
-        try renderer.fillTexturedRectangle(
+        try renderer.drawTexture(
             Rectangle{
                 .x = (app.screen_width - app.texture_handle.width) / 2,
                 .y = (app.screen_height - app.texture_handle.height) / 2,

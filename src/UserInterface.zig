@@ -258,6 +258,7 @@ const Widget = struct {
         pub const Config = struct {
             tint: ?types.Color = null,
             hit_test_visible: bool = true,
+            source_rect: ?Rectangle = null,
         };
         image: *Texture,
         config: Config = .{},
@@ -886,7 +887,7 @@ pub fn render(self: UserInterface) !void {
                 try renderer.drawRectangle(widget.bounds, style_info.border);
 
                 if (control.icon) |icon| {
-                    try renderer.fillTexturedRectangle(
+                    try renderer.drawTexture(
                         widget.bounds.centered(style.icon_size, style.icon_size),
                         icon,
                         Color.white,
@@ -939,7 +940,7 @@ pub fn render(self: UserInterface) !void {
                 );
             },
             .check_box => |control| {
-                try renderer.fillTexturedRectangle(
+                try renderer.drawTexture(
                     widget.bounds,
                     if (control.is_checked)
                         self.icons.checkbox_checked
@@ -949,7 +950,7 @@ pub fn render(self: UserInterface) !void {
                 );
             },
             .radio_button => |control| {
-                try renderer.fillTexturedRectangle(
+                try renderer.drawTexture(
                     widget.bounds,
                     if (control.is_checked)
                         self.icons.radiobutton_checked
@@ -959,11 +960,20 @@ pub fn render(self: UserInterface) !void {
                 );
             },
             .image => |control| {
-                try renderer.fillTexturedRectangle(
-                    widget.bounds,
-                    control.image,
-                    control.config.tint orelse types.Color.white,
-                );
+                if (control.config.source_rect) |source_rect| {
+                    try renderer.drawPartialTexture(
+                        widget.bounds,
+                        control.image,
+                        source_rect,
+                        control.config.tint orelse types.Color.white,
+                    );
+                } else {
+                    try renderer.drawTexture(
+                        widget.bounds,
+                        control.image,
+                        control.config.tint orelse types.Color.white,
+                    );
+                }
             },
             .custom => |control| {
                 if (control.config.draw) |draw| {

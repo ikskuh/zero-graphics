@@ -99,11 +99,29 @@ pub fn main() !void {
         // silently ignore the error here
     }
 
+    var allow_resize: bool = if (@hasDecl(app_meta, "allow_resize")) app_meta.allow_resize else false; // no resize by default
+    if (std.process.getEnvVarOwned(std.heap.c_allocator, "ZEROG_RESIZEABLE")) |env| {
+        defer std.heap.c_allocator.free(env);
+
+        if (std.mem.startsWith(u8, env, "y")) {
+            allow_resize = true;
+        } else if (std.mem.startsWith(u8, env, "n")) {
+            allow_resize = false;
+        } else {
+            logger.err("Could not parse ZEROG_RESIZEABLE environment variable: Unknown value", .{});
+        }
+    } else |_| {
+        // silently ignore the error here
+    }
+
     const use_fullscreen = force_fullscreen orelse !@hasDecl(app_meta, "initial_resolution");
 
     var window_flags: u32 = c.SDL_WINDOW_OPENGL | c.SDL_WINDOW_SHOWN | c.SDL_WINDOW_ALLOW_HIGHDPI;
     if (use_fullscreen) {
         window_flags |= c.SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+    if (allow_resize) {
+        window_flags |= c.SDL_WINDOW_RESIZABLE;
     }
 
     var display_mode: c.SDL_DisplayMode = undefined;

@@ -449,7 +449,7 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle
 pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, color: Color) DrawError!void {
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
-        try self.fillTexturedRectanglePixels(
+        try self.drawTexturePixels(
             Rectangle{
                 .x = self.scalePosition(x) + glyph.x,
                 .y = self.scalePosition(y) + glyph.y,
@@ -745,20 +745,35 @@ pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
     }, color);
 }
 
-/// Copies the given texture to the screen
-pub fn fillTexturedRectangle(self: *Self, rectangle: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
-    return self.fillTexturedRectanglePixels(self.scaleRectangle(rectangle), texture, tint);
+pub fn drawTexture(self: *Self, rectangle: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
+    return self.drawPartialTexture(rectangle, texture, Rectangle.init(Point.zero, Size{ .width = texture.width, .height = texture.height }), tint);
+}
+pub fn drawTexturePixels(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
+    return self.drawPartialTexturePixels(real_rect, texture, Rectangle.init(Point.zero, Size{ .width = texture.width, .height = texture.height }), tint);
 }
 
-pub fn fillTexturedRectanglePixels(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
+/// Copies the given texture to the screen
+pub fn drawPartialTexture(self: *Self, rectangle: Rectangle, texture: *ResourceManager.Texture, source_rect: Rectangle, tint: ?Color) DrawError!void {
+    return self.drawPartialTexturePixels(self.scaleRectangle(rectangle), texture, source_rect, tint);
+}
+
+pub fn drawPartialTexturePixels(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, source_rect: Rectangle, tint: ?Color) DrawError!void {
     if (real_rect.size().isEmpty())
         return;
 
+    const sx = 1.0 / @intToFloat(f32, texture.width - 1);
+    const sy = 1.0 / @intToFloat(f32, texture.height - 1);
+
+    const x0 = @intToFloat(f32, source_rect.x) * sx;
+    const x1 = @intToFloat(f32, source_rect.x + source_rect.width - 1) * sx;
+    const y0 = @intToFloat(f32, source_rect.y) * sy;
+    const y1 = @intToFloat(f32, source_rect.y + source_rect.height - 1) * sy;
+
     const color = tint orelse Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0xFF };
-    const tl = Vertex.init(real_rect.x, real_rect.y, color).offset(-1, -1).withUV(0, 0);
-    const tr = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y, color).offset(1, -1).withUV(1, 0);
-    const bl = Vertex.init(real_rect.x, real_rect.y + real_rect.height - 1, color).offset(-1, 1).withUV(0, 1);
-    const br = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y + real_rect.height - 1, color).offset(1, 1).withUV(1, 1);
+    const tl = Vertex.init(real_rect.x, real_rect.y, color).offset(-1, -1).withUV(x0, y0);
+    const tr = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y, color).offset(1, -1).withUV(x1, y0);
+    const bl = Vertex.init(real_rect.x, real_rect.y + real_rect.height - 1, color).offset(-1, 1).withUV(x0, y1);
+    const br = Vertex.init(real_rect.x + real_rect.width - 1, real_rect.y + real_rect.height - 1, color).offset(1, 1).withUV(x1, y1);
 
     try self.appendTriangles(texture, &[_][3]Vertex{
         .{ tl, br, tr },
