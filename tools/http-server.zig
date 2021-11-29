@@ -19,7 +19,7 @@ pub fn main() !u8 {
 
     const application_name = args[1];
 
-    try file_server.init(allocator, .{ .dir_path = "zig-out/www" });
+    try file_server.init(allocator, .{ .dir_path = "." });
     defer file_server.deinit();
 
     std.log.info("Application is now served at http://127.0.0.1:8000/{s}.htm", .{application_name});

@@ -35,6 +35,8 @@ android_sdk: ?*AndroidSdk,
 key_store: ?AndroidSdk.KeyStore,
 make_keystore_step: ?*std.build.Step,
 
+dummy_server: *std.build.LibExeObjStep,
+
 install_web_sources: []*std.build.InstallFileStep,
 
 render_main_page_tool: *std.build.LibExeObjStep,
@@ -54,6 +56,8 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
             builder.addInstallFileWithDir(.{ .path = sdkRoot() ++ "/www/zero-graphics.js" }, web_folder, "zero-graphics.js"),
         }) catch @panic("out of memory"),
         .render_main_page_tool = builder.addExecutable("render-html-page", sdkRoot() ++ "/tools/render-ztt-page.zig"),
+
+        .dummy_server = undefined,
     };
 
     sdk.render_main_page_tool.addPackage(.{
@@ -71,6 +75,12 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
 
         sdk.make_keystore_step = asdk.initKeystore(sdk.key_store.?, .{});
     }
+
+    sdk.dummy_server = builder.addExecutable("http-server", "tools/http-server.zig");
+    sdk.dummy_server.addPackage(std.build.Pkg{
+        .name = "apple_pie",
+        .path = .{ .path = sdkRoot() ++ "/vendor/apple_pie/src/apple_pie.zig" },
+    });
 
     return sdk;
 }
@@ -340,7 +350,15 @@ pub const AppCompilation = struct {
     pub fn run(comp: *AppCompilation) *std.build.RunStep {
         return switch (comp.data) {
             .desktop => |step| step.run(),
-            .web => @panic("Web cannot be run yet!"),
+            .web => |step| blk: {
+                step.install();
+
+                const serve = comp.sdk.dummy_server.run();
+                serve.addArg(comp.app.name);
+                serve.step.dependOn(&step.install_step.?.step);
+                serve.cwd = comp.sdk.builder.getInstallPath(.{ .custom = "www" }, "");
+                break :blk serve;
+            },
             .android => @panic("Android cannot be run yet!"),
         };
     }
