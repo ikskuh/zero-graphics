@@ -76,7 +76,7 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
         sdk.make_keystore_step = asdk.initKeystore(sdk.key_store.?, .{});
     }
 
-    sdk.dummy_server = builder.addExecutable("http-server", "tools/http-server.zig");
+    sdk.dummy_server = builder.addExecutable("http-server", sdkRoot() ++ "/tools/http-server.zig");
     sdk.dummy_server.addPackage(std.build.Pkg{
         .name = "apple_pie",
         .path = .{ .path = sdkRoot() ++ "/vendor/apple_pie/src/apple_pie.zig" },
