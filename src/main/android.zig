@@ -40,7 +40,7 @@ pub const panic = android.panic;
 pub const AndroidApp = struct {
     const Self = @This();
 
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     activity: *android.ANativeActivity,
 
     thread: ?std.Thread = null,
@@ -69,7 +69,7 @@ pub const AndroidApp = struct {
     /// This is the entry point which initializes a application
     /// that has stored its previous state.
     /// If `stored_state` is not `null`, it is the state that was previously saved with 
-    pub fn init(allocator: *std.mem.Allocator, activity: *android.ANativeActivity, stored_state: ?[]const u8) !Self {
+    pub fn init(allocator: std.mem.Allocator, activity: *android.ANativeActivity, stored_state: ?[]const u8) !Self {
         logger.info("AndroidApp.init({any})", .{stored_state});
 
         return Self{
@@ -192,8 +192,8 @@ pub const AndroidApp = struct {
     }
 
     fn mainLoop(self: *Self) !void {
-        logger.notice("mainLoop() started\n", .{});
-        defer logger.notice("mainLoop() finished\n", .{});
+        logger.info("mainLoop() started\n", .{});
+        defer logger.info("mainLoop() finished\n", .{});
         errdefer |err| logger.err("mainLoop() crashed: {}", .{err});
 
         self.config = blk: {

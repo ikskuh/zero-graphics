@@ -60,7 +60,7 @@ const file_system_image = [_]FileSystemEntry{
 };
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const allocator = &gpa.allocator;
+const allocator = gpa.allocator();
 
 fn exec(cwd: []const u8, argv: []const []const u8) !void {
     var proc = try std.ChildProcess.init(argv, allocator);

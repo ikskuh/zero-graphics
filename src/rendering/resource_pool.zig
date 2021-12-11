@@ -16,7 +16,7 @@ pub fn ResourcePool(comptime Resource: type, comptime Context: type, destruct: f
         list: List,
         free_list: List,
 
-        pub fn init(allocator: *std.mem.Allocator) Self {
+        pub fn init(allocator: std.mem.Allocator) Self {
             return Self{
                 .arena = std.heap.ArenaAllocator.init(allocator),
                 .list = List{},
@@ -50,7 +50,7 @@ pub fn ResourcePool(comptime Resource: type, comptime Context: type, destruct: f
             const node = if (self.free_list.pop()) |old_node|
                 old_node
             else
-                try self.arena.allocator.create(Node);
+                try self.arena.allocator().create(Node);
             node.* = .{
                 .data = .{
                     .refcount = 1,

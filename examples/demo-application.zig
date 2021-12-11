@@ -1,5 +1,5 @@
 //! This file must export the following functions:
-//! - `pub fn init(app: *Application, allocator: *std.mem.Allocator) !void`
+//! - `pub fn init(app: *Application, allocator: std.mem.Allocator) !void`
 //! - `pub fn setupGraphics(app: *Application) !void`
 //! - `pub fn resize(app: *Application, width: u15, height: u15) !void`
 //! - `pub fn update(app: *Application) !bool`
@@ -27,7 +27,7 @@ screen_height: u15,
 resources: ResourceManager,
 renderer: Renderer,
 texture_handle: *ResourceManager.Texture,
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 font: *const Renderer.Font,
 input: *zero_graphics.Input,
 
@@ -40,7 +40,7 @@ mesh: *ResourceManager.Geometry,
 
 startup_time: i64,
 
-pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
+pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphics.Input) !void {
     app.* = Application{
         .allocator = allocator,
         .screen_width = 0,

@@ -7,10 +7,10 @@ const gl = zero_graphics.gles;
 
 const Application = @This();
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 input: *zero_graphics.Input,
 
-pub fn init(app: *Application, allocator: *std.mem.Allocator, input: *zero_graphics.Input) !void {
+pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphics.Input) !void {
     app.* = Application{
         .allocator = allocator,
         .input = input,

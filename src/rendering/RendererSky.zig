@@ -32,7 +32,7 @@ static_geometry_shader: *ResourceManager.Shader,
 /// list of CCW triangles that will be rendered 
 draw_calls: std.ArrayList(DrawCall),
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 
 resources: *ResourceManager,
 
@@ -60,7 +60,7 @@ const sky_cube_mesh = ResourceManager.StaticMesh{
     .texture = null,
 };
 
-pub fn init(resources: *ResourceManager, allocator: *std.mem.Allocator) InitError!Self {
+pub fn init(resources: *ResourceManager, allocator: std.mem.Allocator) InitError!Self {
     const static_vertex_source =
         \\attribute vec3 vPosition;
         \\uniform mat4 uViewProjMatrix;

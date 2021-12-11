@@ -78,7 +78,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 pub fn main() !u8 {
     defer _ = gpa.deinit();
 
-    const allocator = &gpa.allocator;
+    const allocator = gpa.allocator();
 
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();

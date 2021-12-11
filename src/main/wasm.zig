@@ -94,12 +94,12 @@ pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
 export fn app_init() u32 {
     global_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     gpa = .{
-        .backing_allocator = &global_arena.allocator,
+        .backing_allocator = global_arena.allocator(),
     };
 
-    input_handler = zerog.Input.init(&gpa.allocator);
+    input_handler = zerog.Input.init(gpa.allocator());
 
-    app_instance.init(&gpa.allocator, &input_handler) catch |err| @panic(@errorName(err));
+    app_instance.init(gpa.allocator(), &input_handler) catch |err| @panic(@errorName(err));
 
     gles.load({}, loadOpenGlFunction) catch |err| @panic(@errorName(err));
 
@@ -521,10 +521,10 @@ const WebGL = struct {
 
             export fn getString_alloc(size: u32) [*]u8 {
                 if (memory) |old| {
-                    gpa.allocator.free(old);
+                    gpa.allocator().free(old);
                     memory = null;
                 }
-                memory = gpa.allocator.allocSentinel(u8, size, 0) catch @panic("out of memory!");
+                memory = gpa.allocator().allocSentinel(u8, size, 0) catch @panic("out of memory!");
                 return memory.?.ptr;
             }
         };
@@ -539,7 +539,7 @@ const WebGL = struct {
 
     extern "webgl" fn bindAttribLocationJs(_program: GLuint, _index: GLuint, _name: [*]const GLchar, name_len: usize) void;
     fn bindAttribLocation(_program: GLuint, _index: GLuint, _name: [*c]const GLchar) callconv(.C) void {
-        bindAttribLocationJs(_program, _index, _name, std.mem.lenZ(@as([*:0]const u8, _name)));
+        bindAttribLocationJs(_program, _index, _name, std.mem.len(@as([*:0]const u8, _name)));
     }
 
     extern "webgl" fn bindRenderbuffer(_target: GLenum, _renderbuffer: GLuint) void;

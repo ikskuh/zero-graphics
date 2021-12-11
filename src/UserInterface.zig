@@ -338,7 +338,7 @@ const Widget = struct {
     };
 };
 
-const ControlType = std.meta.TagType(Widget.Control);
+const ControlType = std.meta.Tag(Widget.Control);
 
 const WidgetList = std.TailQueue(Widget);
 const WidgetNode = std.TailQueue(Widget).Node;
@@ -354,7 +354,7 @@ const Icons = struct {
     radiobutton_checked: *Texture,
 };
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
 
 /// The current mode. This is used to interlock building and updating APIs
@@ -396,7 +396,7 @@ renderer: ?*Renderer,
 
 icons: Icons,
 
-pub fn init(allocator: *std.mem.Allocator, renderer: ?*Renderer) !UserInterface {
+pub fn init(allocator: std.mem.Allocator, renderer: ?*Renderer) !UserInterface {
     var ui = UserInterface{
         .renderer = null,
         .default_font = undefined,
@@ -487,7 +487,7 @@ fn allocWidgetNode(self: *UserInterface) !*WidgetNode {
     const node = if (self.free_widgets.popFirst()) |n|
         n
     else
-        try self.arena.allocator.create(WidgetNode);
+        try self.arena.allocator().create(WidgetNode);
     node.* = .{
         .data = undefined,
     };
@@ -1117,7 +1117,7 @@ const StringBuffer = union(enum) {
         items: [max_len]u8,
     };
 
-    pub fn init(allocator: *std.mem.Allocator, string: []const u8) !Self {
+    pub fn init(allocator: std.mem.Allocator, string: []const u8) !Self {
         var self = Self{ .self_contained = undefined };
         try self.set(allocator, string);
         return self;
@@ -1137,7 +1137,7 @@ const StringBuffer = union(enum) {
         };
     }
 
-    pub fn set(self: *Self, allocator: *std.mem.Allocator, string: []const u8) !void {
+    pub fn set(self: *Self, allocator: std.mem.Allocator, string: []const u8) !void {
         switch (self.*) {
             .allocated => |*list| {
                 try list.resize(string.len);

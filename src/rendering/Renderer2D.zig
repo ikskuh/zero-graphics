@@ -48,7 +48,7 @@ vertex_buffer: *ResourceManager.Buffer,
 vertices: std.ArrayList(Vertex),
 draw_calls: std.ArrayList(DrawCall),
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 
 fonts: FontList,
 
@@ -60,7 +60,7 @@ white_texture: *ResourceManager.Texture,
 /// A value of `2.0` means that `1 unit` is equal to `2 pixels`
 unit_to_pixel_ratio: f32 = 1.0,
 
-pub fn init(resources: *ResourceManager, allocator: *std.mem.Allocator) InitError!Self {
+pub fn init(resources: *ResourceManager, allocator: std.mem.Allocator) InitError!Self {
     const shader_program = try resources.createShader(ResourceManager.BasicShader{
         .vertex_shader = vertexSource,
         .fragment_shader = fragmentSource,
@@ -158,7 +158,7 @@ fn scaleRectangle(self: Self, rect: Rectangle) Rectangle {
 /// Creates a new font from `ttf_bytes`. The bytes passed must be a valid TTF
 pub fn createFont(self: *Self, ttf_bytes: []const u8, size: u15) CreateFontError!*const Font {
     var info = std.mem.zeroes(c.stbtt_fontinfo);
-    info.userdata = self.allocator;
+    info.userdata = &self.allocator;
 
     const offset = c.stbtt_GetFontOffsetForIndex(ttf_bytes.ptr, 0);
     if (offset < 0)
@@ -264,8 +264,8 @@ fn getGlyphInternal(self: *Self, font: *Font, codepoint: u21) !Glyph {
 
     var gop = try font.glyphs.getOrPut(codepoint);
     if (!gop.found_existing or gop.value_ptr.width != width or gop.value_ptr.height != height) {
-        const bitmap = try font.arena.allocator.alloc(u8, @as(usize, width) * height);
-        errdefer font.arena.allocator.free(bitmap);
+        const bitmap = try font.arena.allocator().alloc(u8, @as(usize, width) * height);
+        errdefer font.arena.allocator().free(bitmap);
 
         c.stbtt_MakeCodepointBitmap(
             &font.font,
@@ -282,8 +282,8 @@ fn getGlyphInternal(self: *Self, font: *Font, codepoint: u21) !Glyph {
         var left_side_bearing: c_int = undefined;
         c.stbtt_GetCodepointHMetrics(&font.font, codepoint, &advance_width, &left_side_bearing);
 
-        const texture_data = try font.arena.allocator.alloc(u8, 4 * @as(usize, width) * height);
-        errdefer font.arena.allocator.free(texture_data);
+        const texture_data = try font.arena.allocator().alloc(u8, 4 * @as(usize, width) * height);
+        errdefer font.arena.allocator().free(texture_data);
 
         for (bitmap) |a, i| {
             const o = 4 * i;
@@ -680,7 +680,7 @@ pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangle
 
     std.debug.assert(draw_call.texture == texture);
 
-    try self.vertices.ensureCapacity(self.vertices.items.len + 3 * triangles.len);
+    try self.vertices.ensureUnusedCapacity(3 * triangles.len);
     for (triangles) |tris| {
         try self.vertices.appendSlice(&tris);
     }
@@ -942,7 +942,7 @@ pub const Font = struct {
     refcount: usize,
 
     font: c.stbtt_fontinfo,
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
     glyphs: std.AutoHashMap(u24, Glyph),
 

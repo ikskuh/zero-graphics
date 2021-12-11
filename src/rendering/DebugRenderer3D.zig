@@ -41,11 +41,11 @@ vertex_buffer: *ResourceManager.Buffer,
 vertices: std.ArrayList(Vertex),
 draw_calls: std.ArrayList(DrawCall),
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 
 resources: *ResourceManager,
 
-pub fn init(resources: *ResourceManager, allocator: *std.mem.Allocator) InitError!Self {
+pub fn init(resources: *ResourceManager, allocator: std.mem.Allocator) InitError!Self {
     const vertex_source =
         \\attribute vec3 vPosition;
         \\attribute vec3 vNormal;

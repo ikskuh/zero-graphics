@@ -283,7 +283,7 @@ pointer_location: Location,
 
 keyboard_state: ScancodeMap,
 
-pub fn init(allocator: *std.mem.Allocator) Self {
+pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .arena = std.heap.ArenaAllocator.init(allocator),
         .string_pool = std.ArrayList([]const u8).init(allocator),
@@ -339,7 +339,8 @@ fn poolString(self: *Self, str: []const u8) ![]const u8 {
             return item[index .. index + str.len];
         }
     }
-    const dupe = try self.arena.allocator.dupe(u8, str);
+
+    const dupe = try self.arena.allocator().dupe(u8, str);
     try self.string_pool.append(dupe);
     return dupe;
 }
@@ -348,7 +349,7 @@ pub fn pushEvent(self: *Self, event: Event) !void {
     const node = if (self.free_queue.popFirst()) |n|
         n
     else
-        try self.arena.allocator.create(EventNode);
+        try self.arena.allocator().create(EventNode);
     errdefer self.free_queue.append(node);
 
     node.* = .{

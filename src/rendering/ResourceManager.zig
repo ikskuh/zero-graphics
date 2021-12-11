@@ -24,7 +24,7 @@ const ResourceManager = @This();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-allocator: *std.mem.Allocator,
+allocator: std.mem.Allocator,
 
 textures: TexturePool,
 shaders: ShaderPool,
@@ -34,7 +34,7 @@ envmaps: EnvMapPool,
 
 is_gpu_available: bool,
 
-pub fn init(allocator: *std.mem.Allocator) ResourceManager {
+pub fn init(allocator: std.mem.Allocator) ResourceManager {
     return ResourceManager{
         .allocator = allocator,
         .textures = TexturePool.init(allocator),
@@ -160,7 +160,7 @@ fn DataSource(comptime ResourceData: type) type {
     return struct {
         const Self = @This();
 
-        pub fn init(allocator: *std.mem.Allocator, resource_data: anytype) !Self {
+        pub fn init(allocator: std.mem.Allocator, resource_data: anytype) !Self {
             const ActualDataType = @TypeOf(resource_data);
 
             const resource_data_cpy = try allocator.create(ActualDataType);
@@ -506,7 +506,7 @@ fn destroyEnvironmentMapInternal(ctx: *ResourceManager, envmap: *EnvironmentMap)
 // Shaders
 
 pub const ShaderData = struct {
-    pub fn init(allocator: *std.mem.Allocator) ShaderData {
+    pub fn init(allocator: std.mem.Allocator) ShaderData {
         return ShaderData{
             .arena = std.heap.ArenaAllocator.init(allocator),
             .sources = std.ArrayList(Source).init(allocator),
@@ -523,13 +523,13 @@ pub const ShaderData = struct {
     pub fn appendShader(self: *@This(), shader_type: gl.GLenum, source: []const u8) !void {
         try self.sources.append(Source{
             .shader_type = shader_type,
-            .source = try self.arena.allocator.dupeZ(u8, source),
+            .source = try self.arena.allocator().dupeZ(u8, source),
         });
     }
 
     pub fn setAttribute(self: *@This(), name: []const u8, index: gl.GLuint) !void {
         try self.attributes.append(ShaderAttribute{
-            .name = try self.arena.allocator.dupeZ(u8, name),
+            .name = try self.arena.allocator().dupeZ(u8, name),
             .index = index,
         });
     }
@@ -656,7 +656,7 @@ fn destroyShaderInternal(ctx: *ResourceManager, shader: *Shader) void {
 pub const BufferData = struct {
     data: ?[]const u8,
 
-    pub fn deinit(self: *@This(), allocator: *std.mem.Allocator) void {
+    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
         if (self.data) |data| {
             allocator.free(data);
         }

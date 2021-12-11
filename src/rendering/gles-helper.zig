@@ -100,11 +100,11 @@ fn glesDebugProc(
     var fmt_arg = .{ source_name, type_name, message };
 
     switch (severity) {
-        debug.DEBUG_SEVERITY_HIGH_KHR => logger.emerg(fmt_string, fmt_arg),
+        debug.DEBUG_SEVERITY_HIGH_KHR => logger.err(fmt_string, fmt_arg),
         debug.DEBUG_SEVERITY_MEDIUM_KHR => logger.err(fmt_string, fmt_arg),
         debug.DEBUG_SEVERITY_LOW_KHR => logger.warn(fmt_string, fmt_arg),
         debug.DEBUG_SEVERITY_NOTIFICATION_KHR => logger.info(fmt_string, fmt_arg),
-        else => logger.emerg("encountered invalid log severity: {}", .{severity}),
+        else => logger.err("encountered invalid log severity: {}", .{severity}),
     }
 }
 

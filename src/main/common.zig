@@ -1,6 +1,6 @@
 const std = @import("std");
 
-// fn init(app: *Application, allocator: *std.mem.Allocator) !void
+// fn init(app: *Application, allocator: std.mem.Allocator) !void
 // fn setupGraphics(app: *Application) !void
 // fn resize(app: *Application, width: u15, height: u15) !void
 // fn update(app: *Application) !bool
@@ -9,7 +9,7 @@ const std = @import("std");
 // fn deinit(app: *Application) void
 
 pub fn verifyApplication(comptime T: type) void {
-    if (!@hasDecl(T, "init")) @compileError("Application file must export 'fn init(app: *Application, allocator: *std.mem.Allocator) !void'");
+    if (!@hasDecl(T, "init")) @compileError("Application file must export 'fn init(app: *Application, allocator: std.mem.Allocator) !void'");
     if (!@hasDecl(T, "setupGraphics")) @compileError("Application file must export 'fn setupGraphics(app: *Application) !void'");
     if (!@hasDecl(T, "resize")) @compileError("Application file must export 'fn resize(app: *Application, width: u15, height: u15) !void'");
     if (!@hasDecl(T, "update")) @compileError("Application file must export 'fn update(app: *Application) !bool'");
@@ -21,7 +21,8 @@ pub fn verifyApplication(comptime T: type) void {
 }
 
 export fn zerog_renderer2d_alloc(user_data: ?*c_void, size: usize) ?*c_void {
-    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
+    std.log.info("stbttf: alloc {} bytes with {}", .{ size, user_data });
+    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
 
     const buffer = allocator.allocAdvanced(u8, 16, size + 16, .exact) catch return null;
     std.mem.writeIntNative(usize, buffer[0..@sizeOf(usize)], buffer.len);
@@ -29,7 +30,8 @@ export fn zerog_renderer2d_alloc(user_data: ?*c_void, size: usize) ?*c_void {
 }
 
 export fn zerog_renderer2d_free(user_data: ?*c_void, ptr: ?*c_void) void {
-    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
+    std.log.info("stbttf: free {} with {}", .{ ptr, user_data });
+    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
 
     const actual_buffer = @ptrCast([*]u8, ptr orelse return) - 16;
     const len = std.mem.readIntNative(usize, actual_buffer[0..@sizeOf(usize)]);
