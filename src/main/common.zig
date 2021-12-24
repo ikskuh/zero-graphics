@@ -20,7 +20,7 @@ pub fn verifyApplication(comptime T: type) void {
     // TODO: Verify signatures
 }
 
-export fn zerog_renderer2d_alloc(user_data: ?*c_void, size: usize) ?*c_void {
+export fn zerog_renderer2d_alloc(user_data: ?*anyopaque, size: usize) ?*anyopaque {
     std.log.info("stbttf: alloc {} bytes with {}", .{ size, user_data });
     const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
 
@@ -29,7 +29,7 @@ export fn zerog_renderer2d_alloc(user_data: ?*c_void, size: usize) ?*c_void {
     return buffer.ptr + 16;
 }
 
-export fn zerog_renderer2d_free(user_data: ?*c_void, ptr: ?*c_void) void {
+export fn zerog_renderer2d_free(user_data: ?*anyopaque, ptr: ?*anyopaque) void {
     std.log.info("stbttf: free {} with {}", .{ ptr, user_data });
     const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
 

@@ -175,7 +175,7 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
                 gles.TRIANGLES,
                 @intCast(gles.GLsizei, mesh.count),
                 gles.UNSIGNED_SHORT,
-                @intToPtr(?*const c_void, @sizeOf(u16) * mesh.offset),
+                @intToPtr(?*const anyopaque, @sizeOf(u16) * mesh.offset),
             );
         }
     }

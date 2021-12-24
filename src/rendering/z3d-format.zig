@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const FileType = enum(u8) { static = 0, dynamic = 1,_ };
+pub const FileType = enum(u8) { static = 0, dynamic = 1, _ };
 pub const magic_number = [4]u8{ 0xae, 0x32, 0x51, 0x1d };
 
 pub const CommonHeader = extern struct {

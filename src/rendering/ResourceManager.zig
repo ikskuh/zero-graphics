@@ -827,9 +827,9 @@ pub const Geometry = struct {
 
     pub fn bind(self: Geometry) void {
         gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer.?);
-        gl.vertexAttribPointer(attributes.vPosition, 3, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
-        gl.vertexAttribPointer(attributes.vNormal, 3, gl.FLOAT, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "nx")));
-        gl.vertexAttribPointer(attributes.vUV, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
+        gl.vertexAttribPointer(attributes.vPosition, 3, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "x")));
+        gl.vertexAttribPointer(attributes.vNormal, 3, gl.FLOAT, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "nx")));
+        gl.vertexAttribPointer(attributes.vUV, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "u")));
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer.?);
     }
 };

@@ -15,7 +15,7 @@ comptime {
 
 pub const backend: zerog.Backend = .wasm;
 
-extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*c_void;
+extern fn wasm_loadOpenGlFunction(function: [*]const u8, function_len: usize) ?*anyopaque;
 
 extern fn wasm_quit() void;
 extern fn wasm_panic(ptr: [*]const u8, len: usize) void;
@@ -81,11 +81,11 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
     unreachable;
 }
 
-pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const anyopaque {
     inline for (std.meta.declarations(WebGL)) |decl| {
         const gl_ep = "gl" ++ [_]u8{std.ascii.toUpper(decl.name[0])} ++ decl.name[1..];
         if (std.mem.eql(u8, gl_ep, function)) {
-            return @as(*const c_void, @field(WebGL, decl.name));
+            return @as(*const anyopaque, @field(WebGL, decl.name));
         }
     }
     return null;
@@ -454,7 +454,7 @@ const WebGL = struct {
     pub extern "webgl" fn bindFramebuffer(target: c_uint, framebuffer: c_uint) void;
     pub extern "webgl" fn bindTexture(target: c_uint, texture_id: c_uint) void;
     pub extern "webgl" fn blendFunc(x: c_uint, y: c_uint) void;
-    pub extern "webgl" fn bufferData(type: c_uint, count: c_long, data_ptr: ?*const c_void, draw_type: c_uint) void;
+    pub extern "webgl" fn bufferData(type: c_uint, count: c_long, data_ptr: ?*const anyopaque, draw_type: c_uint) void;
     pub extern "webgl" fn checkFramebufferStatus(target: gles.GLenum) gles.GLenum;
     pub extern "webgl" fn clear(mask: gles.GLbitfield) void;
     pub extern "webgl" fn clearColor(r: f32, g: f32, b: f32, a: f32) void;
@@ -477,7 +477,7 @@ const WebGL = struct {
     pub extern "webgl" fn disable(cap: gles.GLenum) void;
     pub extern "webgl" fn genVertexArrays(_n: gles.GLsizei, _arrays: [*c]gles.GLuint) void;
     pub extern "webgl" fn drawArrays(type: c_uint, offset: c_uint, count: c_int) void;
-    pub extern "webgl" fn drawElements(mode: gles.GLenum, count: gles.GLsizei, type: gles.GLenum, offset: ?*const c_void) void;
+    pub extern "webgl" fn drawElements(mode: gles.GLenum, count: gles.GLsizei, type: gles.GLenum, offset: ?*const anyopaque) void;
     pub extern "webgl" fn enable(x: c_uint) void;
     pub extern "webgl" fn enableVertexAttribArray(x: c_uint) void;
     pub extern "webgl" fn framebufferTexture2D(target: gles.GLenum, attachment: gles.GLenum, textarget: gles.GLenum, texture: gles.GLuint, level: gles.GLint) void;
@@ -508,7 +508,7 @@ const WebGL = struct {
     pub extern "webgl" fn uniform4f(location_id: c_int, x: f32, y: f32, z: f32, w: f32) void;
     pub extern "webgl" fn uniformMatrix4fv(location_id: c_int, data_len: c_int, transpose: c_uint, data_ptr: [*]const f32) void;
     pub extern "webgl" fn useProgram(program_id: c_uint) void;
-    pub extern "webgl" fn vertexAttribPointer(attrib_location: c_uint, size: c_uint, type: c_uint, normalize: c_uint, stride: c_uint, offset: ?*const c_void) void;
+    pub extern "webgl" fn vertexAttribPointer(attrib_location: c_uint, size: c_uint, type: c_uint, normalize: c_uint, stride: c_uint, offset: ?*const anyopaque) void;
     pub extern "webgl" fn viewport(x: c_int, y: c_int, width: c_int, height: c_int) void;
     pub extern "webgl" fn scissor(x: gles.GLint, y: gles.GLint, width: gles.GLsizei, height: gles.GLsizei) void;
 
@@ -546,12 +546,12 @@ const WebGL = struct {
     extern "webgl" fn blendColor(_red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) void;
     extern "webgl" fn blendEquationSeparate(_modeRGB: GLenum, _modeAlpha: GLenum) void;
     extern "webgl" fn blendFuncSeparate(_sfactorRGB: GLenum, _dfactorRGB: GLenum, _sfactorAlpha: GLenum, _dfactorAlpha: GLenum) void;
-    extern "webgl" fn bufferSubData(_target: GLenum, _offset: GLintptr, _size: GLsizeiptr, _data: ?*const c_void) void;
+    extern "webgl" fn bufferSubData(_target: GLenum, _offset: GLintptr, _size: GLsizeiptr, _data: ?*const anyopaque) void;
     extern "webgl" fn clearDepthf(_d: GLfloat) void;
     extern "webgl" fn clearStencil(_s: GLint) void;
     extern "webgl" fn colorMask(_red: GLboolean, _green: GLboolean, _blue: GLboolean, _alpha: GLboolean) void;
-    extern "webgl" fn compressedTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _width: GLsizei, _height: GLsizei, _border: GLint, _imageSize: GLsizei, _data: ?*const c_void) void;
-    extern "webgl" fn compressedTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _imageSize: GLsizei, _data: ?*const c_void) void;
+    extern "webgl" fn compressedTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _width: GLsizei, _height: GLsizei, _border: GLint, _imageSize: GLsizei, _data: ?*const anyopaque) void;
+    extern "webgl" fn compressedTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _imageSize: GLsizei, _data: ?*const anyopaque) void;
     extern "webgl" fn copyTexImage2D(_target: GLenum, _level: GLint, _internalformat: GLenum, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _border: GLint) void;
     extern "webgl" fn copyTexSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei) void;
     extern "webgl" fn deleteFramebuffers(_n: GLsizei, _framebuffers: [*c]const GLuint) void;
@@ -583,7 +583,7 @@ const WebGL = struct {
     extern "webgl" fn getUniformiv(_program: GLuint, _location: GLint, _params: [*c]GLint) void;
     extern "webgl" fn getVertexAttribfv(_index: GLuint, _pname: GLenum, _params: [*c]GLfloat) void;
     extern "webgl" fn getVertexAttribiv(_index: GLuint, _pname: GLenum, _params: [*c]GLint) void;
-    extern "webgl" fn getVertexAttribPointerv(_index: GLuint, _pname: GLenum, _pointer: ?*?*c_void) void;
+    extern "webgl" fn getVertexAttribPointerv(_index: GLuint, _pname: GLenum, _pointer: ?*?*anyopaque) void;
     extern "webgl" fn isBuffer(_buffer: GLuint) GLboolean;
     extern "webgl" fn isEnabled(_cap: GLenum) GLboolean;
     extern "webgl" fn isFramebuffer(_framebuffer: GLuint) GLboolean;
@@ -593,11 +593,11 @@ const WebGL = struct {
     extern "webgl" fn isTexture(_texture: GLuint) GLboolean;
     extern "webgl" fn lineWidth(_width: GLfloat) void;
     extern "webgl" fn polygonOffset(_factor: GLfloat, _units: GLfloat) void;
-    extern "webgl" fn readPixels(_x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*c_void) void;
+    extern "webgl" fn readPixels(_x: GLint, _y: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*anyopaque) void;
     extern "webgl" fn releaseShaderCompiler() void;
     extern "webgl" fn renderbufferStorage(_target: GLenum, _internalformat: GLenum, _width: GLsizei, _height: GLsizei) void;
     extern "webgl" fn sampleCoverage(_value: GLfloat, _invert: GLboolean) void;
-    extern "webgl" fn shaderBinary(_count: GLsizei, _shaders: [*c]const GLuint, _binaryFormat: GLenum, _binary: ?*const c_void, _length: GLsizei) void;
+    extern "webgl" fn shaderBinary(_count: GLsizei, _shaders: [*c]const GLuint, _binaryFormat: GLenum, _binary: ?*const anyopaque, _length: GLsizei) void;
     extern "webgl" fn stencilFunc(_func: GLenum, _ref: GLint, _mask: GLuint) void;
     extern "webgl" fn stencilFuncSeparate(_face: GLenum, _func: GLenum, _ref: GLint, _mask: GLuint) void;
     extern "webgl" fn stencilMask(_mask: GLuint) void;
@@ -606,7 +606,7 @@ const WebGL = struct {
     extern "webgl" fn stencilOpSeparate(_face: GLenum, _sfail: GLenum, _dpfail: GLenum, _dppass: GLenum) void;
     extern "webgl" fn texParameterfv(_target: GLenum, _pname: GLenum, _params: [*c]const GLfloat) void;
     extern "webgl" fn texParameteriv(_target: GLenum, _pname: GLenum, _params: [*c]const GLint) void;
-    extern "webgl" fn texSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*const c_void) void;
+    extern "webgl" fn texSubImage2D(_target: GLenum, _level: GLint, _xoffset: GLint, _yoffset: GLint, _width: GLsizei, _height: GLsizei, _format: GLenum, _type: GLenum, _pixels: ?*const anyopaque) void;
     extern "webgl" fn uniform1fv(_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
     extern "webgl" fn uniform1iv(_location: GLint, _count: GLsizei, _value: [*c]const GLint) void;
     extern "webgl" fn uniform2f(_location: GLint, _v0: GLfloat, _v1: GLfloat) void;

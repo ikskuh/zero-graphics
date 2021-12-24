@@ -64,7 +64,7 @@ fn glesDebugProc(
     severity: zero_graphics.gles.GLenum,
     length: zero_graphics.gles.GLsizei,
     message_ptr: [*:0]const u8,
-    userParam: ?*c_void,
+    userParam: ?*anyopaque,
 ) callconv(.C) void {
     _ = msg_type;
     _ = userParam;

@@ -329,11 +329,11 @@ const Widget = struct {
             draw: ?fn (Custom, Rectangle, *Renderer, DrawInfo) Renderer.DrawError!void = null,
             process_event: ?fn (Custom, Event) ?usize = null,
             /// generic second user data to provide context information for the user data
-            context: ?*c_void = null,
+            context: ?*anyopaque = null,
         };
         config: Config = .{},
         /// User data passed to the builder.custom call.
-        user_data: ?*c_void,
+        user_data: ?*anyopaque,
         result: ?usize = null,
     };
 };
@@ -739,7 +739,7 @@ pub const Builder = struct {
         updateWidgetConfig(&info.control.config, config);
     }
 
-    pub fn custom(self: Self, rectangle: Rectangle, user_data: ?*c_void, config: anytype) Error!?usize {
+    pub fn custom(self: Self, rectangle: Rectangle, user_data: ?*anyopaque, config: anytype) Error!?usize {
         const info = try self.initOrUpdateWidget(.custom, rectangle, config);
 
         if (info.needs_init) {

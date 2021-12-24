@@ -22,7 +22,7 @@ pub const android = @import("android");
 const EGLContext = android.egl.EGLContext;
 const JNI = android.JNI;
 
-pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const anyopaque {
     // We can "safely" convert the function name here as eglGetProcAddress is documented as `const`
     return android.egl.c.eglGetProcAddress(function.ptr);
 }

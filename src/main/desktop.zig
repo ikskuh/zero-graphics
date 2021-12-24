@@ -523,7 +523,7 @@ fn translateSdlScancode(scancode: c.SDL_Scancode) ?zerog.Input.Scancode {
     };
 }
 
-pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const c_void {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const anyopaque {
     // logger.debug("getting entry point for '{s}'", .{function});
     return c.SDL_GL_GetProcAddress(function.ptr);
 }

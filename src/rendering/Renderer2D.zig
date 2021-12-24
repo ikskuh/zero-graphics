@@ -545,9 +545,9 @@ pub fn render(self: Self, screen_size: Size) void {
     gles.bindBuffer(gles.ARRAY_BUFFER, self.vertex_buffer.instance.?);
     gles.bufferData(gles.ARRAY_BUFFER, @intCast(gles.GLsizeiptr, @sizeOf(Vertex) * self.vertices.items.len), self.vertices.items.ptr, gles.STATIC_DRAW);
 
-    gles.vertexAttribPointer(vertex_attributes.vPosition, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
-    gles.vertexAttribPointer(vertex_attributes.vColor, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "r")));
-    gles.vertexAttribPointer(vertex_attributes.vUV, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
+    gles.vertexAttribPointer(vertex_attributes.vPosition, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "x")));
+    gles.vertexAttribPointer(vertex_attributes.vColor, 4, gles.UNSIGNED_BYTE, gles.TRUE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "r")));
+    gles.vertexAttribPointer(vertex_attributes.vUV, 2, gles.FLOAT, gles.FALSE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "u")));
 
     var uniforms = glesh.fetchUniforms(self.shader_program.instance.?, Uniforms);
 

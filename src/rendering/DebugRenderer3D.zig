@@ -117,9 +117,9 @@ pub fn render(self: Self, viewProjectionMatrix: Mat4) void {
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer.instance.?);
     gl.bufferData(gl.ARRAY_BUFFER, @intCast(gl.GLsizeiptr, @sizeOf(Vertex) * self.vertices.items.len), self.vertices.items.ptr, gl.STATIC_DRAW);
 
-    gl.vertexAttribPointer(types.ResourceManager.Geometry.attributes.vPosition, 3, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "x")));
-    gl.vertexAttribPointer(types.ResourceManager.Geometry.attributes.vNormal, 3, gl.FLOAT, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "nx")));
-    gl.vertexAttribPointer(types.ResourceManager.Geometry.attributes.vUV, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const c_void, @offsetOf(Vertex, "u")));
+    gl.vertexAttribPointer(types.ResourceManager.Geometry.attributes.vPosition, 3, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "x")));
+    gl.vertexAttribPointer(types.ResourceManager.Geometry.attributes.vNormal, 3, gl.FLOAT, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "nx")));
+    gl.vertexAttribPointer(types.ResourceManager.Geometry.attributes.vUV, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*const anyopaque, @offsetOf(Vertex, "u")));
 
     var uniforms = glesh.fetchUniforms(self.shader_program.instance.?, Uniforms);
 
