@@ -11,7 +11,7 @@ fn QueryExtension(comptime query: []const []const u8) type {
         fld.* = std.builtin.TypeInfo.StructField{
             .name = query[i],
             .field_type = bool,
-            .default_value = false,
+            .default_value = &false,
             .is_comptime = false,
             .alignment = @alignOf(bool),
         };

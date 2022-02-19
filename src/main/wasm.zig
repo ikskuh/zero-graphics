@@ -82,7 +82,7 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
 }
 
 pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const anyopaque {
-    inline for (std.meta.declarations(WebGL)) |decl| {
+    inline for (comptime std.meta.declarations(WebGL)) |decl| {
         const gl_ep = "gl" ++ [_]u8{std.ascii.toUpper(decl.name[0])} ++ decl.name[1..];
         if (std.mem.eql(u8, gl_ep, function)) {
             return @as(*const anyopaque, @field(WebGL, decl.name));
