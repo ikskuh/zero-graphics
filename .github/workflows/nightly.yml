@@ -79,7 +79,7 @@ jobs:
           sdkmanager --install "ndk;21.1.6352462"
 
       - name: Build (native) desktop + WASM
-        run: zig build install
+        run: zig build install --verbose-link
 
       - name: Build Android application
         run: zig build -Denable-android init-keystore install
