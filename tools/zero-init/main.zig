@@ -63,8 +63,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
 fn exec(cwd: []const u8, argv: []const []const u8) !void {
-    var proc = try std.ChildProcess.init(argv, allocator);
-    defer proc.deinit();
+    var proc = std.ChildProcess.init(argv, allocator);
 
     proc.cwd = cwd;
 

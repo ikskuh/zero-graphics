@@ -288,10 +288,10 @@ pub fn update(app: *Application) !bool {
 
                     for (points) |*pt, i| {
                         const offset = @intToFloat(f32, i);
-                        const mirror = std.math.sin((1.0 + 0.2 * offset) * t + offset);
+                        const mirror = @sin((1.0 + 0.2 * offset) * t + offset);
 
-                        pt[0] = mirror * std.math.sin((0.1 * offset) * 0.4 * t + offset);
-                        pt[1] = mirror * std.math.cos((0.1 * offset) * 0.4 * t + offset);
+                        pt[0] = mirror * @sin((0.1 * offset) * 0.4 * t + offset);
+                        pt[1] = mirror * @cos((0.1 * offset) * 0.4 * t + offset);
                     }
 
                     var real_pt: [3]zero_graphics.Point = undefined;
@@ -439,9 +439,9 @@ pub fn render(app: *Application) !void {
         const lookat_mat = zlm.SpecializeOn(f32).Mat4.createLookAt(
             // zlm.specializeOn(f32).vec3(0, 0, -10),
             zlm.SpecializeOn(f32).vec3(
-                4.0 * std.math.sin(ts),
+                4.0 * @sin(ts),
                 3.0,
-                4.0 * std.math.cos(ts),
+                4.0 * @cos(ts),
             ),
             zlm.SpecializeOn(f32).Vec3.zero,
             zlm.SpecializeOn(f32).Vec3.unitY,

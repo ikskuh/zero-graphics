@@ -44,7 +44,7 @@ shader_program: *ResourceManager.Shader,
 
 vertex_buffer: *ResourceManager.Buffer,
 
-/// list of CCW triangles that will be rendered 
+/// list of CCW triangles that will be rendered
 vertices: std.ArrayList(Vertex),
 draw_calls: std.ArrayList(DrawCall),
 
@@ -339,7 +339,7 @@ fn getGlyphInternal(self: *Self, font: *Font, codepoint: u21) !Glyph {
 }
 
 fn scaleInt(ival: isize, scale: f32) i16 {
-    return @intCast(i16, @floatToInt(isize, std.math.round(@intToFloat(f32, ival) * scale)));
+    return @intCast(i16, @floatToInt(isize, @round(@intToFloat(f32, ival) * scale)));
 }
 
 const GlyphIterator = struct {
@@ -661,7 +661,7 @@ pub fn render(self: Self, screen_size: Size) void {
     }
 }
 
-/// Appends a set of triangles to the renderer with the given `texture`. 
+/// Appends a set of triangles to the renderer with the given `texture`.
 pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex) DrawError!void {
     const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture) blk: {
         const dc = try self.draw_calls.addOne();
@@ -936,7 +936,7 @@ const DrawVertices = struct {
 pub const Font = struct {
 
     /// private reference counter.
-    /// This is required as texture references are held in the internal draw 
+    /// This is required as texture references are held in the internal draw
     /// queue when passing them into a draw command and will be released after
     /// the `render()` call
     refcount: usize,

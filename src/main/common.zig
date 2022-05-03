@@ -44,11 +44,11 @@ export fn zerog_panic(msg: [*:0]const u8) noreturn {
 }
 
 export fn zerog_ifloor(v: f64) c_int {
-    return @floatToInt(c_int, std.math.floor(v));
+    return @floatToInt(c_int, @floor(v));
 }
 
 export fn zerog_iceil(v: f64) c_int {
-    return @floatToInt(c_int, std.math.ceil(v));
+    return @floatToInt(c_int, @ceil(v));
 }
 
 export fn zerog_sqrt(v: f64) f64 {
@@ -61,13 +61,13 @@ export fn zerog_fmod(a: f64, b: f64) f64 {
     return @mod(a, b);
 }
 export fn zerog_cos(v: f64) f64 {
-    return std.math.cos(v);
+    return @cos(v);
 }
 export fn zerog_acos(v: f64) f64 {
     return std.math.acos(v);
 }
 export fn zerog_fabs(v: f64) f64 {
-    return std.math.fabs(v);
+    return @fabs(v);
 }
 export fn zerog_strlen(str: ?[*:0]const u8) usize {
     return std.mem.len(str orelse return 0);
