@@ -268,6 +268,10 @@ const ScancodeMap = blk: {
     @setEvalBranchQuota(10_000);
     break :blk std.EnumArray(Scancode, bool);
 };
+const ButtonMap = blk: {
+    @setEvalBranchQuota(10_000);
+    break :blk std.EnumArray(MouseButton, bool);
+};
 
 const Self = @This();
 
@@ -282,6 +286,7 @@ string_pool: std.ArrayList([]const u8),
 pointer_location: Location,
 
 keyboard_state: ScancodeMap,
+mouse_state: ButtonMap,
 
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
@@ -292,6 +297,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
         .current_event = null,
         .pointer_location = .{ .x = -1, .y = -1 },
         .keyboard_state = ScancodeMap.initFill(false),
+        .mouse_state = ButtonMap.initFill(false),
     };
 }
 
@@ -324,6 +330,8 @@ pub fn pollEvent(self: *Self) ?Event {
             // auto-update keyboard state
             .key_down => |k| self.keyboard_state.set(k, true),
             .key_up => |k| self.keyboard_state.set(k, false),
+            .pointer_press => |b| self.mouse_state.set(b, true),
+            .pointer_release => |b| self.mouse_state.set(b, false),
 
             // auto-update via motion events
             .pointer_motion => |pos| self.pointer_location = pos,
