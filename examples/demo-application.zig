@@ -16,6 +16,8 @@ const zero_graphics = @import("zero-graphics");
 const logger = std.log.scoped(.demo);
 const gles = zero_graphics.gles;
 
+const colors = zero_graphics.colors;
+const Color = zero_graphics.Color;
 const ResourceManager = zero_graphics.ResourceManager;
 const Renderer = zero_graphics.Renderer2D;
 const Renderer3D = zero_graphics.Renderer3D;
@@ -35,6 +37,7 @@ input: *zero_graphics.Input,
 ui: zero_graphics.UserInterface,
 
 gui_data: DemoGuiData = .{},
+editor: EditorData = .{},
 
 renderer3d: Renderer3D,
 mesh: *ResourceManager.Geometry,
@@ -171,8 +174,13 @@ pub fn update(app: *Application) !bool {
             .height = app.screen_height,
         });
 
-        if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 30, .height = 30 }, app.gui_data.is_visible, .{}))
+        if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 30, .height = 30 }, app.gui_data.is_visible, .{})) {
             app.gui_data.is_visible = !app.gui_data.is_visible;
+        }
+
+        if (try ui.checkBox(.{ .x = 100, .y = 40, .width = 30, .height = 30 }, app.editor.is_visible, .{})) {
+            app.editor.is_visible = !app.editor.is_visible;
+        }
 
         if (try ui.checkBox(.{ .x = 100, .y = 50, .width = 30, .height = 30 }, app.test_pattern, .{})) {
             app.test_pattern = !app.test_pattern;
@@ -278,7 +286,6 @@ pub fn update(app: *Application) !bool {
                 pub fn draw(self: zero_graphics.UserInterface.CustomWidget, rectangle: zero_graphics.Rectangle, painter: *Renderer, info: zero_graphics.UserInterface.CustomWidget.DrawInfo) Renderer.DrawError!void {
                     _ = self;
                     _ = info;
-                    const Color = zero_graphics.Color;
                     try painter.fillRectangle(rectangle, if (mouse_in)
                         if (mouse_down)
                             Color{ .r = 0xFF, .g = 0x80, .b = 0x80, .a = 0x30 }
@@ -425,6 +432,8 @@ pub fn render(app: *Application) !void {
             zero_graphics.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
         );
 
+        try app.editor.render();
+
         if (app.test_pattern) {
             if (@mod(zero_graphics.milliTimestamp(), 1000) > 500) {
                 var i: u15 = 0;
@@ -566,4 +575,23 @@ const DemoGuiData = struct {
     radio_group_2: usize = 1,
 
     check_group: [4]bool = .{ false, false, false, false },
+};
+
+const EditorData = struct {
+    is_visible: bool = false,
+
+    pub fn render(self: *EditorData) !void {
+        const app = @fieldParentPtr(Application, "editor", self);
+        if (!self.is_visible) {
+            return;
+        }
+
+        try app.renderer.drawLine(
+            0,
+            0,
+            100,
+            100,
+            colors.xkcd.lime,
+        );
+    }
 };

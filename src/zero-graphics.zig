@@ -129,6 +129,11 @@ pub const Size = struct {
 pub const VerticalAlignment = enum { top, center, bottom };
 pub const HorzizontalAlignment = enum { left, center, right };
 
+pub const colors = struct {
+    pub const xkcd = @import("colors/xkcd.zig");
+    pub const css3 = @import("colors/css3.zig");
+};
+
 pub const Color = extern struct {
     r: u8,
     g: u8,
