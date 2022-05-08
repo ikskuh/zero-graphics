@@ -1,6 +1,6 @@
 const std = @import("std");
 
-// fn init(app: *Application, allocator: std.mem.Allocator) !void
+// fn init(app: *Application, allocator: std.mem.Allocator, input: zero_graphics.Input) !void
 // fn setupGraphics(app: *Application) !void
 // fn resize(app: *Application, width: u15, height: u15) !void
 // fn update(app: *Application) !bool
