@@ -47,6 +47,11 @@ pub const ButtonTheme = struct {
     disabled: ButtonStyle,
 };
 
+pub const TextBoxTheme = struct {
+    default: BoxStyle,
+    focused: BoxStyle,
+};
+
 pub const Theme = struct {
     fn rgb(comptime str: *const [6]u8) Color {
         return Color{
@@ -64,7 +69,7 @@ pub const Theme = struct {
 
     button: ButtonTheme,
     panel: BoxStyle,
-    text_box: BoxStyle,
+    text_box: TextBoxTheme,
     label: LabelStyle,
     modal_layer: ModalLayerStyle,
 
@@ -98,9 +103,15 @@ pub const Theme = struct {
             .background = rgb("303030"),
         },
 
-        .text_box = BoxStyle{
-            .border = rgb("cccccc"),
-            .background = rgb("303030"),
+        .text_box = TextBoxTheme{
+            .default = BoxStyle{
+                .border = rgb("cccccc"),
+                .background = rgb("303030"),
+            },
+            .focused = BoxStyle{
+                .border = rgb("3b4898"),
+                .background = rgb("303030"),
+            },
         },
 
         .label = LabelStyle{
@@ -120,9 +131,6 @@ const Widget = struct {
     id: WidgetID,
     control: Control,
     bounds: Rectangle,
-
-    // Runtime state:
-    focused: bool = false,
 
     const Control = union(enum) {
         unset,
@@ -265,11 +273,15 @@ const Widget = struct {
     };
     const TextBox = struct {
         const Config = struct {
-            style: ?BoxStyle = null,
+            style: ?TextBoxTheme = null,
             hit_test_visible: bool = true,
         };
 
         text: StringBuffer,
+        content_hash: StringHash = StringHash.compute(""),
+
+        accepted: bool = false,
+
         config: Config = .{},
     };
     const Label = struct {
@@ -365,8 +377,8 @@ mode: ProcessingMode = .default,
 /// the current frame.
 active_widgets: WidgetList = .{},
 
-/// Contains the list of all widgets that were available in the last 
-/// frame. Widgets in here have valid `.data` and might be re-used in 
+/// Contains the list of all widgets that were available in the last
+/// frame. Widgets in here have valid `.data` and might be re-used in
 /// the current frame. This allows keeping state over several frames.
 retained_widgets: WidgetList = .{},
 
@@ -391,6 +403,9 @@ pressed_widget: ?*Widget = null,
 
 /// The widget which is currently hovered by the pointer.
 hovered_widget: ?*Widget = null,
+
+/// The widget that is currently having the keyboard focus
+focused_widget: ?*Widget = null,
 
 renderer: ?*Renderer,
 
@@ -481,7 +496,7 @@ pub fn setRenderer(self: *UserInterface, new_renderer: ?*Renderer) !void {
     }
 }
 
-/// Allocates a new WidgetNode, either via the arena or 
+/// Allocates a new WidgetNode, either via the arena or
 /// fetches it from the free_widgets list
 fn allocWidgetNode(self: *UserInterface) !*WidgetNode {
     const node = if (self.free_widgets.popFirst()) |n|
@@ -538,7 +553,7 @@ fn typeId(comptime T: type) usize {
     }.i);
 }
 
-/// Computes a adler32 ID from the 
+/// Computes a adler32 ID from the
 fn widgetId(config: anytype) WidgetID {
     const Config = @TypeOf(config);
 
@@ -665,7 +680,7 @@ pub const Builder = struct {
         return processClickable(&info.control.clickable);
     }
 
-    /// Creates a button at the provided position that will display `text` as 
+    /// Creates a button at the provided position that will display `text` as
     pub fn button(self: Self, rectangle: Rectangle, text: ?[]const u8, icon: ?*Texture, config: anytype) Error!bool {
         const info = try self.initOrUpdateWidget(.button, rectangle, config);
         if (info.needs_init) {
@@ -755,6 +770,33 @@ pub const Builder = struct {
         info.control.result = null;
         return result;
     }
+
+    pub fn textBox(self: Self, rectangle: Rectangle, display_string: []const u8, config: anytype) Error!?[]const u8 {
+        const info = try self.initOrUpdateWidget(.text_box, rectangle, config);
+
+        const display_hash = StringHash.compute(display_string);
+
+        if (info.needs_init) {
+            info.control.* = .{
+                .text = try StringBuffer.init(self.ui.allocator, display_string),
+                .content_hash = display_hash,
+            };
+        } else {
+            if (info.control.content_hash != display_hash) {
+                logger.info("updating text box content to {s}", .{display_string});
+                try info.control.text.set(self.ui.allocator, display_string);
+            }
+        }
+        updateWidgetConfig(&info.control.config, config);
+
+        if (info.control.accepted) {
+            info.control.accepted = false;
+
+            return info.control.text.get();
+        } else {
+            return null;
+        }
+    }
 };
 
 pub fn processInput(self: *UserInterface) InputProcessor {
@@ -777,12 +819,7 @@ fn widgetFromPosition(self: *UserInterface, point: Point) ?*Widget {
 /// The user interface supports two types of pointer input.
 /// - The `primary` pointer is the normal touch input or mouse click with the left mouse button. This usually activates the main action of the widget.
 /// - The `secondary` pointer is either a long-click for touch/single button inputs or the right mouse button. This usually opens a context menu or similar.
-pub const Pointer = enum {
-    /// Short click or left-click 
-    primary,
-    /// Long click or right click
-    secondary,
-};
+pub const Pointer = types.Input.MouseButton;
 
 pub const InputProcessor = struct {
     const Self = @This();
@@ -824,7 +861,11 @@ pub const InputProcessor = struct {
     pub fn pointerUp(self: Self, pointer: Pointer) void {
         defer self.ui.pressed_widget = null;
 
-        const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse return;
+        const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse {
+            // clicking on *no* widget unfocused the current one
+            self.ui.focused_widget = null;
+            return;
+        };
 
         if (self.ui.pressed_widget) |widget| {
             widget.sendEvent(.{ .pointer_release = .{
@@ -836,14 +877,75 @@ pub const InputProcessor = struct {
         const pressed_widget = self.ui.pressed_widget orelse return;
 
         if (pointer == .primary and clicked_widget == pressed_widget) {
+            // if the widget is clickable, we focus it
+            self.ui.focused_widget = clicked_widget;
             clicked_widget.click(self.ui.pointer_position);
         }
     }
 
+    pub fn buttonDown(self: Self, button: types.Input.Scancode) !void {
+        const active_widget = self.ui.focused_widget orelse return;
+        switch (active_widget.control) {
+            .text_box => |*control| switch (button) {
+                .@"return" => control.accepted = true,
+                .escape => {},
+                .backspace => { // remove the last unicode codepoint
+                    var view = try std.unicode.Utf8View.init(control.text.get());
+
+                    var iter = view.iterator();
+
+                    var end_marker: usize = 0;
+                    while (iter.nextCodepointSlice()) |cp| {
+                        end_marker = @ptrToInt(cp.ptr) - @ptrToInt(iter.bytes.ptr);
+                    }
+
+                    control.text.shrink(end_marker);
+                },
+                .tab => {},
+                .delete => {},
+                else => {},
+            },
+            else => return, // just eat the event by default
+        }
+    }
+
+    pub fn buttonUp(self: Self, button: types.Input.Scancode) !void {
+        const active_widget = self.ui.focused_widget orelse return;
+        switch (active_widget.control) {
+            else => return, // just eat the event by default
+        }
+        _ = button;
+    }
+
     pub fn enterText(self: Self, string: []const u8) !void {
-        _ = self;
-        _ = string;
-        logger.info("not implemented yet: enterText", .{});
+        const active_widget = self.ui.focused_widget orelse return;
+
+        switch (active_widget.control) {
+            // these widgets can be activated by pressing space
+            .button, .check_box, .radio_button => for (string) |c| switch (c) {
+                ' ' => active_widget.click(self.ui.pointer_position),
+                else => {}, // ignore everything else
+            },
+
+            .text_box => |*control| {
+                // TODO: Improve this by using the embedded arraylist of control.text if possible
+                var edit_box = std.ArrayList(u8).init(self.ui.allocator);
+                defer edit_box.deinit();
+
+                try edit_box.appendSlice(control.text.get());
+
+                for (string) |c| {
+                    switch (c) {
+                        '\r', '\n' => {}, // ignore these
+                        else => try edit_box.append(c),
+                    }
+                }
+
+                try control.text.set(self.ui.allocator, edit_box.items);
+            },
+
+            else => return, // just eat the event by default
+        }
     }
 };
 
@@ -852,6 +954,10 @@ fn clampSub(a: u15, b: u15) u15 {
         a - b
     else
         0;
+}
+
+fn isFocused(self: UserInterface, widget: *Widget) bool {
+    return (self.focused_widget == widget);
 }
 
 pub fn render(self: UserInterface) !void {
@@ -915,8 +1021,41 @@ pub fn render(self: UserInterface) !void {
             },
 
             .text_box => |control| {
-                _ = control;
-                @panic("not implemented yet!");
+                const theme = control.config.style orelse self.theme.text_box;
+
+                const style = if (self.isFocused(widget))
+                    theme.focused
+                else
+                    theme.default;
+
+                try renderer.fillRectangle(widget.bounds, style.background);
+                try renderer.drawRectangle(widget.bounds, style.border);
+
+                const font = self.default_font;
+                const string_width = renderer.measureString(font, control.text.get()).width;
+                const string_height = font.getLineHeight();
+
+                try renderer.drawString(
+                    font,
+                    control.text.get(),
+                    widget.bounds.x + 3,
+                    widget.bounds.y + clampSub(widget.bounds.height, string_height) / 2,
+                    Color.white,
+                );
+
+                if (self.isFocused(widget)) {
+                    const blink_period = 800;
+                    const timer = @mod(std.time.milliTimestamp(), blink_period);
+                    if (timer >= blink_period / 2) {
+                        try renderer.drawLine(
+                            widget.bounds.x + 5 + string_width,
+                            widget.bounds.y + clampSub(widget.bounds.height, string_height) / 2,
+                            widget.bounds.x + 5 + string_width,
+                            widget.bounds.y + (widget.bounds.height + string_height) / 2,
+                            Color.white,
+                        );
+                    }
+                }
             },
             .label => |control| {
                 const style = control.config.style orelse self.theme.label;
@@ -1163,11 +1302,21 @@ const StringBuffer = union(enum) {
         }
     }
 
+    pub fn shrink(self: *Self, new_length: usize) void {
+        switch (self.*) {
+            .allocated => |*list| list.shrinkRetainingCapacity(new_length),
+            .self_contained => |*buf| {
+                std.debug.assert(buf.len >= new_length);
+                buf.len = new_length;
+            },
+        }
+    }
+
     pub fn format(self: StringBuffer, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
         _ = fmt;
         _ = options;
 
-        try writer.print("\"{s}\"", .{self.get()});
+        try writer.print("\"{}\"", .{std.fmt.fmtSliceEscapeUpper(self.get())});
     }
 };
 
@@ -1184,3 +1333,11 @@ test "StringBuffer" {
     try buf.set(std.testing.allocator, long_string);
     try std.testing.expectEqualStrings(long_string, buf.get());
 }
+
+const StringHash = enum(u32) {
+    _,
+
+    pub fn compute(string: []const u8) StringHash {
+        return @intToEnum(StringHash, std.hash.CityHash32.hash(string));
+    }
+};
