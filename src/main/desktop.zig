@@ -558,3 +558,22 @@ pub fn getDisplayDPI() f32 {
     }
     return diagonal_dpi;
 }
+
+pub const WebSocket = struct {
+    pub fn create(server: []const u8, protocols: []const []const u8) !WebSocket {
+        _ = server;
+        _ = protocols;
+        @panic("not implemented yet");
+    }
+
+    pub fn destroy(self: *WebSocket) void {
+        _ = self;
+    }
+
+    pub fn send(self: WebSocket, binary: bool, message: []const u8) !void {
+        _ = self;
+        _ = binary;
+        _ = message;
+        @panic("not implemented yet");
+    }
+};

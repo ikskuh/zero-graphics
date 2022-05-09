@@ -29,7 +29,7 @@
     </style>
 
     <script type="module" defer="true">
-        import { createPlatformEnvironment, createInputModule, createWebGlModule } from "./zero-graphics.js";
+        import { createPlatformEnvironment, createInputModule, createWebGlModule, createWebsocketModule } from "./zero-graphics.js";
 
         const canvas_element = document.getElementById("render-canvas");
         var globalInstance;
@@ -38,6 +38,7 @@
             env: createPlatformEnvironment(() => globalInstance),
             webgl: createWebGlModule(canvas_element, () => globalInstance),
             input: createInputModule(canvas_element, () => globalInstance),
+            websocket: createWebsocketModule(() => globalInstance),
         };
 
         fetch("<? try output.writeAll(context.app_name); ?>.wasm")

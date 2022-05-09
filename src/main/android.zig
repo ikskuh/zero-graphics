@@ -68,7 +68,7 @@ pub const AndroidApp = struct {
 
     /// This is the entry point which initializes a application
     /// that has stored its previous state.
-    /// If `stored_state` is not `null`, it is the state that was previously saved with 
+    /// If `stored_state` is not `null`, it is the state that was previously saved with
     pub fn init(allocator: std.mem.Allocator, activity: *android.ANativeActivity, stored_state: ?[]const u8) !Self {
         logger.info("AndroidApp.init({any})", .{stored_state});
 
@@ -560,3 +560,5 @@ pub const AndroidApp = struct {
         return false;
     }
 };
+
+pub const WebSocket = @compileError("WebSocket not implemented yet");

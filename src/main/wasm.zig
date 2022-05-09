@@ -99,6 +99,8 @@ export fn app_init() u32 {
 
     input_handler = zerog.Input.init(gpa.allocator());
 
+    WebSocket.global_handles = std.AutoArrayHashMap(websocket.Handle, *WebSocket.Data).init(gpa.allocator());
+
     app_instance.init(gpa.allocator(), &input_handler) catch |err| @panic(@errorName(err));
 
     gles.load({}, loadOpenGlFunction) catch |err| @panic(@errorName(err));
@@ -630,4 +632,199 @@ const WebGL = struct {
     extern "webgl" fn vertexAttrib3fv(_index: GLuint, _v: [*c]const GLfloat) void;
     extern "webgl" fn vertexAttrib4f(_index: GLuint, _x: GLfloat, _y: GLfloat, _z: GLfloat, _w: GLfloat) void;
     extern "webgl" fn vertexAttrib4fv(_index: GLuint, _v: [*c]const GLfloat) void;
+};
+
+pub const WebSocket = struct {
+    pub const State = enum {
+        connecting,
+        open,
+        closed,
+        @"error",
+    };
+
+    const Queue = std.TailQueue(Event);
+    const Node = Queue.Node;
+
+    const Data = struct {
+        arena: std.heap.ArenaAllocator,
+        state: State = .connecting,
+        allocator: std.mem.Allocator,
+
+        free_queue: Queue = .{},
+        event_queue: Queue = .{},
+
+        pub fn pushEvent(self: *Data, event: Event) !void {
+            const node = if (self.free_queue.pop()) |node|
+                node
+            else
+                try self.arena.allocator().create(Node);
+            node.* = .{
+                .data = event,
+            };
+            self.event_queue.append(node);
+        }
+    };
+    var global_handles: std.AutoArrayHashMap(websocket.Handle, *Data) = undefined;
+
+    fn get(handle: websocket.Handle) ?*Data {
+        return global_handles.get(handle);
+    }
+
+    handle: websocket.Handle,
+    data: *Data,
+
+    pub fn create(server: []const u8, protocols: []const []const u8) !WebSocket {
+        var ptrs: [16][*]const u8 = undefined;
+        var lens: [ptrs.len]usize = undefined;
+
+        std.debug.assert(protocols.len < ptrs.len);
+
+        for (protocols) |slice, i| {
+            ptrs[i] = slice.ptr;
+            lens[i] = slice.len;
+        }
+
+        const id = websocket.create(server.ptr, server.len, &ptrs, &lens, protocols.len);
+        if (id == 0) {
+            return error.WebsocketFailure;
+        }
+        errdefer websocket.destroy(id);
+
+        var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+        errdefer arena.deinit();
+
+        const data = try arena.allocator().create(Data);
+
+        data.* = .{
+            .arena = arena,
+            .allocator = gpa.allocator(),
+        };
+
+        try global_handles.putNoClobber(id, data);
+
+        return WebSocket{
+            .data = data,
+            .handle = id,
+        };
+    }
+
+    pub fn destroy(self: *WebSocket) void {
+        const data = global_handles.fetchSwapRemove(self.handle) orelse {
+            std.log.err("tried to destroy unknown websocket({})", .{self.handle});
+            return; // already destroyed?!
+        };
+
+        websocket.destroy(self.handle);
+        self.* = undefined;
+
+        data.value.arena.deinit();
+    }
+
+    pub fn send(self: WebSocket, binary: bool, message: []const u8) !void {
+        websocket.send(self.handle, binary, message.ptr, message.len);
+    }
+
+    pub fn receive(self: WebSocket) !?Event {
+        if (self.data.event_queue.popFirst()) |node| {
+            defer self.data.free_queue.append(node);
+            return node.data;
+        } else {
+            return null;
+        }
+    }
+
+    pub const Event = union(enum) {
+        @"error",
+        closed,
+        connected,
+        message: Message,
+    };
+
+    pub const Message = struct {
+        allocator: std.mem.Allocator,
+        data: []const u8,
+        is_binary: bool,
+
+        pub fn deinit(self: *Message) void {
+            self.allocator.free(self.data);
+            self.* = undefined;
+        }
+    };
+};
+
+const websocket = struct {
+    const logger = std.log.scoped(.websocket);
+    const Handle = u32;
+
+    extern "websocket" fn create(
+        server_ptr: [*]const u8,
+        server_len: usize,
+        protocols_str_ptr: [*]const [*]const u8,
+        protocols_len_ptr: [*]const usize,
+        protocols_len: usize,
+    ) Handle;
+    extern "websocket" fn destroy(handle: Handle) void;
+    extern "websocket" fn send(handle: Handle, binary: bool, message_ptr: [*]const u8, message_len: usize) void;
+
+    export fn app_ws_alloc(length: u32) ?[*]u8 {
+        const slice = gpa.allocator().alloc(u8, length) catch return null;
+        return slice.ptr;
+    }
+
+    export fn app_ws_onmessage(handle: Handle, binary: bool, message_ptr: [*]u8, message_len: usize) void {
+        const message = message_ptr[0..message_len];
+
+        if (WebSocket.get(handle)) |ws| {
+            var msg = WebSocket.Message{
+                .allocator = gpa.allocator(),
+                .is_binary = binary,
+                .data = message,
+            };
+
+            ws.pushEvent(.{ .message = msg }) catch {
+                msg.allocator.free(msg.data);
+                logger.info("out of memory for app_ws_onopen (2)", .{});
+            };
+            logger.info("websocket({}) received {} of data(binary={})", .{ handle, message.len, binary });
+        } else {
+            gpa.allocator().free(message);
+            logger.err("app_ws_onmessage with invalid handle {}", .{handle});
+        }
+    }
+
+    export fn app_ws_onopen(handle: Handle) void {
+        if (WebSocket.get(handle)) |ws| {
+            logger.info("websocket({}) is now open", .{handle});
+            ws.state = .open;
+            ws.pushEvent(.connected) catch logger.info("out of memory for app_ws_onopen", .{});
+        } else {
+            logger.err("app_ws_onopen with invalid handle {}", .{handle});
+        }
+    }
+
+    export fn app_ws_onerror(handle: Handle) void {
+        if (WebSocket.get(handle)) |ws| {
+            logger.info("websocket({}) is now error", .{handle});
+            ws.state = .@"error";
+            ws.pushEvent(.@"error") catch logger.info("out of memory for app_ws_onerror", .{});
+        } else {
+            logger.err("app_ws_onerror with invalid handle {}", .{handle});
+        }
+    }
+
+    export fn app_ws_onclose(handle: Handle) void {
+        if (WebSocket.get(handle)) |ws| {
+            logger.info("websocket({}) is now closed", .{handle});
+            ws.state = .closed;
+            ws.pushEvent(.closed) catch logger.info("out of memory for app_ws_onclose", .{});
+        } else {
+            logger.err("app_ws_onclose with invalid handle {}", .{handle});
+        }
+    }
+
+    comptime {
+        if (@sizeOf(usize) != @sizeOf(u32)) {
+            @compileError("no support for wasm64 yet");
+        }
+    }
 };

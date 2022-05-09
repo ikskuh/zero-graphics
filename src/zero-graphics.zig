@@ -28,6 +28,8 @@ pub const Backend = union(enum) {
 
 pub const backend: Backend = @import("root").backend;
 
+pub const WebSocket = @import("root").WebSocket;
+
 pub const Point = struct {
     pub const zero = Point{ .x = 0, .y = 0 };
 

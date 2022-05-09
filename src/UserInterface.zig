@@ -785,6 +785,7 @@ pub const Builder = struct {
             if (info.control.content_hash != display_hash) {
                 logger.info("updating text box content to {s}", .{display_string});
                 try info.control.text.set(self.ui.allocator, display_string);
+                info.control.content_hash = display_hash;
             }
         }
         updateWidgetConfig(&info.control.config, config);
