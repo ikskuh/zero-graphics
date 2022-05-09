@@ -1045,7 +1045,7 @@ pub fn render(self: UserInterface) !void {
 
                 if (self.isFocused(widget)) {
                     const blink_period = 800;
-                    const timer = @mod(std.time.milliTimestamp(), blink_period);
+                    const timer = @mod(types.milliTimestamp(), blink_period);
                     if (timer >= blink_period / 2) {
                         try renderer.drawLine(
                             widget.bounds.x + 5 + string_width,
