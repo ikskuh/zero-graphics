@@ -761,13 +761,21 @@ pub fn drawPartialTexturePixels(self: *Self, real_rect: Rectangle, texture: *Res
     if (real_rect.size().isEmpty())
         return;
 
-    const sx = 1.0 / @intToFloat(f32, texture.width - 1);
-    const sy = 1.0 / @intToFloat(f32, texture.height - 1);
+    // https://stackoverflow.com/a/5879551
+    //
+    //  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+    //  ^   ^   ^   ^   ^   ^   ^   ^   ^
+    // 0.0  |   |   |   |   |   |   |  1.0
+    //  |   |   |   |   |   |   |   |   |
+    // 0/8 1/8 2/8 3/8 4/8 5/8 6/8 7/8 8/8
 
-    const x0 = @intToFloat(f32, source_rect.x) * sx;
-    const x1 = @intToFloat(f32, source_rect.x + source_rect.width - 1) * sx;
-    const y0 = @intToFloat(f32, source_rect.y) * sy;
-    const y1 = @intToFloat(f32, source_rect.y + source_rect.height - 1) * sy;
+    const sx = 1.0 / @intToFloat(f32, texture.width);
+    const sy = 1.0 / @intToFloat(f32, texture.height);
+
+    const x0 = sx * @intToFloat(f32, source_rect.x);
+    const x1 = sx * @intToFloat(f32, source_rect.x + source_rect.width); // don't do off-by-one here, as we're sampling from "left edge" to "right edge"
+    const y0 = sy * @intToFloat(f32, source_rect.y);
+    const y1 = sy * @intToFloat(f32, source_rect.y + source_rect.height); // don't do off-by-one here, as we're sampling from "left edge" to "right edge"
 
     const color = tint orelse Color{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0xFF };
     const tl = Vertex.init(real_rect.x, real_rect.y, color).offset(-1, -1).withUV(x0, y0);

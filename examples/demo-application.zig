@@ -27,6 +27,7 @@ screen_height: u15,
 resources: ResourceManager,
 renderer: Renderer,
 texture_handle: *ResourceManager.Texture,
+pixel_pattern: *ResourceManager.Texture,
 allocator: std.mem.Allocator,
 font: *const Renderer.Font,
 input: *zero_graphics.Input,
@@ -48,6 +49,7 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
         .screen_height = 0,
         .resources = ResourceManager.init(allocator),
         .texture_handle = undefined,
+        .pixel_pattern = undefined,
         .renderer = undefined,
         .ui = undefined,
         .font = undefined,
@@ -66,7 +68,8 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
     app.renderer = try app.resources.createRenderer2D();
     errdefer app.renderer.deinit();
 
-    app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodePng{ .data = @embedFile("ziggy.png") });
+    app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("ziggy.png") });
+    app.pixel_pattern = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("pixelpattern.png") });
     app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
     app.renderer3d = try app.resources.createRenderer3D();
@@ -379,6 +382,35 @@ pub fn render(app: *Application) !void {
                 .height = app.texture_handle.height,
             },
             app.texture_handle,
+            null,
+        );
+
+        try renderer.drawTexture(
+            Rectangle{
+                .x = 16,
+                .y = app.screen_height - app.pixel_pattern.height - 16,
+                .width = app.pixel_pattern.width,
+                .height = app.pixel_pattern.height,
+            },
+            app.pixel_pattern,
+            null,
+        );
+
+        try renderer.drawPartialTexture(
+            Rectangle{
+                .x = 32 + app.pixel_pattern.width,
+                .y = app.screen_height - app.pixel_pattern.height - 16,
+                .width = app.pixel_pattern.width / 2,
+                .height = app.pixel_pattern.height / 2,
+            },
+            app.pixel_pattern,
+            Rectangle{
+                // draw the "centerpiece"
+                .x = app.pixel_pattern.width / 4,
+                .y = app.pixel_pattern.height / 4,
+                .width = app.pixel_pattern.width / 2,
+                .height = app.pixel_pattern.height / 2,
+            },
             null,
         );
 

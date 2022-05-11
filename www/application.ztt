@@ -52,8 +52,13 @@
 
                     // run the update loop until the app dies
                     function update() {
-                        canvas_element.width = canvas_element.clientWidth - 4;
-                        canvas_element.height = canvas_element.clientHeight - 4;
+                        const styles = window.getComputedStyle(canvas_element);
+
+                        const dx = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+                        const dy = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+
+                        canvas_element.width = window.devicePixelRatio * (canvas_element.clientWidth - dx);
+                        canvas_element.height = window.devicePixelRatio * (canvas_element.clientHeight - dy);
 
                         let res = instance.exports.app_update();
                         if (res == 0) {
