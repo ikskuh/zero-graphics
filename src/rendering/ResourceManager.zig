@@ -1178,43 +1178,116 @@ pub const RawRgbaTexture = struct {
     }
 };
 
-pub const DecodePng = struct {
+pub const DecodePng = DecodeImageData; // Deprecated!
+
+pub const DecodeImageData = struct {
     data: []const u8,
     flip_y: bool = false,
 
     pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
+        const start = zero_graphics.milliTimestamp();
+
         var image = zigimg.image.Image.fromMemory(rm.allocator, self.data) catch {
             // logger.debug("failed to load texture: {s}", .{@errorName(err)});
             return error.InvalidFormat;
         };
         defer image.deinit();
 
+        const zimg_load = zero_graphics.milliTimestamp();
+
+        const pixels = image.pixels orelse return error.InvalidFormat;
+
         var buffer = try rm.allocator.alloc(u8, 4 * image.width * image.height);
         errdefer rm.allocator.free(buffer);
 
-        var x: usize = 0;
-        var y: usize = if (self.flip_y) image.height - 1 else 0;
-        var pixels = image.iterator();
-        while (pixels.next()) |pix| {
-            const p8 = pix.toIntegerColor8();
-
-            const offset = image.width * y + x;
-
-            buffer[4 * offset + 0] = p8.R;
-            buffer[4 * offset + 1] = p8.G;
-            buffer[4 * offset + 2] = p8.B;
-            buffer[4 * offset + 3] = p8.A;
-
-            x += 1;
-            if (x >= image.width) {
-                x = 0;
-                if (self.flip_y) {
-                    if (y > 0) y -= 1;
-                } else {
-                    y += 1;
+        switch (pixels) {
+            // super-fast path
+            .Rgba32 => |data| {
+                std.mem.copy(u8, buffer, std.mem.sliceAsBytes(data));
+            },
+            .Bgra32 => |data| {
+                std.mem.copy(u8, buffer, std.mem.sliceAsBytes(data));
+                for (std.mem.bytesAsSlice(u32, buffer)) |*pixel| {
+                    pixel.* = @byteSwap(u32, pixel.*);
                 }
-            }
+            },
+
+            // quite-fast path
+            .Rgb24 => |data| {
+                var i: usize = 0;
+                while (i < buffer.len / 4) : (i += 1) {
+                    buffer[4 * i + 0] = data[i].R;
+                    buffer[4 * i + 1] = data[i].G;
+                    buffer[4 * i + 2] = data[i].B;
+                    buffer[4 * i + 3] = 0xFF;
+                }
+            },
+            // quite-fast path
+            .Bgr24 => |data| {
+                var i: usize = 0;
+                while (i < buffer.len / 4) : (i += 1) {
+                    buffer[4 * i + 0] = data[i].R;
+                    buffer[4 * i + 1] = data[i].G;
+                    buffer[4 * i + 2] = data[i].B;
+                    buffer[4 * i + 3] = 0xFF;
+                }
+            },
+
+            // generic slow loader
+            else => {
+                std.log.warn("loading suboptimal image with format {s}. Rgba32 or Bgra32 would be better!", .{@tagName(pixels)});
+
+                var x: usize = 0;
+                var y: usize = if (self.flip_y) image.height - 1 else 0;
+                var pixel_iterator = image.iterator();
+
+                if (self.flip_y) {
+                    while (pixel_iterator.next()) |pix| {
+                        const p8 = pix.toIntegerColor8();
+
+                        const offset = image.width * y + x;
+
+                        buffer[4 * offset + 0] = p8.R;
+                        buffer[4 * offset + 1] = p8.G;
+                        buffer[4 * offset + 2] = p8.B;
+                        buffer[4 * offset + 3] = p8.A;
+
+                        x += 1;
+                        if (x >= image.width) {
+                            x = 0;
+                            // if (y > 0) TODO: Is this really necessary? we should have the guarantee for same pixel count
+                            y -= 1;
+                        }
+                    }
+                } else {
+                    while (pixel_iterator.next()) |pix| {
+                        const p8 = pix.toIntegerColor8();
+
+                        const offset = image.width * y + x;
+
+                        buffer[4 * offset + 0] = p8.R;
+                        buffer[4 * offset + 1] = p8.G;
+                        buffer[4 * offset + 2] = p8.B;
+                        buffer[4 * offset + 3] = p8.A;
+
+                        x += 1;
+                        if (x >= image.width) {
+                            x = 0;
+                            y += 1;
+                        }
+                    }
+                }
+            },
         }
+
+        const decode_end = zero_graphics.milliTimestamp();
+
+        std.log.info("decoding png image took {} ms, with {} in zigimg and {} in decoding", .{
+            decode_end - start,
+            zimg_load - start,
+            decode_end - zimg_load,
+        });
+
         // std.debug.assert(i == image.width * image.height);
 
         return TextureData{
