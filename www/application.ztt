@@ -49,10 +49,11 @@
                 globalInstance = instance;
                 let res = instance.exports.app_init();
                 if (res == 0) {
+
                     // run the update loop until the app dies
                     function update() {
-                        canvas_element.width = canvas_element.clientWidth;
-                        canvas_element.height = canvas_element.clientHeight;
+                        canvas_element.width = canvas_element.clientWidth - 4;
+                        canvas_element.height = canvas_element.clientHeight - 4;
 
                         let res = instance.exports.app_update();
                         if (res == 0) {

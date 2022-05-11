@@ -414,8 +414,18 @@ export fn app_input_sendTextInput(codepoint: u32, shift: bool, alt: bool, ctrl: 
     } }) catch |err| logInputError(err);
 }
 
+var last_width: u15 = 0;
+var last_height: u15 = 0;
+
 export fn app_update() u32 {
-    app_instance.resize(@intCast(u15, meta_getScreenW()), @intCast(u15, meta_getScreenH())) catch return 2;
+    const screen_width = @intCast(u15, meta_getScreenW());
+    const screen_height = @intCast(u15, meta_getScreenH());
+
+    if (screen_width != last_width or screen_height != last_height) {
+        app_instance.resize(screen_width, screen_height) catch return 2;
+        last_width = screen_width;
+        last_height = screen_height;
+    }
 
     const res = app_instance.update() catch return 1;
     if (!res)

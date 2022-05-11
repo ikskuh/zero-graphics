@@ -68,6 +68,10 @@ pub fn main() !void {
     _ = c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
     _ = c.SDL_GL_SetAttribute(c.SDL_GL_DOUBLEBUFFER, 1);
+
+    _ = c.SDL_GL_SetAttribute(c.SDL_GL_MULTISAMPLEBUFFERS, 1);
+    _ = c.SDL_GL_SetAttribute(c.SDL_GL_MULTISAMPLESAMPLES, 4);
+
     //    _ = c.SDL_GL_SetAttribute(.SDL_GL_DEPTH_SIZE, 24);
     if (builtin.os.tag == .windows) {
         // We just fake OpenGL ES 2.0 by just loading OpenGL fully /o\
@@ -560,20 +564,55 @@ pub fn getDisplayDPI() f32 {
 }
 
 pub const WebSocket = struct {
+    connected: bool = false,
+
+    pub const State = enum {
+        connecting,
+        open,
+        closed,
+        @"error",
+    };
+
     pub fn create(server: []const u8, protocols: []const []const u8) !WebSocket {
         _ = server;
         _ = protocols;
-        @panic("not implemented yet");
+
+        return WebSocket{};
     }
 
     pub fn destroy(self: *WebSocket) void {
-        _ = self;
+        self.* = undefined;
     }
 
-    pub fn send(self: WebSocket, binary: bool, message: []const u8) !void {
+    pub fn send(self: *WebSocket, binary: bool, message: []const u8) !void {
         _ = self;
         _ = binary;
         _ = message;
-        @panic("not implemented yet");
     }
+
+    pub fn receive(self: *WebSocket) !?Event {
+        if (self.connected) {
+            return null;
+        }
+        self.connected = true;
+        return .connected;
+    }
+
+    pub const Event = union(enum) {
+        @"error",
+        closed,
+        connected,
+        message: Message,
+    };
+
+    pub const Message = struct {
+        allocator: std.mem.Allocator,
+        data: []const u8,
+        is_binary: bool,
+
+        pub fn deinit(self: *Message) void {
+            self.allocator.free(self.data);
+            self.* = undefined;
+        }
+    };
 };

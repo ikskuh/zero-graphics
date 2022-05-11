@@ -493,11 +493,11 @@ createWebGlModule(canvas_element, getInstance, stop_fn) {
 
       return {
     meta_getScreenW() {
-      return gl.drawingBufferWidth; // canvas_element.clientWidth; //
+      return gl.drawingBufferWidth;
     }
     ,
         meta_getScreenH() {
-      return gl.drawingBufferHeight; // canvas_element.clientHeight; //
+      return gl.drawingBufferHeight;
     }
     ,
 

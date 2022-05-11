@@ -39,6 +39,7 @@ renderer3d: Renderer3D,
 mesh: *ResourceManager.Geometry,
 
 startup_time: i64,
+test_pattern: bool = false,
 
 pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphics.Input) !void {
     app.* = Application{
@@ -127,11 +128,9 @@ pub fn teardownGraphics(app: *Application) void {
 }
 
 pub fn resize(app: *Application, width: u15, height: u15) !void {
-    if (width != app.screen_width or height != app.screen_height) {
-        logger.info("screen resized to resolution: {}×{}", .{ width, height });
-        app.screen_width = @intCast(u15, width);
-        app.screen_height = @intCast(u15, height);
-    }
+    logger.info("screen resized to resolution: {}×{}", .{ width, height });
+    app.screen_width = width;
+    app.screen_height = height;
 }
 
 pub fn update(app: *Application) !bool {
@@ -171,6 +170,10 @@ pub fn update(app: *Application) !bool {
 
         if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 30, .height = 30 }, app.gui_data.is_visible, .{}))
             app.gui_data.is_visible = !app.gui_data.is_visible;
+
+        if (try ui.checkBox(.{ .x = 100, .y = 50, .width = 30, .height = 30 }, app.test_pattern, .{})) {
+            app.test_pattern = !app.test_pattern;
+        }
 
         if (app.gui_data.is_visible) {
             var fmt_buf: [64]u8 = undefined;
@@ -390,6 +393,26 @@ pub fn render(app: *Application) !void {
             zero_graphics.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
         );
 
+        if (app.test_pattern) {
+            if (@mod(zero_graphics.milliTimestamp(), 1000) > 500) {
+                var i: u15 = 0;
+                while (i < app.screen_width) : (i += 1) {
+                    try app.renderer.drawLine(i, 0, i, app.screen_height - 1, if ((i & 1) == 0)
+                        zero_graphics.Color.white
+                    else
+                        zero_graphics.Color.black);
+                }
+            } else {
+                var i: u15 = 0;
+                while (i < app.screen_height) : (i += 1) {
+                    try app.renderer.drawLine(0, i, app.screen_width - 1, i, if ((i & 1) == 0)
+                        zero_graphics.Color.white
+                    else
+                        zero_graphics.Color.black);
+                }
+            }
+        }
+
         // Paint the UI to the screen,
         // will paint to `renderer`
         try app.ui.render();
@@ -451,7 +474,10 @@ pub fn render(app: *Application) !void {
 
         app.renderer3d.render(view_projection_matrix.fields);
 
-        renderer.render(zero_graphics.Size{ .width = app.screen_width, .height = app.screen_height });
+        renderer.render(zero_graphics.Size{
+            .width = app.screen_width,
+            .height = app.screen_height,
+        });
     }
 
     if (builtin.os.tag != .freestanding) {
