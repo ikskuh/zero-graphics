@@ -819,6 +819,30 @@ pub fn drawRectanglePixels(self: *Self, real_rect: Rectangle, color: Color) Draw
     });
 }
 
+pub fn drawCircle(self: *Self, x: i16, y: i16, radius: u15, color: Color) DrawError!void {
+    try self.drawCirclePixels(self.scalePosition(x), self.scalePosition(y), self.scaleDimension(radius), color);
+}
+
+pub fn drawCirclePixels(self: *Self, x: i16, y: i16, radius: u15, color: Color) DrawError!void {
+    const segments = 36;
+
+    const r = @intToFloat(f32, radius);
+
+    var i: usize = 0;
+    while (i < segments) : (i += 1) {
+        const angle_a = std.math.tau * @intToFloat(f32, i + 0) / segments;
+        const angle_b = std.math.tau * @intToFloat(f32, i + 1) / segments;
+
+        const dx0 = x + @floatToInt(i16, r * @cos(angle_a));
+        const dy0 = y + @floatToInt(i16, r * @sin(angle_a));
+
+        const dx1 = x + @floatToInt(i16, r * @cos(angle_b));
+        const dy1 = y + @floatToInt(i16, r * @sin(angle_b));
+
+        try self.drawLinePixels(dx0, dy0, dx1, dy1, color);
+    }
+}
+
 /// Draws a single pixel wide line from (`x0`,`y0`) to (`x1`,`y1`)
 pub fn drawLine(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Color) DrawError!void {
     return self.drawLinePixels(
