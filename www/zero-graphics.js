@@ -372,7 +372,7 @@ createInputModule(canvas_element, getInstance, stop_fn) {
   canvas_element.addEventListener('mousedown', (ev) => {
     let inst = getInstance()
     if (inst !== undefined) {
-      inst.exports.app_input_sendMouseDown(ev.clientX, ev.clientY, ev.button)
+      inst.exports.app_input_sendMouseDown(ev.clientX * window.devicePixelRatio, ev.clientY * window.devicePixelRatio, ev.button)
     }
   })
 
@@ -380,14 +380,14 @@ createInputModule(canvas_element, getInstance, stop_fn) {
     // ev.button: 0=>left, 1=>middle, 2=>right
     let inst = getInstance()
     if (inst !== undefined) {
-      inst.exports.app_input_sendMouseUp(ev.clientX, ev.clientY, ev.button)
+      inst.exports.app_input_sendMouseUp(ev.clientX * window.devicePixelRatio, ev.clientY * window.devicePixelRatio, ev.button)
     }
   })
 
   canvas_element.addEventListener('mousemove', (ev) => {
     let inst = getInstance()
     if (inst !== undefined) {
-      inst.exports.app_input_sendMouseMotion(ev.clientX, ev.clientY)
+      inst.exports.app_input_sendMouseMotion(ev.clientX * window.devicePixelRatio, ev.clientY * window.devicePixelRatio)
     }
   })
 
