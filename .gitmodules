@@ -28,3 +28,9 @@
 [submodule "vendor/zig-assimp"]
 	path = vendor/zig-assimp
 	url = https://github.com/MasterQ32/zig-assimp
+[submodule "vendor/zigstr"]
+	path = vendor/zigstr
+	url = https://github.com/jecolon/zigstr
+[submodule "vendor/ziglyph"]
+	path = vendor/ziglyph
+	url = https://github.com/jecolon/ziglyph

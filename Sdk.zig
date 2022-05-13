@@ -16,14 +16,29 @@ pub const Platform = union(enum) {
     android,
 };
 
+const pkgs = struct {
+    const zigimg = std.build.Pkg{
+        .name = "zigimg",
+        .path = .{ .path = sdkRoot() ++ "/vendor/zigimg/zigimg.zig" },
+    };
+    const ziglyph = std.build.Pkg{
+        .name = "ziglyph",
+        .path = .{ .path = sdkRoot() ++ "/vendor/ziglyph/src/ziglyph.zig" },
+    };
+    const zigstr = std.build.Pkg{
+        .name = "zigstr",
+        .path = .{ .path = sdkRoot() ++ "/vendor/zigstr/src/Zigstr.zig" },
+        .dependencies = &.{ziglyph},
+    };
+};
+
 const zero_graphics_package = std.build.Pkg{
     .name = "zero-graphics",
     .path = .{ .path = sdkRoot() ++ "/src/zero-graphics.zig" },
     .dependencies = &[_]std.build.Pkg{
-        std.build.Pkg{
-            .name = "zigimg",
-            .path = .{ .path = sdkRoot() ++ "/vendor/zigimg/zigimg.zig" },
-        },
+        pkgs.zigimg,
+        pkgs.ziglyph,
+        pkgs.zigstr,
     },
 };
 
