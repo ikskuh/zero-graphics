@@ -428,7 +428,7 @@ const GlyphIterator = struct {
 /// Measures the extends of the given `text` when rendered with `font`.
 /// Returns the size and relative offset the string will take up on the screen.
 /// Returned values are in pixels.
-pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle {
+pub fn measureString(self: * Self, font: *const Font, text: []const u8) Rectangle {
     var max_dx: i16 = 0;
     var max_dy: i16 = 0;
 

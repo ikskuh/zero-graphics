@@ -186,7 +186,7 @@ const Widget = struct {
         };
     }
 
-    pub fn click(self: *Widget, _: Point) void {
+    pub fn click(self: *Widget, ui: *UserInterface, point: Point) void {
         switch (self.control) {
             .button => |*control| {
                 if (control.config.enabled) {
@@ -205,6 +205,29 @@ const Widget = struct {
             },
             .modal_layer => |*control| {
                 control.clickable.clicked = true;
+            },
+            .text_box => |*control| {
+                const EditorFont = struct {
+                    renderer: *Renderer,
+                    font: *const Renderer.Font,
+
+                    pub fn measureStringWidth(ef: @This(), string: []const u8) u15 {
+                        return ef.renderer.measureString(ef.font, string).width;
+                    }
+                };
+                // TODO: Expose user interface in this function
+                logger.info("click @ {},{}", .{
+                    point.x - self.bounds.x - 7,
+                    point.y - self.bounds.y,
+                });
+                control.editor.setGraphicalCursor(
+                    EditorFont{
+                        .renderer = ui.renderer orelse return,
+                        .font = ui.default_font, // TODO: Select correct font for checkbox
+                    },
+                    point.x - self.bounds.x - 7, // TODO: Adjust to real padding value
+                    point.y - self.bounds.y,
+                );
             },
             else => {},
         }
@@ -888,7 +911,7 @@ pub const InputProcessor = struct {
         if (pointer == .primary and clicked_widget == pressed_widget) {
             // if the widget is clickable, we focus it
             self.ui.focused_widget = clicked_widget;
-            clicked_widget.click(self.ui.pointer_position);
+            clicked_widget.click(self.ui, self.ui.pointer_position);
         }
     }
 
@@ -947,7 +970,7 @@ pub const InputProcessor = struct {
         switch (active_widget.control) {
             // these widgets can be activated by pressing space
             .button, .check_box, .radio_button => for (string) |c| switch (c) {
-                ' ' => active_widget.click(self.ui.pointer_position),
+                ' ' => active_widget.click(self.ui, self.ui.pointer_position),
                 else => {}, // ignore everything else
             },
 
