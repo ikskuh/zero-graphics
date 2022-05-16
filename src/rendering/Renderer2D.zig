@@ -395,24 +395,33 @@ const GlyphIterator = struct {
 
             return GlyphCmd{
                 .codepoint = codepoint,
-                .x = off_x,
-                .y = off_y,
-                .width = glyph.width,
-                .height = glyph.height,
+
+                .glyph_width = @intCast(u15, std.math.max(0, scaleInt(glyph.advance_width, self.scale))),
+                .glyph_height = self.font.getLineHeight(),
+
                 .texture = glyph.texture,
+                .quad_x = off_x,
+                .quad_y = off_y,
+                .quad_width = glyph.width,
+                .quad_height = glyph.height,
             };
         }
     }
 
+    // coordinates are in physical screen space
     const GlyphCmd = struct {
         codepoint: u21,
-        texture: *ResourceManager.Texture,
 
-        // coordinates are in physical screen space
-        x: i16,
-        y: i16,
-        width: u15,
-        height: u15,
+        // "physical" boundaries of the glyph
+        glyph_width: u15,
+        glyph_height: u15,
+
+        // "visual" boundaries of the glyph
+        texture: *ResourceManager.Texture,
+        quad_x: i16,
+        quad_y: i16,
+        quad_width: u15,
+        quad_height: u15,
     };
 };
 
@@ -428,10 +437,10 @@ pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle
 
     var iterator = GlyphIterator.init(self, makeFontMut(font), text);
     while (iterator.next()) |glyph| {
-        min_dx = std.math.min(min_dx, glyph.x);
-        min_dy = std.math.min(min_dy, glyph.y);
-        max_dx = std.math.max(max_dx, glyph.x + glyph.width);
-        max_dy = std.math.max(max_dy, glyph.y + glyph.height);
+        min_dx = std.math.min(min_dx, glyph.quad_x);
+        min_dy = std.math.min(min_dy, glyph.quad_y);
+        max_dx = std.math.max(max_dx, glyph.quad_x + glyph.glyph_width);
+        max_dy = std.math.max(max_dy, glyph.quad_y + glyph.glyph_height);
     }
 
     return Rectangle{
@@ -451,10 +460,10 @@ pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i
     while (iterator.next()) |glyph| {
         try self.drawTexturePixels(
             Rectangle{
-                .x = self.scalePosition(x) + glyph.x,
-                .y = self.scalePosition(y) + glyph.y,
-                .width = glyph.width,
-                .height = glyph.height,
+                .x = self.scalePosition(x) + glyph.quad_x,
+                .y = self.scalePosition(y) + glyph.quad_y,
+                .width = glyph.quad_width,
+                .height = glyph.quad_height,
             },
             glyph.texture,
             color,

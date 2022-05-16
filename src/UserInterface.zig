@@ -18,6 +18,10 @@ pub const VerticalStackLayout = @import("ui/VerticalStackLayout.zig");
 pub const HorizontalStackLayout = @import("ui/HorizontalStackLayout.zig");
 pub const DockLayout = @import("ui/DockLayout.zig");
 
+/// A text editor base that allows implementing visual text editors on top of.
+/// Provides a cursor-based editing interface.
+pub const TextEditor = @import("TextEditor");
+
 pub const CustomWidget = Widget.Custom;
 
 pub const ButtonStyle = struct {
@@ -153,7 +157,7 @@ const Widget = struct {
                 ctrl.text.deinit();
             },
             .text_box => |*ctrl| {
-                ctrl.text.deinit();
+                ctrl.editor.deinit();
             },
             .label => |*ctrl| {
                 ctrl.text.deinit();
@@ -275,10 +279,14 @@ const Widget = struct {
         const Config = struct {
             style: ?TextBoxTheme = null,
             hit_test_visible: bool = true,
+            accept_tabs: bool = false,
+            accept_return: bool = false,
         };
 
-        text: StringBuffer,
+        editor: TextEditor,
         content_hash: StringHash = StringHash.compute(""),
+
+        ctrl_pressed: bool = false,
 
         accepted: bool = false,
 
@@ -597,6 +605,7 @@ pub const Builder = struct {
 
     pub const Error = error{
         OutOfMemory,
+        InvalidUtf8,
     };
 
     ui: *UserInterface,
@@ -778,13 +787,13 @@ pub const Builder = struct {
 
         if (info.needs_init) {
             info.control.* = .{
-                .text = try StringBuffer.init(self.ui.allocator, display_string),
+                .editor = try TextEditor.init(self.ui.allocator, display_string),
                 .content_hash = display_hash,
             };
         } else {
             if (info.control.content_hash != display_hash) {
                 logger.info("updating text box content to {s}", .{display_string});
-                try info.control.text.set(self.ui.allocator, display_string);
+                try info.control.editor.setText(display_string);
                 info.control.content_hash = display_hash;
             }
         }
@@ -792,8 +801,7 @@ pub const Builder = struct {
 
         if (info.control.accepted) {
             info.control.accepted = false;
-
-            return info.control.text.get();
+            return info.control.editor.getText();
         } else {
             return null;
         }
@@ -884,26 +892,36 @@ pub const InputProcessor = struct {
         }
     }
 
+    fn wordModifier(box: Widget.TextBox) TextEditor.EditUnit {
+        return if (box.ctrl_pressed)
+            TextEditor.EditUnit.word
+        else
+            TextEditor.EditUnit.letter;
+    }
+
     pub fn buttonDown(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
             .text_box => |*control| switch (button) {
+                .ctrl_left => control.ctrl_pressed = true,
+                .ctrl_right => control.ctrl_pressed = true,
                 .@"return" => control.accepted = true,
                 .escape => {},
-                .backspace => { // remove the last unicode codepoint
-                    var view = try std.unicode.Utf8View.init(control.text.get());
-
-                    var iter = view.iterator();
-
-                    var end_marker: usize = 0;
-                    while (iter.nextCodepointSlice()) |cp| {
-                        end_marker = @ptrToInt(cp.ptr) - @ptrToInt(iter.bytes.ptr);
+                .tab => {
+                    if (control.config.accept_tabs) {
+                        try control.editor.insertText("\t");
+                    } else {
+                        // TODO: move focus
                     }
-
-                    control.text.shrink(end_marker);
                 },
-                .tab => {},
-                .delete => {},
+
+                .backspace => control.editor.delete(.left, wordModifier(control.*)),
+                .delete => control.editor.delete(.right, wordModifier(control.*)),
+                .left => control.editor.moveCursor(.left, wordModifier(control.*)),
+                .right => control.editor.moveCursor(.right, wordModifier(control.*)),
+
+                .home => control.editor.moveCursor(.left, .line),
+                .end => control.editor.moveCursor(.right, .line),
                 else => {},
             },
             else => return, // just eat the event by default
@@ -913,6 +931,11 @@ pub const InputProcessor = struct {
     pub fn buttonUp(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
+            .text_box => |*control| switch (button) {
+                .ctrl_left => control.ctrl_pressed = false,
+                .ctrl_right => control.ctrl_pressed = false,
+                else => {},
+            },
             else => return, // just eat the event by default
         }
         _ = button;
@@ -929,20 +952,30 @@ pub const InputProcessor = struct {
             },
 
             .text_box => |*control| {
-                // TODO: Improve this by using the embedded arraylist of control.text if possible
-                var edit_box = std.ArrayList(u8).init(self.ui.allocator);
-                defer edit_box.deinit();
+                // these chars cannot be entered via the keyboard
+                const filtered_chars = [_]u8{
+                    // ASCII control codes
+                    0,   1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15,
+                    16,  17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+                    // DELETE
+                    127,
+                };
 
-                try edit_box.appendSlice(control.text.get());
-
-                for (string) |c| {
-                    switch (c) {
-                        '\r', '\n' => {}, // ignore these
-                        else => try edit_box.append(c),
+                var offset: usize = 0;
+                while (offset < string.len) {
+                    if (std.mem.indexOfAnyPos(u8, string, offset, &filtered_chars)) |index| {
+                        try control.editor.insertText(string[offset..index]);
+                        offset = index + 1;
+                    } else {
+                        try control.editor.insertText(string[offset..]);
+                        offset = string.len;
                     }
                 }
 
-                try control.text.set(self.ui.allocator, edit_box.items);
+                logger.info("insertText(\"{}\") => \"{}\"", .{
+                    std.fmt.fmtSliceEscapeUpper(string),
+                    std.fmt.fmtSliceEscapeUpper(control.editor.getText()),
+                });
             },
 
             else => return, // just eat the event by default
@@ -1032,26 +1065,30 @@ pub fn render(self: UserInterface) !void {
                 try renderer.fillRectangle(widget.bounds, style.background);
                 try renderer.drawRectangle(widget.bounds, style.border);
 
+                const string = control.editor.getText();
                 const font = self.default_font;
-                const string_width = renderer.measureString(font, control.text.get()).width;
                 const string_height = font.getLineHeight();
 
                 try renderer.drawString(
                     font,
-                    control.text.get(),
+                    string,
                     widget.bounds.x + 3,
                     widget.bounds.y + clampSub(widget.bounds.height, string_height) / 2,
                     Color.white,
                 );
 
                 if (self.isFocused(widget)) {
+                    const cursor_prefix = control.editor.getSubString(0, control.editor.cursor);
+
+                    const string_width = renderer.measureString(font, cursor_prefix).width;
+
                     const blink_period = 800;
                     const timer = @mod(types.milliTimestamp(), blink_period);
                     if (timer >= blink_period / 2) {
                         try renderer.drawLine(
-                            widget.bounds.x + 5 + string_width,
+                            widget.bounds.x + 4 + string_width,
                             widget.bounds.y + clampSub(widget.bounds.height, string_height) / 2,
-                            widget.bounds.x + 5 + string_width,
+                            widget.bounds.x + 4 + string_width,
                             widget.bounds.y + (widget.bounds.height + string_height) / 2,
                             Color.white,
                         );

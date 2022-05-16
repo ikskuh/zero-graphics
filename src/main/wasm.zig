@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const logger = std.log.scoped(.wasm_backend);
 
 const gles = @import("../gl_es_2v0.zig");
 const zerog = @import("../zero-graphics.zig");
@@ -11,6 +12,23 @@ comptime {
 
     // verify the application api
     common.verifyApplication(Application);
+}
+
+var error_name_buffer: [256]u8 = undefined;
+
+fn mapWasmError(err: anyerror) usize {
+    // prevent "pointer is 0"
+    _ = std.fmt.bufPrintZ(&error_name_buffer, "{s}", .{@errorName(err)}) catch "OutOfMemory";
+
+    return 1;
+}
+
+export fn app_get_error_ptr() [*]u8 {
+    return &error_name_buffer;
+}
+
+export fn app_get_error_len() usize {
+    return std.mem.indexOfScalar(u8, &error_name_buffer, 0) orelse error_name_buffer.len;
 }
 
 pub const backend: zerog.Backend = .wasm;
@@ -417,20 +435,20 @@ export fn app_input_sendTextInput(codepoint: u32, shift: bool, alt: bool, ctrl: 
 var last_width: u15 = 0;
 var last_height: u15 = 0;
 
-export fn app_update() u32 {
+export fn app_update() usize {
     const screen_width = @intCast(u15, meta_getScreenW());
     const screen_height = @intCast(u15, meta_getScreenH());
 
     if (screen_width != last_width or screen_height != last_height) {
-        app_instance.resize(screen_width, screen_height) catch return 2;
+        app_instance.resize(screen_width, screen_height) catch |e| return mapWasmError(e);
         last_width = screen_width;
         last_height = screen_height;
     }
 
-    const res = app_instance.update() catch return 1;
+    const res = app_instance.update() catch |e| return mapWasmError(e);
     if (!res)
         wasm_quit();
-    app_instance.render() catch return 3;
+    app_instance.render() catch |e| return mapWasmError(e);
     return 0;
 }
 
@@ -763,7 +781,7 @@ pub const WebSocket = struct {
 };
 
 const websocket = struct {
-    const logger = std.log.scoped(.websocket);
+    const ws_logger = std.log.scoped(.websocket);
     const Handle = u32;
 
     extern "websocket" fn create(
@@ -793,42 +811,42 @@ const websocket = struct {
 
             ws.pushEvent(.{ .message = msg }) catch {
                 msg.allocator.free(msg.data);
-                logger.info("out of memory for app_ws_onopen (2)", .{});
+                ws_logger.info("out of memory for app_ws_onopen (2)", .{});
             };
-            logger.info("websocket({}) received {} of data(binary={})", .{ handle, message.len, binary });
+            ws_logger.info("websocket({}) received {} of data(binary={})", .{ handle, message.len, binary });
         } else {
             gpa.allocator().free(message);
-            logger.err("app_ws_onmessage with invalid handle {}", .{handle});
+            ws_logger.err("app_ws_onmessage with invalid handle {}", .{handle});
         }
     }
 
     export fn app_ws_onopen(handle: Handle) void {
         if (WebSocket.get(handle)) |ws| {
-            logger.info("websocket({}) is now open", .{handle});
+            ws_logger.info("websocket({}) is now open", .{handle});
             ws.state = .open;
-            ws.pushEvent(.connected) catch logger.info("out of memory for app_ws_onopen", .{});
+            ws.pushEvent(.connected) catch ws_logger.info("out of memory for app_ws_onopen", .{});
         } else {
-            logger.err("app_ws_onopen with invalid handle {}", .{handle});
+            ws_logger.err("app_ws_onopen with invalid handle {}", .{handle});
         }
     }
 
     export fn app_ws_onerror(handle: Handle) void {
         if (WebSocket.get(handle)) |ws| {
-            logger.info("websocket({}) is now error", .{handle});
+            ws_logger.info("websocket({}) is now error", .{handle});
             ws.state = .@"error";
-            ws.pushEvent(.@"error") catch logger.info("out of memory for app_ws_onerror", .{});
+            ws.pushEvent(.@"error") catch ws_logger.info("out of memory for app_ws_onerror", .{});
         } else {
-            logger.err("app_ws_onerror with invalid handle {}", .{handle});
+            ws_logger.err("app_ws_onerror with invalid handle {}", .{handle});
         }
     }
 
     export fn app_ws_onclose(handle: Handle) void {
         if (WebSocket.get(handle)) |ws| {
-            logger.info("websocket({}) is now closed", .{handle});
+            ws_logger.info("websocket({}) is now closed", .{handle});
             ws.state = .closed;
-            ws.pushEvent(.closed) catch logger.info("out of memory for app_ws_onclose", .{});
+            ws.pushEvent(.closed) catch ws_logger.info("out of memory for app_ws_onclose", .{});
         } else {
-            logger.err("app_ws_onclose with invalid handle {}", .{handle});
+            ws_logger.err("app_ws_onclose with invalid handle {}", .{handle});
         }
     }
 

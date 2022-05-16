@@ -30,6 +30,11 @@ const pkgs = struct {
         .path = .{ .path = sdkRoot() ++ "/vendor/zigstr/src/Zigstr.zig" },
         .dependencies = &.{ziglyph},
     };
+    const text_editor = std.build.Pkg{
+        .name = "TextEditor",
+        .path = .{ .path = sdkRoot() ++ "/vendor/text-editor/src/TextEditor.zig" },
+        .dependencies = &.{ziglyph},
+    };
 };
 
 const zero_graphics_package = std.build.Pkg{
@@ -39,6 +44,7 @@ const zero_graphics_package = std.build.Pkg{
         pkgs.zigimg,
         pkgs.ziglyph,
         pkgs.zigstr,
+        pkgs.text_editor,
     },
 };
 

@@ -64,7 +64,16 @@
                         if (res == 0) {
                             requestAnimationFrame(update);
                         } else {
-                            console.log("app_update returned ", res);
+
+                            let error_ptr = instance.exports.app_get_error_ptr();
+                            let error_len = instance.exports.app_get_error_len();
+
+                            let view = new Uint8Array(instance.exports.memory.buffer, error_ptr, error_len);
+
+                            let str = new TextDecoder().decode(view);
+
+                            console.log("app_update returned error code ", str);
+                            alert(str);
                         }
                     }
 

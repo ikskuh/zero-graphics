@@ -34,3 +34,6 @@
 [submodule "vendor/ziglyph"]
 	path = vendor/ziglyph
 	url = https://github.com/jecolon/ziglyph
+[submodule "vendor/text-editor"]
+	path = vendor/text-editor
+	url = https://github.com/MasterQ32/TextEditor
