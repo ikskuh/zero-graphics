@@ -168,8 +168,8 @@ pub fn update(app: *Application) !bool {
                     try ui_input.enterText(text.text);
                 },
 
-                .key_down => |scancode| std.log.info("key_down: {s}", .{@tagName(scancode)}),
-                .key_up => |scancode| std.log.info("key_up: {s}", .{@tagName(scancode)}),
+                .key_down => |scancode| try ui_input.buttonDown(scancode),
+                .key_up => |scancode| try ui_input.buttonUp(scancode),
             }
         }
         ui_input.finish();
@@ -181,20 +181,55 @@ pub fn update(app: *Application) !bool {
             .height = app.screen_height,
         });
 
-        if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 30, .height = 30 }, app.gui_data.is_visible, .{})) {
+        if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 36, .height = 36 }, app.gui_data.is_visible, .{})) {
             app.gui_data.is_visible = !app.gui_data.is_visible;
         }
+        try ui.label(.{ .x = 136, .y = 10, .width = 100, .height = 36 }, "UI Demo", .{ .vertical_alignment = .center });
 
-        if (try ui.checkBox(.{ .x = 100, .y = 40, .width = 30, .height = 30 }, app.editor_data.is_visible, .{})) {
+        if (try ui.checkBox(.{ .x = 100, .y = 50, .width = 36, .height = 36 }, app.editor_data.is_visible, .{})) {
             app.editor_data.is_visible = !app.editor_data.is_visible;
         }
+        try ui.label(.{ .x = 136, .y = 50, .width = 100, .height = 36 }, "Editor Demo", .{ .vertical_alignment = .center });
 
         if (app.editor_data.is_visible) {
             try app.editor_data.update();
         }
 
-        if (try ui.checkBox(.{ .x = 100, .y = 50, .width = 30, .height = 30 }, app.test_pattern, .{})) {
+        if (try ui.checkBox(.{ .x = 100, .y = 90, .width = 36, .height = 36 }, app.test_pattern, .{})) {
             app.test_pattern = !app.test_pattern;
+        }
+        try ui.label(.{ .x = 136, .y = 90, .width = 100, .height = 36 }, "Test Pattern", .{ .vertical_alignment = .center });
+
+        const T = struct {
+            var string_buffer = std.BoundedArray(u8, 512){};
+        };
+
+        if (try ui.textBox(.{ .x = 10, .y = 130, .width = 250, .height = 36 }, T.string_buffer.constSlice(), .{})) |event| {
+            switch (event) {
+                .user_accept => |string| {
+                    T.string_buffer.len = 0;
+                    try T.string_buffer.appendSlice(string);
+                },
+                else => {},
+            }
+        }
+        if (try ui.textBox(.{ .x = 10, .y = 170, .width = 250, .height = 36 }, T.string_buffer.constSlice(), .{})) |event| {
+            switch (event) {
+                .focus_lost => |string| {
+                    T.string_buffer.len = 0;
+                    try T.string_buffer.appendSlice(string);
+                },
+                else => {},
+            }
+        }
+        if (try ui.textBox(.{ .x = 10, .y = 210, .width = 250, .height = 36 }, T.string_buffer.constSlice(), .{})) |event| {
+            switch (event) {
+                .text_changed => |string| {
+                    T.string_buffer.len = 0;
+                    try T.string_buffer.appendSlice(string);
+                },
+                else => {},
+            }
         }
 
         if (app.gui_data.is_visible) {
@@ -242,9 +277,9 @@ pub fn update(app: *Application) !bool {
                 try ui.label(rect, try std.fmt.bufPrint(&fmt_buf, "RadioGroup 2.{}", .{i}), .{ .id = i });
             }
 
-            //            radio_group_1
-            //radio_group_2
-            //check_group
+            // radio_group_1
+            // radio_group_2
+            // check_group
             {
                 var i: u15 = 0;
                 while (i < 3) : (i += 1) {

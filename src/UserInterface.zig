@@ -233,6 +233,28 @@ const Widget = struct {
         }
     }
 
+    ///invoked when the widget is getting focus
+    fn enter(widget: *Widget, ui: *UserInterface) void {
+        _ = ui;
+        switch (widget.control) {
+            .text_box => |*control| {
+                control.events.insert(.enter);
+            },
+            else => {},
+        }
+    }
+
+    ///invoked when the widget is losing focus
+    fn leave(widget: *Widget, ui: *UserInterface) void {
+        _ = ui;
+        switch (widget.control) {
+            .text_box => |*control| {
+                control.events.insert(.leave);
+            },
+            else => {},
+        }
+    }
+
     pub fn sendEvent(self: *Widget, event: Custom.Event) void {
         if (self.control == .custom) {
             if (self.control.custom.config.process_event) |process_event| {
@@ -305,13 +327,14 @@ const Widget = struct {
             accept_tabs: bool = false,
             accept_return: bool = false,
         };
+        const Event = enum { accepted, enter, leave, cancelled, text_changed };
 
         editor: TextEditor,
         content_hash: StringHash = StringHash.compute(""),
 
         ctrl_pressed: bool = false,
 
-        accepted: bool = false,
+        events: std.enums.EnumSet(Event) = std.enums.EnumSet(Event){},
 
         config: Config = .{},
     };
@@ -435,7 +458,8 @@ pressed_widget: ?*Widget = null,
 /// The widget which is currently hovered by the pointer.
 hovered_widget: ?*Widget = null,
 
-/// The widget that is currently having the keyboard focus
+/// The widget that is currently having the keyboard focus.
+/// Use `focusWidget` function to set this field, as there is logic that must be executed.
 focused_widget: ?*Widget = null,
 
 renderer: ?*Renderer,
@@ -803,8 +827,18 @@ pub const Builder = struct {
         return result;
     }
 
-    pub fn textBox(self: Self, rectangle: Rectangle, display_string: []const u8, config: anytype) Error!?[]const u8 {
+    pub const TextBoxEvent = union(enum) {
+        focus_lost: []const u8,
+        text_changed: []const u8,
+        user_accept: []const u8,
+        user_clear,
+    };
+    pub fn textBox(self: Self, rectangle: Rectangle, display_string: []const u8, config: anytype) Error!?TextBoxEvent {
         const info = try self.initOrUpdateWidget(.text_box, rectangle, config);
+        const text_box: *Widget.TextBox = info.control;
+
+        // reset all events at the end of this
+        defer text_box.events = std.enums.EnumSet(Widget.TextBox.Event){}; // clear
 
         const display_hash = StringHash.compute(display_string);
 
@@ -814,20 +848,29 @@ pub const Builder = struct {
                 .content_hash = display_hash,
             };
         } else {
-            if (info.control.content_hash != display_hash) {
+            // clear text box to default when ESC is pressed or the input string changes
+            if (text_box.content_hash != display_hash or text_box.events.contains(.cancelled)) {
                 logger.info("updating text box content to {s}", .{display_string});
-                try info.control.editor.setText(display_string);
-                info.control.content_hash = display_hash;
+                try text_box.editor.setText(display_string);
+                text_box.content_hash = display_hash;
             }
         }
-        updateWidgetConfig(&info.control.config, config);
+        updateWidgetConfig(&text_box.config, config);
 
-        if (info.control.accepted) {
-            info.control.accepted = false;
-            return info.control.editor.getText();
-        } else {
-            return null;
+        if (text_box.events.contains(.cancelled)) {
+            return TextBoxEvent.user_clear;
         }
+        if (text_box.events.contains(.accepted)) {
+            return TextBoxEvent{ .user_accept = info.control.editor.getText() };
+        }
+        if (text_box.events.contains(.leave)) {
+            return TextBoxEvent{ .focus_lost = info.control.editor.getText() };
+        }
+        if (text_box.events.contains(.text_changed)) {
+            return TextBoxEvent{ .text_changed = info.control.editor.getText() };
+        }
+
+        return null;
     }
 };
 
@@ -895,7 +938,7 @@ pub const InputProcessor = struct {
 
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position) orelse {
             // clicking on *no* widget unfocused the current one
-            self.ui.focused_widget = null;
+            self.ui.focusWidget(null);
             return;
         };
 
@@ -910,7 +953,7 @@ pub const InputProcessor = struct {
 
         if (pointer == .primary and clicked_widget == pressed_widget) {
             // if the widget is clickable, we focus it
-            self.ui.focused_widget = clicked_widget;
+            self.ui.focusWidget(clicked_widget);
             clicked_widget.click(self.ui, self.ui.pointer_position);
         }
     }
@@ -928,18 +971,25 @@ pub const InputProcessor = struct {
             .text_box => |*control| switch (button) {
                 .ctrl_left => control.ctrl_pressed = true,
                 .ctrl_right => control.ctrl_pressed = true,
-                .@"return" => control.accepted = true,
-                .escape => {},
+                .@"return" => control.events.insert(.accepted),
+                .escape => control.events.insert(.cancelled),
                 .tab => {
                     if (control.config.accept_tabs) {
                         try control.editor.insertText("\t");
+                        control.events.insert(.text_changed);
                     } else {
                         // TODO: move focus
                     }
                 },
 
-                .backspace => control.editor.delete(.left, wordModifier(control.*)),
-                .delete => control.editor.delete(.right, wordModifier(control.*)),
+                .backspace => {
+                    control.editor.delete(.left, wordModifier(control.*));
+                    control.events.insert(.text_changed);
+                },
+                .delete => {
+                    control.editor.delete(.right, wordModifier(control.*));
+                    control.events.insert(.text_changed);
+                },
                 .left => control.editor.moveCursor(.left, wordModifier(control.*)),
                 .right => control.editor.moveCursor(.right, wordModifier(control.*)),
 
@@ -961,7 +1011,6 @@ pub const InputProcessor = struct {
             },
             else => return, // just eat the event by default
         }
-        _ = button;
     }
 
     pub fn enterText(self: Self, string: []const u8) !void {
@@ -989,9 +1038,13 @@ pub const InputProcessor = struct {
                     if (std.mem.indexOfAnyPos(u8, string, offset, &filtered_chars)) |index| {
                         try control.editor.insertText(string[offset..index]);
                         offset = index + 1;
+
+                        control.events.insert(.text_changed);
                     } else {
                         try control.editor.insertText(string[offset..]);
                         offset = string.len;
+
+                        control.events.insert(.text_changed);
                     }
                 }
 
@@ -1015,6 +1068,16 @@ fn clampSub(a: u15, b: u15) u15 {
 
 fn isFocused(self: UserInterface, widget: *Widget) bool {
     return (self.focused_widget == widget);
+}
+
+fn focusWidget(self: *UserInterface, widget: ?*Widget) void {
+    if (self.focused_widget) |focus| {
+        focus.leave(self);
+    }
+    self.focused_widget = widget;
+    if (self.focused_widget) |focus| {
+        focus.enter(self);
+    }
 }
 
 pub fn render(self: UserInterface) !void {
