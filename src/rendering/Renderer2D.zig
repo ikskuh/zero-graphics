@@ -3,6 +3,8 @@ const gles = @import("../gl_es_2v0.zig");
 const types = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_renderer2D);
 
+const ziglyph = @import("ziglyph");
+
 const glesh = @import("gles-helper.zig");
 
 const c = @cImport({
@@ -343,9 +345,12 @@ fn scaleInt(ival: isize, scale: f32) i16 {
 }
 
 const GlyphIterator = struct {
+    const Grapheme = ziglyph.Grapheme;
+    const GraphemeIterator = ziglyph.GraphemeIterator;
+
     renderer: *Self,
     font: *Font,
-    codepoint_src: std.unicode.Utf8Iterator,
+    grapheme_src: GraphemeIterator,
     scale: f32,
 
     dx: isize,
@@ -359,10 +364,7 @@ const GlyphIterator = struct {
         return GlyphIterator{
             .renderer = renderer,
             .font = font,
-            .codepoint_src = std.unicode.Utf8Iterator{
-                .bytes = text,
-                .i = 0,
-            },
+            .grapheme_src = GraphemeIterator.init(text) catch @panic("invalid utf-8 detected"), // assume valid utf-8
 
             .scale = scale,
 
@@ -373,20 +375,28 @@ const GlyphIterator = struct {
 
     pub fn next(self: *GlyphIterator) ?GlyphCmd {
         while (true) {
-            const codepoint = self.codepoint_src.nextCodepoint() orelse return null;
-            if (codepoint == '\n') {
+            const grapheme = self.grapheme_src.next() orelse return null;
+            if (std.mem.eql(u8, grapheme.bytes, "\n")) {
                 self.dx = 0;
                 self.dy += self.font.getLineHeight();
                 self.previous_codepoint = null;
                 continue;
             }
 
-            const glyph = self.renderer.getGlyph(self.font, codepoint) catch continue;
+            var codepoints = ziglyph.CodePointIterator{ .bytes = grapheme.bytes };
+
+            const codepoint = codepoints.next() orelse unreachable; // we have at least a single codepoint
+
+            if (codepoints.next() != null) {
+                // TODO: Handle multi-codepoint-graphemes properly
+            }
+
+            const glyph = self.renderer.getGlyph(self.font, codepoint.scalar) catch continue;
 
             if (self.previous_codepoint) |prev| {
-                self.dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&self.font.font, prev, codepoint));
+                self.dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&self.font.font, prev, codepoint.scalar));
             }
-            self.previous_codepoint = codepoint;
+            self.previous_codepoint = codepoint.scalar;
 
             const off_x = scaleInt(self.dx + glyph.left_side_bearing, self.scale);
             const off_y = glyph.offset_y + self.dy;
@@ -394,7 +404,7 @@ const GlyphIterator = struct {
             self.dx += glyph.advance_width;
 
             return GlyphCmd{
-                .codepoint = codepoint,
+                .codepoint = codepoint.scalar,
 
                 .glyph_width = @intCast(u15, std.math.max(0, scaleInt(glyph.advance_width, self.scale))),
                 .glyph_height = self.font.getLineHeight(),
@@ -428,7 +438,7 @@ const GlyphIterator = struct {
 /// Measures the extends of the given `text` when rendered with `font`.
 /// Returns the size and relative offset the string will take up on the screen.
 /// Returned values are in pixels.
-pub fn measureString(self: * Self, font: *const Font, text: []const u8) Rectangle {
+pub fn measureString(self: *Self, font: *const Font, text: []const u8) Rectangle {
     var max_dx: i16 = 0;
     var max_dy: i16 = 0;
 
