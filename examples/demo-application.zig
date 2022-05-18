@@ -35,9 +35,10 @@ font: *const Renderer.Font,
 input: *zero_graphics.Input,
 
 ui: zero_graphics.UserInterface,
+editor: Editor,
 
 gui_data: DemoGuiData = .{},
-editor: EditorData = .{},
+editor_data: EditorData = .{},
 
 renderer3d: Renderer3D,
 mesh: *ResourceManager.Geometry,
@@ -55,6 +56,7 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
         .pixel_pattern = undefined,
         .renderer = undefined,
         .ui = undefined,
+        .editor = undefined,
         .font = undefined,
         .input = input,
 
@@ -65,20 +67,21 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
     };
     errdefer app.resources.deinit();
 
-    app.ui = try zero_graphics.UserInterface.init(app.allocator, null);
-    errdefer app.ui.deinit();
-
     app.renderer = try app.resources.createRenderer2D();
     errdefer app.renderer.deinit();
 
+    app.ui = try zero_graphics.UserInterface.init(app.allocator, &app.renderer);
+    errdefer app.ui.deinit();
     app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("ziggy.png") });
     app.pixel_pattern = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("pixelpattern.png") });
+
+    app.editor = Editor.init(app.allocator);
+    errdefer app.editor.deinit();
+
     app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
     app.renderer3d = try app.resources.createRenderer3D();
     errdefer app.renderer3d.deinit();
-
-    try app.ui.setRenderer(&app.renderer);
 
     // app.mesh = try app.resources.createGeometry(ResourceManager.StaticMesh{
     //     .vertices = &.{
@@ -104,10 +107,14 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
         .data = @embedFile("twocubes.z3d"),
         .loader = .{},
     });
+
+    try app.editor_data.init();
 }
 
 pub fn deinit(app: *Application) void {
+    app.editor.deinit();
     app.ui.deinit();
+    app.resources.deinit();
     app.* = undefined;
 }
 
@@ -178,8 +185,12 @@ pub fn update(app: *Application) !bool {
             app.gui_data.is_visible = !app.gui_data.is_visible;
         }
 
-        if (try ui.checkBox(.{ .x = 100, .y = 40, .width = 30, .height = 30 }, app.editor.is_visible, .{})) {
-            app.editor.is_visible = !app.editor.is_visible;
+        if (try ui.checkBox(.{ .x = 100, .y = 40, .width = 30, .height = 30 }, app.editor_data.is_visible, .{})) {
+            app.editor_data.is_visible = !app.editor_data.is_visible;
+        }
+
+        if (app.editor_data.is_visible) {
+            try app.editor_data.update();
         }
 
         if (try ui.checkBox(.{ .x = 100, .y = 50, .width = 30, .height = 30 }, app.test_pattern, .{})) {
@@ -432,7 +443,10 @@ pub fn render(app: *Application) !void {
             zero_graphics.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
         );
 
-        try app.editor.render();
+        if (app.editor_data.is_visible) {
+            try app.editor_data.render();
+            try app.editor.render(renderer);
+        }
 
         if (app.test_pattern) {
             if (@mod(zero_graphics.milliTimestamp(), 1000) > 500) {
@@ -580,18 +594,156 @@ const DemoGuiData = struct {
 const EditorData = struct {
     is_visible: bool = false,
 
-    pub fn render(self: *EditorData) !void {
-        const app = @fieldParentPtr(Application, "editor", self);
+    quad: [4]zero_graphics.Point = .{
+        .{ .x = 300, .y = 200 },
+        .{ .x = 400, .y = 200 },
+        .{ .x = 400, .y = 300 },
+        .{ .x = 300, .y = 300 },
+    },
+    gizmos: [4]*Gizmo = undefined,
+
+    pub fn init(self: *EditorData) !void {
+        const app = @fieldParentPtr(Application, "editor_data", self);
+
+        for (self.quad) |pos, i| {
+            self.gizmos[i] = try app.editor.addGizmo(.{ .point = pos });
+        }
+    }
+
+    pub fn update(self: *EditorData) !void {
+        const app = @fieldParentPtr(Application, "editor_data", self);
         if (!self.is_visible) {
             return;
         }
 
-        try app.renderer.drawLine(
-            0,
-            0,
-            100,
-            100,
-            colors.xkcd.lime,
-        );
+        for (self.gizmos) |gizmo, i| {
+            if (app.editor.wasModified(gizmo)) {
+                self.quad[i] = gizmo.point;
+            }
+        }
+    }
+
+    pub fn render(self: *EditorData) !void {
+        const app = @fieldParentPtr(Application, "editor_data", self);
+        if (!self.is_visible) {
+            return;
+        }
+
+        for (self.quad) |vert, i| {
+            const next = self.quad[(i + 1) % self.quad.len];
+
+            try app.renderer.drawLine(
+                vert.x,
+                vert.y,
+                next.x,
+                next.y,
+                colors.xkcd.bright_lilac,
+            );
+        }
+    }
+};
+
+pub const GizmoType = enum {
+    point,
+};
+
+pub const Gizmo = union(GizmoType) {
+    point: zero_graphics.Point,
+};
+
+pub const Editor = struct {
+    const Rectangle = zero_graphics.Rectangle;
+    const Self = @This();
+
+    const GizmoInternal = struct {
+        gizmo: Gizmo,
+        changed: bool = false,
+    };
+
+    const Queue = std.TailQueue(GizmoInternal);
+    const Node = Queue.Node;
+
+    node_arena: std.heap.ArenaAllocator,
+    free_gizmos: Queue = .{},
+    gizmos: Queue = .{},
+
+    focused: ?*GizmoInternal = null,
+
+    pub fn init(allocator: std.mem.Allocator) Self {
+        return Self{
+            .node_arena = std.heap.ArenaAllocator.init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.node_arena.deinit();
+        self.* = undefined;
+    }
+
+    pub fn addGizmo(self: *Self, initial: Gizmo) !*Gizmo {
+        const node = if (self.free_gizmos.popFirst()) |node|
+            node
+        else
+            try self.node_arena.allocator().create(Node);
+        node.* = .{
+            .data = .{ .gizmo = initial },
+        };
+        self.gizmos.append(node);
+        return &node.data.gizmo;
+    }
+
+    pub fn removeGizmo(self: *Self, gizmo: *Gizmo) void {
+        const internal = @fieldParentPtr(GizmoInternal, "gizmo", gizmo);
+        const node = @fieldParentPtr(Node, "data", internal);
+
+        internal.* = undefined;
+
+        self.gizmos.remove(node);
+        self.free_gizmos.append(node);
+    }
+
+    pub fn wasModified(self: Self, gizmo: *Gizmo) bool {
+        _ = self;
+
+        const internal = @fieldParentPtr(GizmoInternal, "gizmo", gizmo);
+
+        return internal.changed;
+    }
+
+    pub fn update(self: *Self, input: zero_graphics.Input) !void {
+        var it = self.gizmos.first;
+        while (it) |node| : (it = node.next) {
+
+            //
+            _ = input;
+        }
+    }
+
+    pub fn render(self: Self, renderer: *zero_graphics.Renderer2D) !void {
+        var it = self.gizmos.first;
+        while (it) |node| : (it = node.next) {
+            switch (node.data.gizmo) {
+                .point => |point| {
+                    try renderer.drawRectangle(
+                        getEditHandleRectangle(point.x, point.y),
+                        if (self.focused == @as(?*GizmoInternal, &node.data))
+                            colors.xkcd.lime
+                        else
+                            colors.xkcd.green,
+                    );
+                },
+                //
+            }
+        }
+    }
+
+    fn getEditHandleRectangle(x: i16, y: i16) Rectangle {
+        const size = 4;
+        return Rectangle{
+            .x = x - size,
+            .y = y - size,
+            .width = 2 * size + 1,
+            .height = 2 * size + 1,
+        };
     }
 };
