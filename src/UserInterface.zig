@@ -848,8 +848,9 @@ pub const Builder = struct {
                 .content_hash = display_hash,
             };
         } else {
+
             // clear text box to default when ESC is pressed or the input string changes
-            if (text_box.content_hash != display_hash or text_box.events.contains(.cancelled)) {
+            if ((text_box.content_hash != display_hash) or text_box.events.contains(.cancelled)) {
                 logger.info("updating text box content to {s}", .{display_string});
                 try text_box.editor.setText(display_string);
                 text_box.content_hash = display_hash;
@@ -1078,6 +1079,10 @@ fn focusWidget(self: *UserInterface, widget: ?*Widget) void {
     if (self.focused_widget) |focus| {
         focus.enter(self);
     }
+}
+
+pub fn hasFocus(self: UserInterface) bool {
+    return (self.focused_widget != null);
 }
 
 pub fn render(self: UserInterface) !void {
