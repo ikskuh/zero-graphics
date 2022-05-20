@@ -225,7 +225,7 @@ const Widget = struct {
                         .renderer = ui.renderer orelse return,
                         .font = ui.default_font, // TODO: Select correct font for checkbox
                     },
-                    point.x - self.bounds.x - 7, // TODO: Adjust to real padding value
+                    point.x - self.bounds.x + control.scroll_offset - 3, // TODO: Adjust to real padding value
                     point.y - self.bounds.y,
                 );
             },
