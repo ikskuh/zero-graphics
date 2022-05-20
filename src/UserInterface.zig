@@ -333,6 +333,7 @@ const Widget = struct {
         content_hash: StringHash = StringHash.compute(""),
 
         ctrl_pressed: bool = false,
+        scroll_offset: u15 = 0,
 
         events: std.enums.EnumSet(Event) = std.enums.EnumSet(Event){},
 
@@ -1145,7 +1146,7 @@ pub fn render(self: UserInterface) !void {
                 try renderer.drawRectangle(widget.bounds, style.border);
             },
 
-            .text_box => |control| {
+            .text_box => |*control| {
                 const theme = control.config.style orelse self.theme.text_box;
 
                 const style = if (self.isFocused(widget))
@@ -1160,31 +1161,65 @@ pub fn render(self: UserInterface) !void {
                 const font = self.default_font;
                 const string_height = font.getLineHeight();
 
+                const CursorInfo = struct {
+                    position: u15,
+                };
+
+                const text_padding = 3;
+
+                const cursor_info: CursorInfo = if (self.isFocused(widget)) blk: {
+                    const cursor_prefix = control.editor.getSubString(0, control.editor.cursor);
+
+                    const cursor_position = renderer.measureString(font, cursor_prefix).width;
+
+                    const scroll_padding_l = 48;
+                    const scroll_padding_r = 16;
+                    const scroll_extra_l = 32;
+                    const view_width = widget.bounds.width - 2 * text_padding;
+
+                    const l = std.math.min(view_width, scroll_padding_l);
+                    const r = clampSub(view_width, scroll_padding_r);
+
+                    const civ = clampSub(cursor_position, control.scroll_offset);
+
+                    if (civ < l) {
+                        // TODO: Scroll to the left
+                        control.scroll_offset = clampSub(control.scroll_offset, l - civ + scroll_extra_l);
+                    } else if (civ > r) {
+                        // TODO: Scroll to the right
+                        control.scroll_offset += civ - r;
+                    }
+
+                    break :blk CursorInfo{
+                        .position = cursor_position,
+                    };
+                } else undefined;
+
+                try renderer.pushClipRectangle(widget.bounds);
+
                 try renderer.drawString(
                     font,
                     string,
-                    widget.bounds.x + 3,
+                    widget.bounds.x + text_padding - control.scroll_offset,
                     widget.bounds.y + clampSub(widget.bounds.height, string_height) / 2,
                     Color.white,
                 );
 
                 if (self.isFocused(widget)) {
-                    const cursor_prefix = control.editor.getSubString(0, control.editor.cursor);
-
-                    const string_width = renderer.measureString(font, cursor_prefix).width;
-
                     const blink_period = 800;
                     const timer = @mod(types.milliTimestamp(), blink_period);
                     if (timer >= blink_period / 2) {
                         try renderer.drawLine(
-                            widget.bounds.x + 4 + string_width,
+                            widget.bounds.x + text_padding + cursor_info.position - control.scroll_offset,
                             widget.bounds.y + clampSub(widget.bounds.height, string_height) / 2,
-                            widget.bounds.x + 4 + string_width,
+                            widget.bounds.x + text_padding + cursor_info.position - control.scroll_offset,
                             widget.bounds.y + (widget.bounds.height + string_height) / 2,
                             Color.white,
                         );
                     }
                 }
+
+                try renderer.popClipRectangle();
             },
             .label => |control| {
                 const style = control.config.style orelse self.theme.label;
