@@ -19,27 +19,27 @@ pub const Platform = union(enum) {
 const pkgs = struct {
     const zigimg = std.build.Pkg{
         .name = "zigimg",
-        .path = .{ .path = sdkRoot() ++ "/vendor/zigimg/zigimg.zig" },
+        .source = .{ .path = sdkRoot() ++ "/vendor/zigimg/zigimg.zig" },
     };
     const ziglyph = std.build.Pkg{
         .name = "ziglyph",
-        .path = .{ .path = sdkRoot() ++ "/vendor/ziglyph/src/ziglyph.zig" },
+        .source = .{ .path = sdkRoot() ++ "/vendor/ziglyph/src/ziglyph.zig" },
     };
     const zigstr = std.build.Pkg{
         .name = "zigstr",
-        .path = .{ .path = sdkRoot() ++ "/vendor/zigstr/src/Zigstr.zig" },
+        .source = .{ .path = sdkRoot() ++ "/vendor/zigstr/src/Zigstr.zig" },
         .dependencies = &.{ziglyph},
     };
     const text_editor = std.build.Pkg{
         .name = "TextEditor",
-        .path = .{ .path = sdkRoot() ++ "/vendor/text-editor/src/TextEditor.zig" },
+        .source = .{ .path = sdkRoot() ++ "/vendor/text-editor/src/TextEditor.zig" },
         .dependencies = &.{ziglyph},
     };
 };
 
 const zero_graphics_package = std.build.Pkg{
     .name = "zero-graphics",
-    .path = .{ .path = sdkRoot() ++ "/src/zero-graphics.zig" },
+    .source = .{ .path = sdkRoot() ++ "/src/zero-graphics.zig" },
     .dependencies = &[_]std.build.Pkg{
         pkgs.zigimg,
         pkgs.ziglyph,
@@ -83,7 +83,7 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
 
     sdk.render_main_page_tool.addPackage(.{
         .name = "html",
-        .path = TemplateStep.transform(builder, sdkRoot() ++ "/www/application.ztt"),
+        .source = TemplateStep.transform(builder, sdkRoot() ++ "/www/application.ztt"),
     });
 
     if (sdk.android_sdk) |asdk| {
@@ -100,7 +100,7 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
     sdk.dummy_server = builder.addExecutable("http-server", sdkRoot() ++ "/tools/http-server.zig");
     sdk.dummy_server.addPackage(std.build.Pkg{
         .name = "apple_pie",
-        .path = .{ .path = sdkRoot() ++ "/vendor/apple_pie/src/apple_pie.zig" },
+        .source = .{ .path = sdkRoot() ++ "/vendor/apple_pie/src/apple_pie.zig" },
     });
 
     return sdk;
@@ -144,7 +144,7 @@ pub fn createApplicationSource(sdk: *Sdk, name: []const u8, root_file: std.build
         .packages = std.ArrayList(std.build.Pkg).init(sdk.builder.allocator),
         .meta_pkg = std.build.Pkg{
             .name = "application-meta",
-            .path = std.build.FileSource{ .generated = &create_meta_step.outfile },
+            .source = std.build.FileSource{ .generated = &create_meta_step.outfile },
         },
         .permissions = std.ArrayList([]const u8).init(sdk.builder.allocator),
     };
@@ -232,7 +232,7 @@ pub const Application = struct {
     pub fn compileFor(app: *Application, platform: Platform) *AppCompilation {
         const app_pkg = app.sdk.builder.dupePkg(std.build.Pkg{
             .name = "application",
-            .path = app.root_file,
+            .source = app.root_file,
             .dependencies = app.packages.items,
         });
 

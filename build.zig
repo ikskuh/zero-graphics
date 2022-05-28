@@ -16,7 +16,7 @@ pub fn build(b: *std.build.Builder) !void {
         const zero_init = b.addExecutable("zero-init", "tools/zero-init/main.zig");
         zero_init.addPackage(std.build.Pkg{
             .name = "args",
-            .path = .{ .path = "vendor/args/args.zig" },
+            .source = .{ .path = "vendor/args/args.zig" },
         });
         zero_init.install();
     }
@@ -46,15 +46,15 @@ pub fn build(b: *std.build.Builder) !void {
         });
         converter.addPackage(std.build.Pkg{
             .name = "api",
-            .path = .{ .generated = &converter_api.output_file },
+            .source = .{ .generated = &converter_api.output_file },
         });
         converter.addPackage(std.build.Pkg{
             .name = "z3d",
-            .path = .{ .path = "src/rendering/z3d-format.zig" },
+            .source = .{ .path = "src/rendering/z3d-format.zig" },
         });
         converter.addPackage(std.build.Pkg{
             .name = "args",
-            .path = .{ .path = "vendor/args/args.zig" },
+            .source = .{ .path = "vendor/args/args.zig" },
         });
         converter.linkLibC();
         converter.linkLibCpp();
@@ -69,7 +69,7 @@ pub fn build(b: *std.build.Builder) !void {
 
     app.addPackage(std.build.Pkg{
         .name = "zlm",
-        .path = .{ .path = "vendor/zlm/zlm.zig" },
+        .source = .{ .path = "vendor/zlm/zlm.zig" },
     });
 
     {

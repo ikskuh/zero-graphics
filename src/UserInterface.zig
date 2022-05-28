@@ -667,6 +667,15 @@ pub const Builder = struct {
         self.ui.mode = .default;
 
         while (self.ui.retained_widgets.popFirst()) |node| {
+            if (self.ui.focused_widget == &node.data) {
+                self.ui.focused_widget = null;
+            }
+            if (self.ui.hovered_widget == &node.data) {
+                self.ui.hovered_widget = null;
+            }
+            if (self.ui.pressed_widget == &node.data) {
+                self.ui.pressed_widget = null;
+            }
             node.data.deinit();
             self.ui.freeWidgetNode(node);
         }
