@@ -220,9 +220,9 @@ const MeshStream = struct {
         const header = @ptrCast(*align(1) z3d.static_model.Header, &stream.target_buffer.items[0]);
         header.* = z3d.static_model.Header{
             .common = z3d.CommonHeader{ .type = .static },
-            .vertex_count = std.mem.nativeToLittle(u32, std.math.cast(u32, vertices) catch |err| return stream.setError(err)),
-            .index_count = std.mem.nativeToLittle(u32, std.math.cast(u32, indices) catch |err| return stream.setError(err)),
-            .mesh_count = std.mem.nativeToLittle(u32, std.math.cast(u32, ranges) catch |err| return stream.setError(err)),
+            .vertex_count = std.mem.nativeToLittle(u32, std.math.cast(u32, vertices) orelse return stream.setError(error.Overflow)),
+            .index_count = std.mem.nativeToLittle(u32, std.math.cast(u32, indices) orelse return stream.setError(error.Overflow)),
+            .mesh_count = std.mem.nativeToLittle(u32, std.math.cast(u32, ranges) orelse return stream.setError(error.Overflow)),
         };
 
         //std.log.info("vertices: {},\tindices: {},\ttextures: {}", .{ vertices, indices, ranges });
@@ -273,8 +273,8 @@ const MeshStream = struct {
 
         const meshes = @ptrCast([*]align(1) z3d.static_model.Mesh, &stream.target_buffer.items[stream.meshOffset()]);
         meshes[stream.mesh_offset] = z3d.static_model.Mesh{
-            .offset = std.mem.nativeToLittle(u32, std.math.cast(u32, offset) catch |e| return stream.setError(e)),
-            .length = std.mem.nativeToLittle(u32, std.math.cast(u32, length) catch |e| return stream.setError(e)),
+            .offset = std.mem.nativeToLittle(u32, std.math.cast(u32, offset) orelse return stream.setError(error.Overflow)),
+            .length = std.mem.nativeToLittle(u32, std.math.cast(u32, length) orelse return stream.setError(error.Overflow)),
             .texture_file = [1]u8{0} ** 120,
         };
 
