@@ -25,10 +25,10 @@ pub fn deinit(app: *Application) void {
 }
 
 pub fn setupGraphics(app: *Application) !void {
-    logger.info("OpenGL Version:       {s}", .{std.mem.span(gl.getString(gl.VERSION))});
-    logger.info("OpenGL Vendor:        {s}", .{std.mem.span(gl.getString(gl.VENDOR))});
-    logger.info("OpenGL Renderer:      {s}", .{std.mem.span(gl.getString(gl.RENDERER))});
-    logger.info("OpenGL GLSL:          {s}", .{std.mem.span(gl.getString(gl.SHADING_LANGUAGE_VERSION))});
+    logger.info("OpenGL Version:       {?s}", .{std.mem.span(gl.getString(gl.VERSION))});
+    logger.info("OpenGL Vendor:        {?s}", .{std.mem.span(gl.getString(gl.VENDOR))});
+    logger.info("OpenGL Renderer:      {?s}", .{std.mem.span(gl.getString(gl.RENDERER))});
+    logger.info("OpenGL GLSL:          {?s}", .{std.mem.span(gl.getString(gl.SHADING_LANGUAGE_VERSION))});
 
     // If possible, install the debug callback in debug builds
     if (builtin.mode == .Debug) {

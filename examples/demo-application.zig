@@ -120,10 +120,10 @@ pub fn deinit(app: *Application) void {
 
 pub fn setupGraphics(app: *Application) !void {
     {
-        logger.info("OpenGL Version:       {s}", .{std.mem.span(gles.getString(gles.VERSION))});
-        logger.info("OpenGL Vendor:        {s}", .{std.mem.span(gles.getString(gles.VENDOR))});
-        logger.info("OpenGL Renderer:      {s}", .{std.mem.span(gles.getString(gles.RENDERER))});
-        logger.info("OpenGL GLSL:          {s}", .{std.mem.span(gles.getString(gles.SHADING_LANGUAGE_VERSION))});
+        logger.info("OpenGL Version:       {?s}", .{std.mem.span(gles.getString(gles.VERSION))});
+        logger.info("OpenGL Vendor:        {?s}", .{std.mem.span(gles.getString(gles.VENDOR))});
+        logger.info("OpenGL Renderer:      {?s}", .{std.mem.span(gles.getString(gles.RENDERER))});
+        logger.info("OpenGL GLSL:          {?s}", .{std.mem.span(gles.getString(gles.SHADING_LANGUAGE_VERSION))});
     }
 
     logger.info("Display density: {d:.3} DPI", .{zero_graphics.getDisplayDPI()});
