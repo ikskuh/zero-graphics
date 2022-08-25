@@ -53,7 +53,7 @@ pub fn resize(app: *Application, width: u15, height: u15) !void {
 
 pub fn update(app: *Application) !bool {
     // process input events here:
-    while (app.input.pollEvent()) |event| {
+    while (app.input.fetch()) |event| {
         switch (event) {
             .quit => return false,
             .pointer_motion => {},

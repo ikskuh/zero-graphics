@@ -315,7 +315,7 @@ pub fn isReleased(self: Self, key: Scancode) bool {
     return !self.keyboard_state.get(key);
 }
 
-pub fn pollEvent(self: *Self) ?Event {
+pub fn fetch(self: *Self) ?Event {
     if (self.current_event) |node| {
         node.data = undefined;
         self.free_queue.append(node);
