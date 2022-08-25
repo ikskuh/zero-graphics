@@ -6,6 +6,8 @@ const Assimp = @import("vendor/zig-assimp/Sdk.zig");
 pub fn build(b: *std.build.Builder) !void {
     const enable_android = b.option(bool, "enable-android", "Enables android build support. Requires the android sdk and ndk to be installed.") orelse false;
 
+    const app_only_step = b.step("app", "Builds only the desktop application");
+
     const sdk = Sdk.init(b, enable_android);
     const assimp = Assimp.init(b);
 
@@ -75,6 +77,8 @@ pub fn build(b: *std.build.Builder) !void {
     {
         const desktop_exe = app.compileFor(platform);
         desktop_exe.install();
+
+        app_only_step.dependOn(&desktop_exe.data.desktop.install_step.?.step);
 
         const run_cmd = desktop_exe.run();
         run_cmd.step.dependOn(b.getInstallStep());

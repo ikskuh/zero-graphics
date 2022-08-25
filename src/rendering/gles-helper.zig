@@ -112,7 +112,7 @@ pub fn fetchUniforms(program: gles.GLuint, comptime T: type) T {
     var t: T = undefined;
     inline for (std.meta.fields(T)) |fld| {
         const name = comptime fld.name[0.. :0];
-        @field(t, fld.name) = gles.getUniformLocation(program, name.ptr);
+        @field(t, fld.name) = gles.getUniformLocation(program, name);
     }
     return t;
 }

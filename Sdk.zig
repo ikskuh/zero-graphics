@@ -1,7 +1,11 @@
 const std = @import("std");
 
-fn sdkRoot() []const u8 {
-    return std.fs.path.dirname(@src().file) orelse ".";
+fn sdkPath(comptime suffix: []const u8) []const u8 {
+    if (suffix[0] != '/') @compileError("relToPath requires an absolute path!");
+    return comptime blk: {
+        const root_dir = std.fs.path.dirname(@src().file) orelse ".";
+        break :blk root_dir ++ suffix;
+    };
 }
 
 const Sdk = @This();
@@ -19,33 +23,22 @@ pub const Platform = union(enum) {
 const pkgs = struct {
     const zigimg = std.build.Pkg{
         .name = "zigimg",
-        .source = .{ .path = sdkRoot() ++ "/vendor/zigimg/zigimg.zig" },
+        .source = .{ .path = sdkPath("/vendor/zigimg/zigimg.zig") },
     };
     const ziglyph = std.build.Pkg{
         .name = "ziglyph",
-        .source = .{ .path = sdkRoot() ++ "/vendor/ziglyph/src/ziglyph.zig" },
+        .source = .{ .path = sdkPath("/vendor/ziglyph/src/ziglyph.zig") },
     };
     const zigstr = std.build.Pkg{
         .name = "zigstr",
-        .source = .{ .path = sdkRoot() ++ "/vendor/zigstr/src/Zigstr.zig" },
+        .source = .{ .path = sdkPath("/vendor/zigstr/src/Zigstr.zig") },
         .dependencies = &.{ziglyph},
     };
     const text_editor = std.build.Pkg{
         .name = "TextEditor",
-        .source = .{ .path = sdkRoot() ++ "/vendor/text-editor/src/TextEditor.zig" },
+        .source = .{ .path = sdkPath("/vendor/text-editor/src/TextEditor.zig") },
         .dependencies = &.{ziglyph},
     };
-};
-
-const zero_graphics_package = std.build.Pkg{
-    .name = "zero-graphics",
-    .source = .{ .path = sdkRoot() ++ "/src/zero-graphics.zig" },
-    .dependencies = &[_]std.build.Pkg{
-        pkgs.zigimg,
-        pkgs.ziglyph,
-        pkgs.zigstr,
-        pkgs.text_editor,
-    },
 };
 
 const web_folder = std.build.InstallDir{ .custom = "www" };
@@ -74,16 +67,16 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
         .key_store = null,
         .make_keystore_step = null,
         .install_web_sources = builder.allocator.dupe(*std.build.InstallFileStep, &[_]*std.build.InstallFileStep{
-            builder.addInstallFileWithDir(.{ .path = sdkRoot() ++ "/www/zero-graphics.js" }, web_folder, "zero-graphics.js"),
+            builder.addInstallFileWithDir(.{ .path = sdkPath("/www/zero-graphics.js") }, web_folder, "zero-graphics.js"),
         }) catch @panic("out of memory"),
-        .render_main_page_tool = builder.addExecutable("render-html-page", sdkRoot() ++ "/tools/render-ztt-page.zig"),
+        .render_main_page_tool = builder.addExecutable("render-html-page", sdkPath("/tools/render-ztt-page.zig")),
 
         .dummy_server = undefined,
     };
 
     sdk.render_main_page_tool.addPackage(.{
         .name = "html",
-        .source = TemplateStep.transform(builder, sdkRoot() ++ "/www/application.ztt"),
+        .source = TemplateStep.transform(builder, sdkPath("/www/application.ztt")),
     });
 
     if (sdk.android_sdk) |asdk| {
@@ -97,10 +90,10 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
         sdk.make_keystore_step = asdk.initKeystore(sdk.key_store.?, .{});
     }
 
-    sdk.dummy_server = builder.addExecutable("http-server", sdkRoot() ++ "/tools/http-server.zig");
+    sdk.dummy_server = builder.addExecutable("http-server", sdkPath("/tools/http-server.zig"));
     sdk.dummy_server.addPackage(std.build.Pkg{
         .name = "apple_pie",
-        .source = .{ .path = sdkRoot() ++ "/vendor/apple_pie/src/apple_pie.zig" },
+        .source = .{ .path = sdkPath("/vendor/apple_pie/src/apple_pie.zig") },
     });
 
     return sdk;
@@ -132,6 +125,17 @@ pub fn createApplication(sdk: *Sdk, name: []const u8, root_file: []const u8) *Ap
     return createApplicationSource(sdk, name, .{ .path = root_file });
 }
 
+const zero_graphics_pkg = std.build.Pkg{
+    .name = "zero-graphics",
+    .source = .{ .path = sdkPath("/src/zero-graphics.zig") },
+    .dependencies = &[_]std.build.Pkg{
+        pkgs.zigimg,
+        pkgs.ziglyph,
+        pkgs.zigstr,
+        pkgs.text_editor,
+    },
+};
+
 pub fn createApplicationSource(sdk: *Sdk, name: []const u8, root_file: std.build.FileSource) *Application {
     validateName(name, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
 
@@ -148,7 +152,7 @@ pub fn createApplicationSource(sdk: *Sdk, name: []const u8, root_file: std.build
         },
         .permissions = std.ArrayList([]const u8).init(sdk.builder.allocator),
     };
-    app.addPackage(zero_graphics_package);
+    app.addPackage(zero_graphics_pkg);
 
     return app;
 }
@@ -217,14 +221,17 @@ pub const Application = struct {
     }
 
     fn prepareExe(app: *Application, exe: *std.build.LibExeObjStep, app_pkg: std.build.Pkg) void {
-        exe.main_pkg_path = sdkRoot() ++ "/src";
+        exe.main_pkg_path = sdkPath("/src");
 
         exe.addPackage(app_pkg);
         exe.addPackage(app.meta_pkg);
+        for (zero_graphics_pkg.dependencies.?) |dep| {
+            exe.addPackage(dep);
+        }
 
         // TTF rendering library:
-        exe.addIncludeDir(sdkRoot() ++ "/vendor/stb");
-        exe.addCSourceFile(sdkRoot() ++ "/src/rendering/stb_truetype.c", &[_][]const u8{
+        exe.addIncludeDir(sdkPath("/vendor/stb"));
+        exe.addCSourceFile(sdkPath("/src/rendering/stb_truetype.c"), &[_][]const u8{
             "-std=c99",
         });
     }
@@ -238,7 +245,7 @@ pub const Application = struct {
 
         switch (platform) {
             .desktop => |target| {
-                const exe = app.sdk.builder.addExecutable(app.name, sdkRoot() ++ "/src/main/desktop.zig");
+                const exe = app.sdk.builder.addExecutable(app.name, sdkPath("/src/main/desktop.zig"));
 
                 exe.setBuildMode(app.build_mode);
                 exe.setTarget(target);
@@ -253,7 +260,7 @@ pub const Application = struct {
                 });
             },
             .web => {
-                const exe = app.sdk.builder.addSharedLibrary(app.name, sdkRoot() ++ "/src/main/wasm.zig", .unversioned);
+                const exe = app.sdk.builder.addSharedLibrary(app.name, sdkPath("/src/main/wasm.zig"), .unversioned);
                 exe.single_threaded = true;
                 exe.setBuildMode(app.build_mode);
                 exe.setTarget(std.zig.CrossTarget{
@@ -273,11 +280,11 @@ pub const Application = struct {
                     if (app.icon) |str|
                     app.sdk.builder.pathFromRoot(str)
                 else
-                    sdkRoot() ++ "/design/app-icon.png";
+                    sdkPath("/design/app-icon.png");
                 const asdk = app.sdk.android_sdk orelse @panic("Android build support is disabled!");
                 const android_app = asdk.createApp(
                     app.sdk.builder.getInstallPath(.bin, app.sdk.builder.fmt("{s}.apk", .{app.name})), // apk_file: []const u8,
-                    sdkRoot() ++ "/src/main/android.zig", // src_file: []const u8,
+                    sdkPath("/src/main/android.zig"), // src_file: []const u8,
                     AndroidSdk.AppConfig{
                         .display_name = app.display_name orelse @panic("Display name is required for Android!"),
                         .app_name = app.name,

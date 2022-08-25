@@ -985,7 +985,6 @@ const DrawVertices = struct {
 };
 
 pub const Font = struct {
-
     /// private reference counter.
     /// This is required as texture references are held in the internal draw
     /// queue when passing them into a draw command and will be released after

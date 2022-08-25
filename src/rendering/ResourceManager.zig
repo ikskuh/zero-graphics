@@ -151,10 +151,10 @@ const ResourceDataHandle = struct {
 pub const CreateResourceDataError = error{ OutOfMemory, InvalidFormat, IoError, FileNotFound };
 
 fn CreateResourceData(comptime ResourceData: type) type {
-    return fn (ResourceDataHandle, *ResourceManager) CreateResourceDataError!ResourceData;
+    return std.meta.FnPtr(fn (ResourceDataHandle, *ResourceManager) CreateResourceDataError!ResourceData);
 }
 
-const DestroyResourceData = fn (ResourceDataHandle, *ResourceManager) void;
+const DestroyResourceData = std.meta.FnPtr(fn (ResourceDataHandle, *ResourceManager) void);
 
 fn DataSource(comptime ResourceData: type) type {
     return struct {
@@ -249,6 +249,11 @@ pub const Texture = struct {
     source: DataSource(TextureData),
 
     fn initGpuFromData(tex: *Texture, texture_data: TextureData) void {
+        if ((texture_data.width == 0) or (texture_data.height == 0)) {
+            tex.instance = 0;
+            return;
+        }
+
         var id: gl.GLuint = undefined;
         gl.genTextures(1, &id);
         std.debug.assert(id != 0);
@@ -960,10 +965,14 @@ pub fn Z3DGeometry(comptime TextureLoader: ?type) type {
         data: []const u8,
         loader: ?ActualTextureLoader = null,
 
+        noinline fn launder(x: usize) usize {
+            return x;
+        }
+
         pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!GeometryData {
             const geometry_data = self.data;
 
-            if (geometry_data.len < @sizeOf(z3d.CommonHeader))
+            if (geometry_data.len < launder(@sizeOf(z3d.CommonHeader)))
                 return error.InvalidFormat;
 
             const common_header = @ptrCast(*align(1) const z3d.CommonHeader, &geometry_data[0]);
@@ -1187,55 +1196,53 @@ pub const DecodeImageData = struct {
     pub fn create(self: @This(), rm: *ResourceManager) CreateResourceDataError!TextureData {
         const start = zero_graphics.milliTimestamp();
 
-        var image = zigimg.image.Image.fromMemory(rm.allocator, self.data) catch {
-            // logger.debug("failed to load texture: {s}", .{@errorName(err)});
+        var image = zigimg.Image.fromMemory(rm.allocator, self.data) catch |err| {
+            logger.warn("failed to load texture: {s}", .{@errorName(err)});
             return error.InvalidFormat;
         };
         defer image.deinit();
 
         const zimg_load = zero_graphics.milliTimestamp();
 
-        const pixels = image.pixels orelse return error.InvalidFormat;
-
         var buffer = try rm.allocator.alloc(u8, 4 * image.width * image.height);
         errdefer rm.allocator.free(buffer);
 
-        switch (pixels) {
+        switch (image.pixels) {
             // super-fast path
-            .Rgba32 => |data| {
+            .rgba32 => |data| {
                 std.mem.copy(u8, buffer, std.mem.sliceAsBytes(data));
             },
-            .Bgra32 => |data| {
+            .bgra32 => |data| {
                 std.mem.copy(u8, buffer, std.mem.sliceAsBytes(data));
                 for (std.mem.bytesAsSlice(u32, buffer)) |*pixel| {
-                    pixel.* = @byteSwap(u32, pixel.*);
+                    pixel.* = @byteSwap(pixel.*);
                 }
             },
 
             // quite-fast path
-            .Rgb24 => |data| {
+            .rgb24 => |data| {
                 var i: usize = 0;
                 while (i < buffer.len / 4) : (i += 1) {
-                    buffer[4 * i + 0] = data[i].R;
-                    buffer[4 * i + 1] = data[i].G;
-                    buffer[4 * i + 2] = data[i].B;
+                    buffer[4 * i + 0] = data[i].r;
+                    buffer[4 * i + 1] = data[i].g;
+                    buffer[4 * i + 2] = data[i].b;
                     buffer[4 * i + 3] = 0xFF;
                 }
             },
             // quite-fast path
-            .Bgr24 => |data| {
+            .bgr24 => |data| {
                 var i: usize = 0;
                 while (i < buffer.len / 4) : (i += 1) {
-                    buffer[4 * i + 0] = data[i].R;
-                    buffer[4 * i + 1] = data[i].G;
-                    buffer[4 * i + 2] = data[i].B;
+                    buffer[4 * i + 0] = data[i].r;
+                    buffer[4 * i + 1] = data[i].g;
+                    buffer[4 * i + 2] = data[i].b;
                     buffer[4 * i + 3] = 0xFF;
                 }
             },
 
             // generic slow loader
             else => {
-                std.log.warn("loading suboptimal image with format {s}. Rgba32 or Bgra32 would be better!", .{@tagName(pixels)});
+                std.log.warn("loading suboptimal image with format {s}. Rgba32 or Bgra32 would be better!", .{@tagName(image.pixels)});
 
                 var x: usize = 0;
                 var y: usize = if (self.flip_y) image.height - 1 else 0;
@@ -1243,14 +1250,14 @@ pub const DecodeImageData = struct {
 
                 if (self.flip_y) {
                     while (pixel_iterator.next()) |pix| {
-                        const p8 = pix.toIntegerColor8();
+                        const p8 = pix.toRgba32();
 
                         const offset = image.width * y + x;
 
-                        buffer[4 * offset + 0] = p8.R;
-                        buffer[4 * offset + 1] = p8.G;
-                        buffer[4 * offset + 2] = p8.B;
-                        buffer[4 * offset + 3] = p8.A;
+                        buffer[4 * offset + 0] = p8.r;
+                        buffer[4 * offset + 1] = p8.g;
+                        buffer[4 * offset + 2] = p8.b;
+                        buffer[4 * offset + 3] = p8.a;
 
                         x += 1;
                         if (x >= image.width) {
@@ -1261,14 +1268,14 @@ pub const DecodeImageData = struct {
                     }
                 } else {
                     while (pixel_iterator.next()) |pix| {
-                        const p8 = pix.toIntegerColor8();
+                        const p8 = pix.toRgba32();
 
                         const offset = image.width * y + x;
 
-                        buffer[4 * offset + 0] = p8.R;
-                        buffer[4 * offset + 1] = p8.G;
-                        buffer[4 * offset + 2] = p8.B;
-                        buffer[4 * offset + 3] = p8.A;
+                        buffer[4 * offset + 0] = p8.r;
+                        buffer[4 * offset + 1] = p8.g;
+                        buffer[4 * offset + 2] = p8.b;
+                        buffer[4 * offset + 3] = p8.a;
 
                         x += 1;
                         if (x >= image.width) {

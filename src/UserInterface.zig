@@ -393,8 +393,8 @@ const Widget = struct {
 
         pub const Config = struct {
             hit_test_visible: bool = true,
-            draw: ?fn (Custom, Rectangle, *Renderer, DrawInfo) Renderer.DrawError!void = null,
-            process_event: ?fn (Custom, Event) ?usize = null,
+            draw: ?std.meta.FnPtr(fn (Custom, Rectangle, *Renderer, DrawInfo) Renderer.DrawError!void) = null,
+            process_event: ?std.meta.FnPtr(fn (Custom, Event) ?usize) = null,
             /// generic second user data to provide context information for the user data
             context: ?*anyopaque = null,
         };
