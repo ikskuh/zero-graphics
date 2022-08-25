@@ -935,7 +935,7 @@ pub const InputFilter = struct {
     pub const Error = error{OutOfMemory};
 
     context: *anyopaque,
-    fetchFn: fn (ctx: *anyopaque) Error!?Event,
+    fetchFn: std.meta.FnPtr(fn (ctx: *anyopaque) Error!?Event),
 
     pub fn fetch(self: InputFilter) Error!?Event {
         return self.fetchFn(self.context);
