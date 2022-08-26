@@ -19,6 +19,7 @@ pub const ResourceManager = @import("rendering/ResourceManager.zig");
 pub const Input = @import("Input.zig");
 
 pub const UserInterface = @import("UserInterface.zig");
+pub const Editor = @import("Editor.zig");
 
 pub const Backend = union(enum) {
     android,
@@ -170,6 +171,12 @@ pub const Color = extern struct {
 
     pub fn gray(level: u8) Color {
         return Color{ .r = level, .g = level, .b = level, .a = 0xFF };
+    }
+
+    pub fn withAlpha(color: Color, alpha: u8) Color {
+        var dupe = color;
+        dupe.a = alpha;
+        return dupe;
     }
 
     // Predefined color values:

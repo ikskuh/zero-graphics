@@ -286,6 +286,9 @@ const Widget = struct {
             enabled: bool = true,
             style: ?ButtonTheme = null,
             hit_test_visible: bool = true,
+
+            vertical_text_alignment: types.VerticalAlignment = .center,
+            horizontal_text_alignment: types.HorzizontalAlignment = .center,
         };
         text: StringBuffer,
         icon: ?*Texture,
@@ -1068,6 +1071,60 @@ pub const InputProcessor = struct {
             else => return, // just eat the event by default
         }
     }
+
+    pub fn inputFilter(self: InputProcessor, source: types.Input.Filter) InputFilter {
+        return InputFilter{
+            .target = self,
+            .source = source,
+        };
+    }
+
+    pub const InputFilter = struct {
+        target: InputProcessor,
+        source: types.Input.Filter,
+
+        pub fn inputFilter(self: *InputFilter) types.Input.Filter {
+            return types.Input.Filter{
+                .context = @ptrCast(*anyopaque, self),
+                .fetchFn = fetchFunc,
+            };
+        }
+
+        fn fetchFunc(ctx: *anyopaque) error{OutOfMemory}!?types.Input.Event {
+            const filter = @ptrCast(*InputFilter, @alignCast(@alignOf(InputFilter), ctx));
+            while (try filter.source.fetch()) |event| {
+                switch (event) {
+                    .pointer_motion => |pt| filter.target.setPointer(pt),
+                    .pointer_press => filter.target.pointerDown(),
+                    .pointer_release => |cursor| filter.target.pointerUp(switch (cursor) {
+                        .primary => Pointer.primary,
+                        .secondary => .secondary,
+                    }),
+
+                    .text_input => |text| {
+                        std.log.info("text_input: '{}' ({})", .{
+                            std.fmt.fmtSliceEscapeUpper(text.text), // escape special chars here
+                            text.modifiers,
+                        });
+                        filter.target.enterText(text.text) catch |e| switch (e) {
+                            error.InvalidUtf8 => @panic("invalid utf8 from key event"),
+                            error.OutOfMemory => return error.OutOfMemory,
+                        };
+                    },
+
+                    .key_down => |scancode| filter.target.buttonDown(scancode) catch |e| switch (e) {
+                        error.InvalidUtf8 => @panic("invalid utf8 from key event"),
+                        error.OutOfMemory => return error.OutOfMemory,
+                    },
+                    .key_up => |scancode| try filter.target.buttonUp(scancode),
+
+                    else => return event,
+                }
+                return event;
+            }
+            return null;
+        }
+    };
 };
 
 fn clampSub(a: u15, b: u15) u15 {
@@ -1138,13 +1195,16 @@ pub fn render(self: UserInterface) !void {
                 const text = control.text.get();
                 if (text.len > 0) {
                     const font = control.config.font orelse self.default_font;
-                    const string_size = renderer.measureString(font, control.text.get());
-                    try renderer.drawString(
+                    const color = control.config.text_color orelse style_info.text_color;
+                    try renderer.drawText(
                         font,
                         control.text.get(),
-                        widget.bounds.x + @divTrunc((@as(i16, widget.bounds.width) - string_size.width), 2),
-                        widget.bounds.y + @divTrunc((@as(i16, widget.bounds.height) - string_size.height), 2),
-                        control.config.text_color orelse style_info.text_color,
+                        widget.bounds.shrink(2),
+                        .{
+                            .color = color,
+                            .vertical_alignment = control.config.vertical_text_alignment,
+                            .horizontal_alignment = control.config.horizontal_text_alignment,
+                        },
                     );
                 }
             },

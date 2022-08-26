@@ -481,64 +481,67 @@ pub fn drawString(self: *Self, font: *const Font, text: []const u8, x: i16, y: i
     }
 }
 
-// TODO: Implement a proper `drawText()`
-// pub const DrawTextOptions = struct {
-//     color: Color,
-//     vertical_alignment: types.VerticalAlignment = .left,
-//     horizontal_alignment: types.HorzizontalAlignment = .top,
-//     max_width: ?u15 = null,
-//     max_height: ?u15 = null,
-// };
+pub const DrawTextOptions = struct {
+    color: Color,
+    vertical_alignment: types.VerticalAlignment = .top,
+    horizontal_alignment: types.HorzizontalAlignment = .left,
+    word_wrap: bool = false,
+    align_mode: AlignMode = .align_line,
+};
 
-// /// Draws the given `text` into `rectangle` using the layout configuration in `options`.
-// /// Text will only be drawn when full glyphs fit the area specified via `max_width` and `max_height`.
-// /// This function a lot more computation than two calls to `measureString()` and `drawString()`, so it should only
-// /// be used when proper text layouting is required.
-// pub fn drawText(self: *Self, font: *const Font, text: []const u8, x: i16, y: i16, options: DrawTextOptions) !void {
-//     var total_width: u15 = 0;
-//     var total_height: u15 = 0;
-//     var line_count: usize = 0;
+pub const AlignMode = enum { align_line, align_block };
 
-//     const line_height = font.getLineHeight();
+/// Draws the given `text` into `rectangle` using the layout configuration in `options`.
+/// Text will only be drawn when full glyphs fit the area specified via `max_width` and `max_height`.
+/// This function a lot more computation than two calls to `measureString()` and `drawString()`, so it should only
+/// be used when proper text layouting is required.
+pub fn drawText(self: *Self, font: *const Font, text: []const u8, target: Rectangle, options: DrawTextOptions) !void {
+    var total_width: u15 = 0;
+    var total_height: u15 = 0;
+    var line_count: usize = 0;
 
-//     var lines_iter = std.mem.split(text, "\n");
-//     while (lines_iter.next()) |line| {
-//         if (options.max_height) |limit| {
-//             if (total_height + line_height > limit)
-//                 break;
-//         }
-//         total_width += self.measureString(font, line).width;
-//         total_height += line_height;
-//         line_count += 1;
-//     }
+    const line_height = font.getLineHeight();
 
-//     const offset_x: i16 = switch (options.vertical_alignment) {
-//         .left => @as(i16, 0),
-//         .center => -@as(i16, total_width / 2),
-//         .right => -@as(i16, total_width),
-//     };
-//     const offset_y = switch (options.vertical_alignment) {
-//         .top => @as(i16, 0),
-//         .center => -@as(i16, total_height / 2),
-//         .bottom => -@as(i16, total_height),
-//     };
+    var lines_iter = std.mem.split(u8, text, "\n");
+    while (lines_iter.next()) |line| {
+        // if (options.max_height) |limit| {
+        //     if (total_height + line_height > limit)
+        //         break;
+        // }
+        total_width += self.measureString(font, line).width;
+        total_height += line_height;
+        line_count += 1;
+    }
 
-//     var dy: u15 = 0;
+    const left: i16 = switch (options.horizontal_alignment) {
+        .left => target.x,
+        .center => target.x + target.width / 2 - total_width / 2,
+        .right => target.x + target.width - total_width,
+    };
+    const top = switch (options.vertical_alignment) {
+        .top => target.y,
+        .center => target.y + target.height / 2 - total_height / 2,
+        .bottom => target.y + target.height - total_height,
+    };
 
-//     var i: usize = 0;
-//     lines_iter = td.mem.split(text, "\n");
-//     while (lines_iter.next()) |line| {
-//         i += 1;
-//         if (i >= line_count) // would draw outside max_height
-//             break;
-//         const width = self.measureString(font, line).width;
+    var y: i16 = top;
 
-//         const dx = switch(options.horizontal_alignment) {
-//             .left => @as(i16,0),
-//             .center => -@as(i16, total_width / 2),
-//         };
-//     }
-// }
+    try self.pushClipRectangle(target);
+
+    lines_iter = std.mem.split(u8, text, "\n");
+    while (lines_iter.next()) |line| {
+        try self.drawString(
+            font,
+            line,
+            left,
+            y,
+            options.color,
+        );
+        y += line_height;
+    }
+
+    try self.popClipRectangle();
+}
 
 /// Resets the state of the renderer and prepares a fresh new frame.
 pub fn reset(self: *Self) void {
