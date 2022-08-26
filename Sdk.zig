@@ -1,7 +1,7 @@
 const std = @import("std");
 
 fn sdkPath(comptime suffix: []const u8) []const u8 {
-    if (suffix[0] != '/') @compileError("relToPath requires an absolute path!");
+    if (suffix[0] != '/') @compileError("sdkPath requires an absolute path!");
     return comptime blk: {
         const root_dir = std.fs.path.dirname(@src().file) orelse ".";
         break :blk root_dir ++ suffix;
@@ -13,6 +13,7 @@ const Sdk = @This();
 const SdlSdk = @import("vendor/SDL.zig/Sdk.zig");
 const AndroidSdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
 const TemplateStep = @import("vendor/ztt/src/TemplateStep.zig");
+const NFD = @import("vendor/nfd/build.zig");
 
 pub const Platform = union(enum) {
     desktop: std.zig.CrossTarget,
@@ -246,7 +247,6 @@ pub const Application = struct {
         switch (platform) {
             .desktop => |target| {
                 const exe = app.sdk.builder.addExecutable(app.name, sdkPath("/src/main/desktop.zig"));
-
                 exe.setBuildMode(app.build_mode);
                 exe.setTarget(target);
 
@@ -254,6 +254,11 @@ pub const Application = struct {
                 app.sdk.sdl_sdk.link(exe, .dynamic);
 
                 app.prepareExe(exe, app_pkg);
+
+                // For desktop versions, we link lib-nfd
+                const libnfd = NFD.makeLib(app.sdk.builder, .ReleaseSafe, target);
+                exe.linkLibrary(libnfd);
+                exe.addPackage(NFD.getPackage("nfd"));
 
                 return app.createCompilation(.{
                     .desktop = exe,

@@ -35,7 +35,7 @@ font: *const Renderer.Font,
 input: *zero_graphics.Input,
 
 ui: zero_graphics.UserInterface,
-editor: Editor,
+editor: zero_graphics.Editor,
 
 gui_data: DemoGuiData = .{},
 editor_data: EditorData = .{},
@@ -75,7 +75,7 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
     app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("ziggy.png") });
     app.pixel_pattern = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("pixelpattern.png") });
 
-    app.editor = Editor.init(app.allocator);
+    app.editor = zero_graphics.Editor.init(app.allocator);
     errdefer app.editor.deinit();
 
     app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
@@ -148,10 +148,12 @@ pub fn resize(app: *Application, width: u15, height: u15) !void {
 
 pub fn update(app: *Application) !bool {
     {
+        var ui_input = app.ui.processInput();
+        defer ui_input.finish();
+
         var core_filter = app.input.filter();
 
-        var ui_filter = UiInputFilter.init(app.ui.processInput(), core_filter);
-        defer ui_filter.finish();
+        var ui_filter = ui_input.inputFilter(core_filter);
 
         var editor_filter = app.editor.inputFilter(ui_filter.inputFilter());
 
@@ -621,7 +623,7 @@ const EditorData = struct {
         .{ .x = 400, .y = 300 },
         .{ .x = 300, .y = 300 },
     },
-    gizmos: [4]*Gizmo = undefined,
+    gizmos: [4]*zero_graphics.Editor.Gizmo = undefined,
 
     pub fn init(self: *EditorData) !void {
         const app = @fieldParentPtr(Application, "editor_data", self);

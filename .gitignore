@@ -4,3 +4,4 @@ zig-out/
 .build_config/
 hackzig/
 .vscode/
+*.ll

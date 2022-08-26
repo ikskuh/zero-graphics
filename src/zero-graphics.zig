@@ -190,3 +190,28 @@ pub const Color = extern struct {
     pub const yellow = Color{ .r = 0xFF, .g = 0xFF, .b = 0x00 };
     pub const cyan = Color{ .r = 0x00, .g = 0xFF, .b = 0xFF };
 };
+
+pub const FileFilter = struct {
+    pattern: []const u8,
+    title: ?[]const u8,
+};
+
+pub fn openFileDialog(allocator: std.mem.Allocator, filters: []const FileFilter, default_path: ?[]const u8) error{OutOfMemory}!?[]const u8 {
+    _ = allocator;
+    _ = filters;
+    _ = default_path;
+    return null;
+}
+
+pub fn saveFileDialog(allocator: std.mem.Allocator, filters: []const FileFilter, default_path: ?[]const u8) error{OutOfMemory}!?[]const u8 {
+    _ = allocator;
+    _ = filters;
+    _ = default_path;
+    return null;
+}
+
+pub fn openFolderDialog(allocator: std.mem.Allocator, default_path: ?[]const u8) error{OutOfMemory}!?[]const u8 {
+    _ = allocator;
+    _ = default_path;
+    return null;
+}

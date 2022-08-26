@@ -37,3 +37,6 @@
 [submodule "vendor/text-editor"]
 	path = vendor/text-editor
 	url = https://github.com/MasterQ32/TextEditor
+[submodule "vendor/nfd-zig"]
+	path = vendor/nfd
+	url = https://github.com/fabioarnold/nfd-zig/

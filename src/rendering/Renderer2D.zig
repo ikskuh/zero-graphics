@@ -394,7 +394,7 @@ const GlyphIterator = struct {
             const glyph = self.renderer.getGlyph(self.font, codepoint.scalar) catch continue;
 
             if (self.previous_codepoint) |prev| {
-                self.dx += @intCast(i16, c.stbtt_GetCodepointKernAdvance(&self.font.font, prev, codepoint.scalar));
+                self.dx -= @intCast(i16, c.stbtt_GetCodepointKernAdvance(&self.font.font, prev, codepoint.scalar));
             }
             self.previous_codepoint = codepoint.scalar;
 
