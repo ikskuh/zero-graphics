@@ -117,6 +117,8 @@ export fn app_init() u32 {
 
     input_handler = zerog.Input.init(gpa.allocator());
 
+    zerog.CodeEditor.init() catch |err| @panic(@errorName(err));
+
     WebSocket.global_handles = std.AutoArrayHashMap(websocket.Handle, *WebSocket.Data).init(gpa.allocator());
 
     app_instance.init(gpa.allocator(), &input_handler) catch |err| @panic(@errorName(err));
@@ -128,6 +130,13 @@ export fn app_init() u32 {
     app_instance.resize(@intCast(u15, meta_getScreenW()), @intCast(u15, meta_getScreenH())) catch return 2;
 
     return 0;
+}
+
+pub fn getScreenSize() zerog.Size {
+    return zerog.Size{
+        .width = @intCast(u15, meta_getScreenW()),
+        .height = @intCast(u15, meta_getScreenH()),
+    };
 }
 
 fn logInputError(err: error{ OutOfMemory, Utf8CannotEncodeSurrogateHalf, CodepointTooLarge }) void {
@@ -456,6 +465,9 @@ export fn app_deinit() u32 {
     app_instance.teardownGraphics();
     app_instance.deinit();
     input_handler.deinit();
+
+    zerog.CodeEditor.deinit();
+
     // _ = gpa.deinit();
     global_arena.deinit();
 

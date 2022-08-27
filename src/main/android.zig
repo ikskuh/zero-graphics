@@ -72,6 +72,8 @@ pub const AndroidApp = struct {
     pub fn init(allocator: std.mem.Allocator, activity: *android.ANativeActivity, stored_state: ?[]const u8) !Self {
         logger.info("AndroidApp.init({any})", .{stored_state});
 
+        try zerog.CodeEditor.init();
+
         return Self{
             .allocator = allocator,
             .activity = activity,
@@ -108,6 +110,7 @@ pub const AndroidApp = struct {
             android.AConfiguration_delete(config);
         }
         self.zero_input.deinit();
+        zerog.CodeEditor.deinit();
         self.* = undefined;
     }
 

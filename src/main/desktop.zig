@@ -23,7 +23,10 @@ const debug_window_mode = if (@hasDecl(Application, "zerog_enable_window_mode"))
 else
     false;
 
-pub const milliTimestamp = std.time.milliTimestamp;
+var startup_time: i64 = 0;
+pub fn milliTimestamp() i64 {
+    return std.time.milliTimestamp() - startup_time;
+}
 
 // const DPI_AWARENESS_CONTEXT_UNAWARE = (DPI_AWARENESS_CONTEXT - 1);
 // const DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = (DPI_AWARENESS_CONTEXT - 2);
@@ -47,6 +50,8 @@ fn logAppError(context: []const u8, trace: ?*std.builtin.StackTrace, err: anytyp
     std.log.scoped(.application).err("Application failed in {s}: {s}", .{ context, @errorName(err) });
     return err;
 }
+
+var screen_size = zerog.Size.empty;
 
 // Desktop entry point
 pub fn main() !void {
@@ -157,6 +162,11 @@ pub fn main() !void {
     var input_queue = zerog.Input.init(std.heap.c_allocator);
     defer input_queue.deinit();
 
+    try zerog.CodeEditor.init();
+    defer zerog.CodeEditor.deinit();
+
+    startup_time = std.time.milliTimestamp();
+
     var app: Application = undefined;
     app.init(std.heap.c_allocator, &input_queue) catch |e| return logAppError("init", @errorReturnTrace(), e);
     defer app.deinit();
@@ -204,7 +214,9 @@ pub fn main() !void {
         var height: c_int = undefined;
 
         c.SDL_GL_GetDrawableSize(window, &width, &height);
-        try app.resize(@intCast(u15, width), @intCast(u15, height));
+        screen_size.width = @intCast(u15, width);
+        screen_size.height = @intCast(u15, height);
+        try app.resize(screen_size.width, screen_size.height);
     }
 
     while (true) {
@@ -278,7 +290,9 @@ pub fn main() !void {
 
                         c.SDL_GL_GetDrawableSize(window, &width, &height);
 
-                        app.resize(@intCast(u15, width), @intCast(u15, height)) catch |e| return logAppError("resize", @errorReturnTrace(), e);
+                        screen_size.width = @intCast(u15, width);
+                        screen_size.height = @intCast(u15, height);
+                        app.resize(screen_size.width, screen_size.height) catch |e| return logAppError("resize", @errorReturnTrace(), e);
                     } else {
                         // logger.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});
                     }
@@ -616,3 +630,7 @@ pub const WebSocket = struct {
         }
     };
 };
+
+pub fn getScreenSize() zerog.Size {
+    return screen_size;
+}

@@ -220,6 +220,16 @@ pub fn update(app: *Application) !bool {
             }
         }
 
+        if (try ui.codeEditor(.{ .x = 270, .y = 130, .width = 250, .height = 116 }, T.string_buffer.constSlice(), .{})) |event| {
+            switch (event) {
+                .text_changed => |string| {
+                    T.string_buffer.len = 0;
+                    try T.string_buffer.appendSlice(string);
+                },
+                else => {},
+            }
+        }
+
         if (app.gui_data.is_visible) {
             var fmt_buf: [64]u8 = undefined;
 

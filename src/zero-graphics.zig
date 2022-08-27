@@ -3,6 +3,7 @@ const std = @import("std");
 pub const loadOpenGlFunction = @import("root").loadOpenGlFunction;
 pub const milliTimestamp = @import("root").milliTimestamp;
 pub const getDisplayDPI = @import("root").getDisplayDPI;
+pub const getScreenSize = @import("root").getScreenSize;
 
 // opengl docs can be found here:
 // https://www.khronos.org/registry/OpenGL-Refpages/es2.0/
@@ -15,6 +16,8 @@ pub const Renderer3D = @import("rendering/Renderer3D.zig");
 pub const RendererSky = @import("rendering/RendererSky.zig");
 pub const DebugRenderer3D = @import("rendering/DebugRenderer3D.zig");
 pub const ResourceManager = @import("rendering/ResourceManager.zig");
+
+pub const CodeEditor = @import("scintilla/CodeEditor.zig");
 
 pub const Input = @import("Input.zig");
 

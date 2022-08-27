@@ -143,6 +143,7 @@ const Widget = struct {
         panel: Panel,
         button: Button,
         text_box: TextBox,
+        code_editor: CodeEditor,
         label: Label,
         check_box: CheckBox,
         radio_button: RadioButton,
@@ -158,6 +159,9 @@ const Widget = struct {
             },
             .text_box => |*ctrl| {
                 ctrl.editor.deinit();
+            },
+            .code_editor => |*ctrl| {
+                ctrl.editor.destroy();
             },
             .label => |*ctrl| {
                 ctrl.text.deinit();
@@ -177,6 +181,7 @@ const Widget = struct {
             .panel => |ctrl| ctrl.config.hit_test_visible,
             .button => |ctrl| ctrl.config.hit_test_visible,
             .text_box => |ctrl| ctrl.config.hit_test_visible,
+            .code_editor => |ctrl| ctrl.config.hit_test_visible,
             .label => |ctrl| ctrl.config.hit_test_visible,
             .check_box => |ctrl| ctrl.config.hit_test_visible,
             .radio_button => |ctrl| ctrl.config.hit_test_visible,
@@ -339,6 +344,26 @@ const Widget = struct {
         scroll_offset: u15 = 0,
 
         events: std.enums.EnumSet(Event) = std.enums.EnumSet(Event){},
+
+        config: Config = .{},
+    };
+    const CodeEditor = struct {
+        const Config = struct {
+            style: ?TextBoxTheme = null,
+            hit_test_visible: bool = true,
+        };
+        const Event = enum { enter, leave, cancelled, text_changed };
+
+        editor: types.CodeEditor,
+        content_hash: StringHash = StringHash.compute(""),
+
+        events: std.enums.EnumSet(Event) = std.enums.EnumSet(Event){},
+
+        ctrl_pressed: bool = false,
+        shift_pressed: bool = false,
+        alt_pressed: bool = false,
+
+        tick_increment: u32 = 0,
 
         config: Config = .{},
     };
@@ -886,6 +911,58 @@ pub const Builder = struct {
 
         return null;
     }
+
+    pub const CodeEditorEvent = union(enum) {
+        focus_lost: []const u8,
+        text_changed: []const u8,
+    };
+    pub fn codeEditor(self: Self, rectangle: Rectangle, code: []const u8, config: anytype) Error!?TextBoxEvent {
+        const info = try self.initOrUpdateWidget(.code_editor, rectangle, config);
+        const code_editor: *Widget.CodeEditor = info.control;
+
+        // reset all events at the end of this
+        defer code_editor.events = std.enums.EnumSet(Widget.CodeEditor.Event){}; // clear
+
+        const display_hash = StringHash.compute(code);
+
+        if (info.needs_init) {
+            info.control.* = .{
+                .editor = undefined,
+                .content_hash = display_hash,
+            };
+            try code_editor.editor.create(self.ui.renderer.?);
+            try code_editor.editor.setText(code);
+        } else {
+
+            // clear text box to default when ESC is pressed or the input string changes
+            if ((code_editor.content_hash != display_hash) or code_editor.events.contains(.cancelled)) {
+                logger.info("updating code editor content to {s}", .{code});
+                try code_editor.editor.setText(code);
+                code_editor.content_hash = display_hash;
+            }
+        }
+        updateWidgetConfig(&code_editor.config, config);
+
+        code_editor.editor.setPosition(rectangle);
+
+        if (code_editor.tick_increment == 0) {
+            code_editor.editor.tick();
+            code_editor.tick_increment = 6;
+        } else {
+            code_editor.tick_increment -= 1;
+        }
+
+        if (code_editor.events.contains(.leave)) {
+            @panic("nope");
+            // return TextBoxEvent{ .focus_lost = code_editor.getText() };
+        }
+        if (code_editor.events.contains(.text_changed)) {
+            @panic("nope");
+            // return TextBoxEvent{ .text_changed = code_editor.getText() };
+        }
+
+        return null;
+    }
 };
 
 pub fn processInput(self: *UserInterface) InputProcessor {
@@ -933,6 +1010,16 @@ pub const InputProcessor = struct {
         }
 
         if (self.ui.hovered_widget) |widget| {
+            switch (widget.control) {
+                .code_editor => |*control| {
+                    control.editor.mouseMove(
+                        self.ui.pointer_position.x,
+                        self.ui.pointer_position.y,
+                    );
+                },
+                else => {},
+            }
+
             widget.sendEvent(.{ .pointer_motion = self.ui.pointer_position });
         }
     }
@@ -941,6 +1028,17 @@ pub const InputProcessor = struct {
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
 
         if (clicked_widget) |widget| {
+            switch (widget.control) {
+                .code_editor => |*control| {
+                    control.editor.mouseDown(
+                        @intToFloat(f32, types.milliTimestamp()) / 1000.0,
+                        self.ui.pointer_position.x,
+                        self.ui.pointer_position.y,
+                    );
+                },
+                else => {},
+            }
+
             widget.sendEvent(.{ .pointer_press = self.ui.pointer_position });
         }
 
@@ -961,6 +1059,17 @@ pub const InputProcessor = struct {
                 .position = self.ui.pointer_position,
                 .pointer = pointer,
             } });
+
+            switch (widget.control) {
+                .code_editor => |*control| {
+                    control.editor.mouseUp(
+                        @intToFloat(f32, types.milliTimestamp()) / 1000.0,
+                        self.ui.pointer_position.x,
+                        self.ui.pointer_position.y,
+                    );
+                },
+                else => {},
+            }
         }
 
         const pressed_widget = self.ui.pressed_widget orelse return;
@@ -982,6 +1091,22 @@ pub const InputProcessor = struct {
     pub fn buttonDown(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
+            .code_editor => |*control| {
+                switch (button) {
+                    .ctrl_left, .ctrl_right => control.ctrl_pressed = true,
+                    .shift_left, .shift_right => control.shift_pressed = true,
+                    .alt_left, .alt_right => control.alt_pressed = true,
+                    else => {},
+                }
+
+                _ = control.editor.keyDown(
+                    button,
+                    control.shift_pressed,
+                    control.ctrl_pressed,
+                    control.alt_pressed,
+                );
+            },
+
             .text_box => |*control| switch (button) {
                 .ctrl_left => control.ctrl_pressed = true,
                 .ctrl_right => control.ctrl_pressed = true,
@@ -1018,6 +1143,13 @@ pub const InputProcessor = struct {
     pub fn buttonUp(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
+            .code_editor => |*control| switch (button) {
+                .ctrl_left, .ctrl_right => control.ctrl_pressed = false,
+                .shift_left, .shift_right => control.shift_pressed = false,
+                .alt_left, .alt_right => control.alt_pressed = false,
+                else => {},
+            },
+
             .text_box => |*control| switch (button) {
                 .ctrl_left => control.ctrl_pressed = false,
                 .ctrl_right => control.ctrl_pressed = false,
@@ -1066,6 +1198,10 @@ pub const InputProcessor = struct {
                     std.fmt.fmtSliceEscapeUpper(string),
                     std.fmt.fmtSliceEscapeUpper(control.editor.getText()),
                 });
+            },
+
+            .code_editor => |*control| {
+                control.editor.enterString(string);
             },
 
             else => return, // just eat the event by default
@@ -1290,6 +1426,11 @@ pub fn render(self: UserInterface) !void {
 
                 try renderer.popClipRectangle();
             },
+
+            .code_editor => |*control| {
+                control.editor.render();
+            },
+
             .label => |control| {
                 const style = control.config.style orelse self.theme.label;
 
