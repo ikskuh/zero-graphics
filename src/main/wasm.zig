@@ -5,13 +5,11 @@ const logger = std.log.scoped(.wasm_backend);
 const gles = @import("../gl_es_2v0.zig");
 const zerog = @import("../zero-graphics.zig");
 const Application = @import("application");
+pub const CoreApplication = @import("../CoreApplication.zig");
 
 comptime {
     // enforce inclusion of "extern  c" implementations
-    const common = @import("common.zig");
-
-    // verify the application api
-    common.verifyApplication(Application);
+    _ = @import("common.zig");
 }
 
 var error_name_buffer: [256]u8 = undefined;
@@ -45,7 +43,7 @@ extern fn now_f64() f64;
 
 pub const log_level = .info;
 
-var app_instance: Application = undefined;
+var app_instance: CoreApplication = undefined;
 var input_handler: zerog.Input = undefined;
 
 var global_arena: std.heap.ArenaAllocator = undefined;

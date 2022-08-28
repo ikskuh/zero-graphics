@@ -5,15 +5,14 @@ const zerog = @import("../zero-graphics.zig");
 const c = @import("sdl2");
 const Application = @import("application");
 const app_meta = @import("application-meta");
+pub const CoreApplication = @import("../CoreApplication.zig");
 
 pub const backend: zerog.Backend = .desktop;
 
+
 comptime {
     // enforce inclusion of "extern  c" implementations
-    const common = @import("common.zig");
-
-    // verify the application api
-    common.verifyApplication(Application);
+    _ = @import("common.zig");
 }
 
 var window: *c.SDL_Window = undefined;
@@ -157,7 +156,7 @@ pub fn main() !void {
     var input_queue = zerog.Input.init(std.heap.c_allocator);
     defer input_queue.deinit();
 
-    var app: Application = undefined;
+    var app: CoreApplication = undefined;
     app.init(std.heap.c_allocator, &input_queue) catch |e| return logAppError("init", @errorReturnTrace(), e);
     defer app.deinit();
 
