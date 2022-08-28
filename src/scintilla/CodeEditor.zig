@@ -36,10 +36,11 @@ const c = struct {
         setClipRect: ?std.meta.FnPtr(fn (*ZigEditorInterface, *const ZigRect) callconv(.C) void),
         setClipboardContent: ?std.meta.FnPtr(fn (*ZigEditorInterface, [*]const u8, usize) callconv(.C) void),
         getClipboardContent: ?std.meta.FnPtr(fn (*ZigEditorInterface, [*]u8, usize) callconv(.C) usize),
+        sendNotification: ?std.meta.FnPtr(fn (*ZigEditorInterface, notification: u32) callconv(.C) void),
     };
     pub const ScintillaEditor = opaque {};
     pub const ZigString = extern struct {
-        ptr: [*]u8,
+        ptr: ?[*]u8,
         len: usize,
     };
     pub const LOG_DEBUG: c_int = 0;
@@ -48,6 +49,8 @@ const c = struct {
     pub const LOG_ERROR: c_int = 3;
     pub const LogLevel = c_uint;
 
+    pub const NOTIFY_CHANGE = 1;
+
     pub extern fn scintilla_init(...) void;
     pub extern fn scintilla_deinit(...) void;
     pub extern fn scintilla_create(*ZigEditorInterface) ?*ScintillaEditor;
@@ -55,6 +58,7 @@ const c = struct {
     pub extern fn scintilla_getText(editor: ?*ScintillaEditor, allocator: ?*anyopaque) ZigString;
     pub extern fn scintilla_tick(editor: ?*ScintillaEditor) void;
     pub extern fn scintilla_render(editor: ?*ScintillaEditor) void;
+    pub extern fn scintilla_setFocus(editor: ?*ScintillaEditor, focused: bool) void;
     pub extern fn scintilla_mouseMove(editor: ?*ScintillaEditor, x: c_int, y: c_int) void;
     pub extern fn scintilla_mouseDown(editor: ?*ScintillaEditor, time: f32, x: c_int, y: c_int) void;
     pub extern fn scintilla_mouseUp(editor: ?*ScintillaEditor, time: f32, x: c_int, y: c_int) void;
@@ -63,6 +67,12 @@ const c = struct {
     pub extern fn scintilla_setPosition(editor: ?*ScintillaEditor, x: c_int, y: c_int, w: c_int, h: c_int) void;
     pub extern fn scintilla_destroy(editor: ?*ScintillaEditor) void;
 };
+
+pub const Notification = enum(u32) {
+    text_changed,
+};
+
+pub const NotificationSet = std.EnumSet(Notification);
 
 pub fn init() !void {
     c.scintilla_init();
@@ -76,6 +86,7 @@ interface: c.ZigEditorInterface,
 instance: *c.ScintillaEditor,
 renderer: *Renderer,
 position: Rectangle,
+notifications: NotificationSet,
 
 pub fn create(editor: *CodeEditor, renderer: *Renderer) !void {
     _ = default_editor_impl;
@@ -84,6 +95,7 @@ pub fn create(editor: *CodeEditor, renderer: *Renderer) !void {
         .renderer = renderer,
         .instance = c.scintilla_create(&editor.interface) orelse return error.OutOfMemory,
         .position = undefined,
+        .notifications = NotificationSet{},
     };
     editor.setPosition(Rectangle.init(Point.zero, zero_graphics.getScreenSize()));
 }
@@ -91,6 +103,12 @@ pub fn create(editor: *CodeEditor, renderer: *Renderer) !void {
 pub fn destroy(editor: *CodeEditor) void {
     c.scintilla_destroy(editor.instance);
     editor.* = undefined;
+}
+
+pub fn getNotifications(editor: *CodeEditor) NotificationSet {
+    const result = editor.notifications;
+    editor.notifications = NotificationSet{};
+    return result;
 }
 
 pub fn tick(editor: *CodeEditor) void {
@@ -110,11 +128,12 @@ pub fn setText(editor: *CodeEditor, text: []const u8) !void {
     c.scintilla_setText(editor.instance, text.ptr, text.len);
 }
 
-pub fn getText(editor: *CodeEditor, allocator: *std.mem.Allocator) ![]u8 {
-    const str = c.scintilla_getText(editor.instance, allocator);
-    if (str.ptr == null)
-        return error.OutOfMemory;
-    return str.ptr[0..str.len];
+pub fn getText(editor: *CodeEditor, allocator: std.mem.Allocator) ![]u8 {
+    const str = c.scintilla_getText(editor.instance, &allocator);
+    const ptr = str.ptr orelse return error.OutOfMemory;
+    if (str.len == 0)
+        return try allocator.alloc(u8, 0); // we're allocating, as 0 len means the backend didn't allocate
+    return ptr[0..str.len];
 }
 
 pub fn mouseMove(editor: *CodeEditor, x: c_int, y: c_int) void {
@@ -137,6 +156,10 @@ pub fn enterString(editor: *CodeEditor, text: []const u8) void {
     c.scintilla_enterString(editor.instance, text.ptr, text.len);
 }
 
+pub fn setFocus(editor: *CodeEditor, focused: bool) void {
+    c.scintilla_setFocus(editor.instance, focused);
+}
+
 const default_editor_impl = c.ZigEditorInterface{
     .createFont = createFont,
     .destroyFont = destroyFont,
@@ -152,10 +175,19 @@ const default_editor_impl = c.ZigEditorInterface{
     .setClipRect = setClipRect,
     .setClipboardContent = setClipboardContent,
     .getClipboardContent = getClipboardContent,
+    .sendNotification = sendNotification,
 };
 
 const PZigApp = *c.ZigAppInterface;
 const PZigEditor = *c.ZigEditorInterface;
+
+fn sendNotification(zedit: PZigEditor, notification: u32) callconv(.C) void {
+    const self = getEditor(zedit);
+
+    if ((notification & c.NOTIFY_CHANGE) != 0) {
+        self.notifications.insert(.text_changed);
+    }
+}
 
 fn getEditor(zedit: PZigEditor) *CodeEditor {
     return @fieldParentPtr(CodeEditor, "interface", zedit);
@@ -194,6 +226,8 @@ export fn zero_graphics_getHeight() callconv(.C) c_int {
 
 export fn zero_graphics_alloc(raw_allocator: ?*anyopaque, size: usize) callconv(.C) ?*anyopaque {
     const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), raw_allocator));
+
+    if (size == 0) return null;
 
     const slice = allocator.alloc(u8, size) catch return null;
 

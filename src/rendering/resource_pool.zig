@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn ResourcePool(comptime Resource: type, comptime Context: type, destruct: fn (Context, *Resource) void) type {
+pub fn ResourcePool(comptime Resource: type, comptime Context: type, comptime destruct: fn (Context, *Resource) void) type {
     return struct {
         const Self = @This();
 

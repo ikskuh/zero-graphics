@@ -874,26 +874,35 @@ struct ScintillaEditor : public Scintilla::Editor {
     this->WndProc(SCI_SETUNDOCOLLECTION, 1, 0);
     this->WndProc(SCI_SETREADONLY, bReadOnly, 0);
     this->WndProc(SCI_GOTOPOS, 0, 0);
-    if (!bReadOnly) {
-      this->SetFocusState(true);
-    }
+  }
+
+  void SetFocus(bool focused) {
+    this->SetFocusState(focused);
   }
 
   ZigString GetText(void *allocator) {
     int lengthDoc = (int)this->WndProc(SCI_GETLENGTH, 0, 0);
 
-    char *buffer = static_cast<char *>(zero_graphics_alloc(allocator, lengthDoc));
-    if (buffer != nullptr) {
-      Scintilla::TextRange tr;
-      tr.chrg.cpMin = 0;
-      tr.chrg.cpMax = lengthDoc;
-      tr.lpstrText = buffer;
-      this->WndProc(SCI_GETTEXTRANGE, 0, reinterpret_cast<sptr_t>(&tr));
+    if (lengthDoc == 0) {
+      return ZigString{"", 0};
     }
+
+    char *buffer = static_cast<char *>(zero_graphics_alloc(allocator, lengthDoc));
+    if (buffer == nullptr) {
+      return ZigString{nullptr, 0};
+    }
+
+    Scintilla::TextRange tr;
+    tr.chrg.cpMin = 0;
+    tr.chrg.cpMax = lengthDoc;
+    tr.lpstrText = buffer;
+    this->WndProc(SCI_GETTEXTRANGE, 0, reinterpret_cast<sptr_t>(&tr));
+
     return ZigString{buffer, size_t(lengthDoc)};
   }
 
-  void ButtonDown(Scintilla::Point pt, unsigned int curTime, bool shift, bool ctrl, bool alt) override {
+  void
+  ButtonDown(Scintilla::Point pt, unsigned int curTime, bool shift, bool ctrl, bool alt) override {
     Scintilla::Editor::ButtonDown(pt, curTime, shift, ctrl, alt);
   }
 
@@ -921,13 +930,16 @@ public:
   void SetVerticalScrollPos() override {
     log_debug("SetVerticalScrollPos");
   }
+
   void SetHorizontalScrollPos() override {
     log_debug("SetHorizontalScrollPos");
   }
+
   bool ModifyScrollBars(int nMax, int nPage) override {
     log_debug("ModifyScrollBars(nMax=%d,nPage=%d)", nMax, nPage);
     return true;
   }
+
   void Copy() override {
     if (!sel.Empty()) {
       SelectionText selectedText;
@@ -957,12 +969,15 @@ public:
       InsertPaste(clipboard_content.data(), len);
     }
   }
+
   void ClaimSelection() override {
     log_debug("ClaimSelection");
   }
+
   void NotifyChange() override {
-    log_debug("NotifyChange");
+    current_app->sendNotification(current_app, NOTIFY_CHANGE);
   }
+
   void NotifyParent(SCNotification scn) override {
     // log_debug("NotifyParent");
     // switch (scn.nmhdr.code) {
@@ -979,10 +994,12 @@ public:
   void CopyToClipboard(const SelectionText &selectedText) override {
     current_app->setClipboardContent(current_app, selectedText.Data(), selectedText.Length());
   }
+
   void SetMouseCapture(bool on) override {
     log_debug("SetMouseCapture(%d)", on);
     bHasMouseCapture = on;
   }
+
   bool HaveMouseCapture() override {
     return bHasMouseCapture;
   }
@@ -1002,6 +1019,7 @@ public:
   }
 
   void SetTicking(bool on) override {
+    log_debug("SetTicking(%d)", on);
   }
 
   void NotifyStyleToNeeded(int endStyleNeeded) override {
@@ -1056,6 +1074,10 @@ void scintilla_mouseDown(ScintillaEditor *editor, float time, int x, int y) {
 void scintilla_mouseUp(ScintillaEditor *editor, float time, int x, int y) {
   PseudoGlobal<ZigEditorInterface *, EditorInterfaceHack> pseudo_global{editor->current_app};
   editor->ButtonUp(Scintilla::Point(x, y), time * 1000, false);
+}
+void scintilla_setFocus(ScintillaEditor *editor, bool focused) {
+  PseudoGlobal<ZigEditorInterface *, EditorInterfaceHack> pseudo_global{editor->current_app};
+  editor->SetFocus(focused);
 }
 
 static int zigScanToSci(int sc);

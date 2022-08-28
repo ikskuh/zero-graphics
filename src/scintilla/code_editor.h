@@ -13,6 +13,8 @@ extern "C" {
 
 // Keep in sync with CodeEditor.zig
 
+#define NOTIFY_CHANGE (1U << 0)
+
 typedef struct ZigEditorInterface ZigEditorInterface;
 typedef struct ZigFont ZigFont;
 typedef struct ScintillaEditor ScintillaEditor;
@@ -59,6 +61,9 @@ struct ZigEditorInterface {
 
   void (*setClipboardContent)(ZigEditorInterface *app, char const *str, size_t length);
   size_t (*getClipboardContent)(ZigEditorInterface *app, char *str, size_t max_length);
+
+  // notify commands
+  void (*sendNotification)(ZigEditorInterface *app, uint32_t notification);
 };
 
 void scintilla_init();
@@ -75,6 +80,7 @@ void scintilla_mouseDown(ScintillaEditor *editor, float time, int x, int y);
 void scintilla_mouseUp(ScintillaEditor *editor, float time, int x, int y);
 bool scintilla_keyDown(ScintillaEditor *editor, int zig_scancode, bool shift, bool ctrl, bool alt);
 void scintilla_enterString(ScintillaEditor *editor, char const *str, size_t len);
+void scintilla_setFocus(ScintillaEditor *editor, bool focused);
 
 void scintilla_setPosition(ScintillaEditor *editor, int x, int y, int w, int h);
 

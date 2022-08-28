@@ -182,6 +182,115 @@ pub const Color = extern struct {
         return dupe;
     }
 
+    pub fn parse(string: []const u8) !Color {
+        if (fromName(string)) |c| return c;
+
+        if (std.mem.startsWith(u8, string, "#")) {
+            // html color
+            return try fromHtml(string);
+        }
+
+        return try fromValues(string, .int);
+    }
+
+    pub const ValueRange = enum { float, int };
+
+    fn mapFloatToInt(a: f32) !u8 {
+        if (a < 0.0) return error.Overflow;
+        if (a > 1.0) return error.Overflow;
+        return @floatToInt(u8, 255.0 * a);
+    }
+
+    /// Parses values that are written in 3-tuples or 4-tuples separated by comma, semicolon, space and tab.
+    /// Examples:
+    /// - `255,0,0`
+    /// - `255;255;0`
+    /// - `0.0 1.0 0.0`
+    /// - `0.0; 1.0; 0.46`
+    pub fn fromValues(string: []const u8, range: ValueRange) !Color {
+        var tokenizer = std.mem.tokenize(u8, string, ",; \t");
+
+        var r_str: []const u8 = tokenizer.next() orelse return error.InvalidFormat;
+        var g_str: []const u8 = tokenizer.next() orelse return error.InvalidFormat;
+        var b_str: []const u8 = tokenizer.next() orelse return error.InvalidFormat;
+        var a_str: ?[]const u8 = tokenizer.next();
+        if (tokenizer.next() != null)
+            return error.InvalidFormat;
+
+        return switch (range) {
+            .float => Color{
+                .r = try mapFloatToInt(try std.fmt.parseFloat(f32, r_str)),
+                .g = try mapFloatToInt(try std.fmt.parseFloat(f32, g_str)),
+                .b = try mapFloatToInt(try std.fmt.parseFloat(f32, b_str)),
+                .a = try mapFloatToInt(try std.fmt.parseFloat(f32, a_str orelse "1.0")),
+            },
+            .int => Color{
+                .r = try std.fmt.parseInt(u8, r_str, 0),
+                .g = try std.fmt.parseInt(u8, g_str, 0),
+                .b = try std.fmt.parseInt(u8, b_str, 0),
+                .a = try std.fmt.parseInt(u8, a_str orelse "0xFF", 0),
+            },
+        };
+    }
+
+    fn expand4to8(c: u4) u8 {
+        return (@as(u8, c) << 4) | c;
+    }
+
+    /// Parses one of the following patterns:
+    /// - `#RGB`
+    /// - `#RGBA`
+    /// - `#RRGGBB`
+    /// - `#RRGGBBAA`
+    pub fn fromHtml(str: []const u8) !Color {
+        if (str.len < 4) // requires at least #RGB
+            return error.InvalidFormat;
+        if (str[0] != '#') // must start with #
+            return error.InvalidFormat;
+        const hexchars = str[1..];
+
+        var color = Color{ .r = 0, .g = 0, .b = 0, .a = 0xFF };
+
+        if (hexchars.len == 3 or hexchars.len == 4) {
+            // #RGB
+            // #RGBA
+            color.r = expand4to8(try std.fmt.parseInt(u4, hexchars[0..1], 16));
+            color.g = expand4to8(try std.fmt.parseInt(u4, hexchars[1..2], 16));
+            color.b = expand4to8(try std.fmt.parseInt(u4, hexchars[2..3], 16));
+        } else if (hexchars.len == 6 or hexchars.len == 8) {
+            // #RRGGBB
+            // #RRGGBBAA
+            color.r = try std.fmt.parseInt(u8, hexchars[0..2], 16);
+            color.g = try std.fmt.parseInt(u8, hexchars[2..4], 16);
+            color.b = try std.fmt.parseInt(u8, hexchars[4..6], 16);
+        } else {
+            return error.InvalidFormat;
+        }
+
+        if (hexchars.len == 4) {
+            // #RGBA
+            color.a = expand4to8(try std.fmt.parseInt(u4, hexchars[3..4], 16));
+        } else if (hexchars.len == 8) {
+            // #RRGGBBAA
+            color.a = try std.fmt.parseInt(u8, hexchars[6..8], 16);
+        } else {
+            color.a = 0xFF;
+        }
+
+        return color;
+    }
+
+    /// Creates a color from one of the CSS3 named ones.
+    pub fn fromName(name: []const u8) ?Color {
+        inline for (comptime std.meta.declarations(colors.css3)) |decl| {
+            if (!decl.is_pub)
+                continue;
+            if (std.ascii.eqlIgnoreCase(decl.name, name))
+                return @field(colors.css3, decl.name);
+        }
+        return null;
+    }
+
     // Predefined color values:
     pub const transparent = .{ .r = 0, .g = 0, .b = 0, .a = 0 };
     pub const black = Color{ .r = 0x00, .g = 0x00, .b = 0x00 };

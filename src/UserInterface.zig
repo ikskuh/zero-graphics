@@ -245,6 +245,9 @@ const Widget = struct {
             .text_box => |*control| {
                 control.events.insert(.enter);
             },
+            .code_editor => |*control| {
+                control.editor.setFocus(true);
+            },
             else => {},
         }
     }
@@ -255,6 +258,9 @@ const Widget = struct {
         switch (widget.control) {
             .text_box => |*control| {
                 control.events.insert(.leave);
+            },
+            .code_editor => |*control| {
+                control.editor.setFocus(false);
             },
             else => {},
         }
@@ -912,18 +918,14 @@ pub const Builder = struct {
         return null;
     }
 
-    pub const CodeEditorEvent = union(enum) {
-        focus_lost: []const u8,
-        text_changed: []const u8,
-    };
-    pub fn codeEditor(self: Self, rectangle: Rectangle, code: []const u8, config: anytype) Error!?TextBoxEvent {
+    pub fn codeEditor(self: Self, rectangle: Rectangle, initial_code: []const u8, config: anytype) Error!*types.CodeEditor {
         const info = try self.initOrUpdateWidget(.code_editor, rectangle, config);
         const code_editor: *Widget.CodeEditor = info.control;
 
         // reset all events at the end of this
         defer code_editor.events = std.enums.EnumSet(Widget.CodeEditor.Event){}; // clear
 
-        const display_hash = StringHash.compute(code);
+        const display_hash = StringHash.compute(initial_code);
 
         if (info.needs_init) {
             info.control.* = .{
@@ -931,15 +933,21 @@ pub const Builder = struct {
                 .content_hash = display_hash,
             };
             try code_editor.editor.create(self.ui.renderer.?);
-            try code_editor.editor.setText(code);
+            try code_editor.editor.setText(initial_code);
+
+            // Clear all notifications created through init actions
+            _ = code_editor.editor.getNotifications();
         } else {
 
-            // clear text box to default when ESC is pressed or the input string changes
-            if ((code_editor.content_hash != display_hash) or code_editor.events.contains(.cancelled)) {
-                logger.info("updating code editor content to {s}", .{code});
-                try code_editor.editor.setText(code);
-                code_editor.content_hash = display_hash;
-            }
+            // // clear text box to default when ESC is pressed or the input string changes
+            // if ((code_editor.content_hash != display_hash) or code_editor.events.contains(.cancelled)) {
+            //     logger.info("updating code editor content to {s}", .{initial_code});
+            //     try code_editor.editor.setText(initial_code);
+            //     code_editor.content_hash = display_hash;
+
+            //     // Clear all notifications created through changing the text
+            //     _ = code_editor.editor.getNotifications();
+            // }
         }
         updateWidgetConfig(&code_editor.config, config);
 
@@ -952,16 +960,7 @@ pub const Builder = struct {
             code_editor.tick_increment -= 1;
         }
 
-        if (code_editor.events.contains(.leave)) {
-            @panic("nope");
-            // return TextBoxEvent{ .focus_lost = code_editor.getText() };
-        }
-        if (code_editor.events.contains(.text_changed)) {
-            @panic("nope");
-            // return TextBoxEvent{ .text_changed = code_editor.getText() };
-        }
-
-        return null;
+        return &code_editor.editor;
     }
 };
 

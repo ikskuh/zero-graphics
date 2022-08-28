@@ -185,7 +185,7 @@ fn processEvent(self: *Editor, event: zero_graphics.Input.Event) !bool {
                     self.dragged = null;
                     if (self.mouse_down) {
                         self.mouse_down = false;
-                        return true;
+                        return (self.focused != null);
                     }
                 },
                 else => {},
