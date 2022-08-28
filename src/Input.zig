@@ -417,3 +417,59 @@ test "pool text_input events" {
     try std.testing.expectEqualStrings("hel", queue.pollEvent().?.text_input.text);
     try std.testing.expectEqualStrings("lo", queue.pollEvent().?.text_input.text);
 }
+
+pub fn filter(self: *Self) Filter {
+    return Filter{
+        .context = @ptrCast(*anyopaque, self),
+        .fetchFn = fetchFromInput,
+    };
+}
+
+fn fetchFromInput(ctx: *anyopaque) Filter.Error!?Event {
+    const input = @ptrCast(*Self, @alignCast(@alignOf(Self), ctx));
+    return input.fetch();
+}
+
+pub const Filter = struct {
+    pub const Error = error{OutOfMemory};
+
+    context: *anyopaque,
+    fetchFn: std.meta.FnPtr(fn (ctx: *anyopaque) Error!?Event),
+
+    pub fn fetch(self: Filter) Error!?Event {
+        return self.fetchFn(self.context);
+    }
+
+    pub fn pump(self: Filter) (Error || error{QuitEvent})!void {
+        while (try self.fetch()) |event| {
+            if (event == .quit)
+                return error.QuitEvent;
+        }
+    }
+
+    pub fn GenericFilter(comptime Target: type, comptime callback: std.meta.FnPtr(fn (*Target, Event) Error!bool)) type {
+        return struct {
+            const Instance = @This();
+
+            target: *Target,
+            source: Filter,
+
+            pub fn inputFilter(self: *Instance) Filter {
+                return Filter{
+                    .context = @ptrCast(*anyopaque, self),
+                    .fetchFn = fetchFunc,
+                };
+            }
+
+            fn fetchFunc(ctx: *anyopaque) Error!?Event {
+                const instance = @ptrCast(*Instance, @alignCast(@alignOf(Instance), ctx));
+                while (try instance.source.fetch()) |event| {
+                    if (try callback(instance.target, event))
+                        continue;
+                    return event;
+                }
+                return null;
+            }
+        };
+    }
+};

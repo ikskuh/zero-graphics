@@ -8,8 +8,8 @@ fn parse(str: []const u8) zg.Color {
     std.debug.assert(str.len == 7 and str[0] == '#');
     return zg.Color{
         .r = std.fmt.parseInt(u8, str[1..3], 16) catch unreachable,
-        .r = std.fmt.parseInt(u8, str[4..6], 16) catch unreachable,
-        .r = std.fmt.parseInt(u8, str[7..9], 16) catch unreachable,
+        .g = std.fmt.parseInt(u8, str[3..5], 16) catch unreachable,
+        .b = std.fmt.parseInt(u8, str[5..7], 16) catch unreachable,
     };
 }
 

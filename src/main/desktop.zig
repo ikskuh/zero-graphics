@@ -9,7 +9,6 @@ pub const CoreApplication = @import("../CoreApplication.zig");
 
 pub const backend: zerog.Backend = .desktop;
 
-
 comptime {
     // enforce inclusion of "extern  c" implementations
     _ = @import("common.zig");
@@ -22,7 +21,10 @@ const debug_window_mode = if (@hasDecl(Application, "zerog_enable_window_mode"))
 else
     false;
 
-pub const milliTimestamp = std.time.milliTimestamp;
+var startup_time: i64 = 0;
+pub fn milliTimestamp() i64 {
+    return std.time.milliTimestamp() - startup_time;
+}
 
 // const DPI_AWARENESS_CONTEXT_UNAWARE = (DPI_AWARENESS_CONTEXT - 1);
 // const DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = (DPI_AWARENESS_CONTEXT - 2);
@@ -156,6 +158,11 @@ pub fn main() !void {
     var input_queue = zerog.Input.init(std.heap.c_allocator);
     defer input_queue.deinit();
 
+    try zerog.CodeEditor.init();
+    defer zerog.CodeEditor.deinit();
+
+    startup_time = std.time.milliTimestamp();
+
     var app: CoreApplication = undefined;
     app.init(std.heap.c_allocator, &input_queue) catch |e| return logAppError("init", @errorReturnTrace(), e);
     defer app.deinit();
@@ -276,7 +283,6 @@ pub fn main() !void {
                         var height: c_int = undefined;
 
                         c.SDL_GL_GetDrawableSize(window, &width, &height);
-
                         app.resize(@intCast(u15, width), @intCast(u15, height)) catch |e| return logAppError("resize", @errorReturnTrace(), e);
                     } else {
                         // logger.info("unhandled window event: {}", .{@intToEnum(c.SDL_WindowEventID, event.window.event)});

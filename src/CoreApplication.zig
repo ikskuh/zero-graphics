@@ -19,12 +19,16 @@ screen_size: zero_graphics.Size = zero_graphics.Size.empty,
 resources: zero_graphics.ResourceManager,
 exit_request: bool = false,
 
+pub var instance: ?*CoreApplication = null;
+
 /// Returns the core application for a given application
-pub fn get(app: *Application) *CoreApplication {
-    return @fieldParentPtr(CoreApplication, "application", app);
+pub fn get() *CoreApplication {
+    return instance orelse @panic("CoreApplication was not started. This is a bug.");
 }
 
 pub fn init(app: *CoreApplication, allocator: std.mem.Allocator, input: *zero_graphics.Input) !void {
+    if (instance != null)
+        @panic("Cannot instantiate two CoreApplications. This is a bug.");
     app.* = CoreApplication{
         .allocator = allocator,
         .input = input,
@@ -33,13 +37,21 @@ pub fn init(app: *CoreApplication, allocator: std.mem.Allocator, input: *zero_gr
     };
     errdefer app.resources.deinit();
 
-    try app.application.init(allocator, input);
+    instance = app;
+
+    try app.application.init();
 }
 
 pub fn deinit(app: *CoreApplication) void {
+    const current_instance = instance orelse @panic("Deinitializing a CoreApplication while none is active. This is a bug.");
+    if (current_instance != app)
+        @panic("Deinitializing another CoreApplication than the one that was started. This is a bug.");
+
     app.application.deinit();
     app.resources.deinit();
     app.* = undefined;
+
+    instance = null;
 }
 
 pub fn exit(app: *CoreApplication) void {
@@ -91,7 +103,7 @@ pub fn render(app: *CoreApplication) !void {
     try app.render();
 }
 
-// fn init(app: *Application, allocator: std.mem.Allocator, input: zero_graphics.Input) !void
+// fn init(app: *Application) !void
 // fn setupGraphics(app: *Application) !void
 // fn resize(app: *Application, width: u15, height: u15) !void
 // fn update(app: *Application) !bool
@@ -100,7 +112,7 @@ pub fn render(app: *CoreApplication) !void {
 // fn deinit(app: *Application) void
 
 fn verifyApplicationType(comptime T: type) void {
-    validateSignature(T, "init", true, .{ *T, std.mem.Allocator, *zero_graphics.Input });
+    validateSignature(T, "init", true, .{*T});
     validateSignature(T, "setupGraphics", false, .{*T});
     validateSignature(T, "resize", false, .{ *T, u15, u15 });
     validateSignature(T, "update", true, .{*T});

@@ -1,7 +1,7 @@
 const std = @import("std");
 
 fn sdkPath(comptime suffix: []const u8) []const u8 {
-    if (suffix[0] != '/') @compileError("relToPath requires an absolute path!");
+    if (suffix[0] != '/') @compileError("sdkPath requires an absolute path!");
     return comptime blk: {
         const root_dir = std.fs.path.dirname(@src().file) orelse ".";
         break :blk root_dir ++ suffix;
@@ -13,6 +13,7 @@ const Sdk = @This();
 const SdlSdk = @import("vendor/SDL.zig/Sdk.zig");
 const AndroidSdk = @import("vendor/ZigAndroidTemplate/Sdk.zig");
 const TemplateStep = @import("vendor/ztt/src/TemplateStep.zig");
+const NFD = @import("vendor/nfd/build.zig");
 
 pub const Platform = union(enum) {
     desktop: std.zig.CrossTarget,
@@ -234,6 +235,24 @@ pub const Application = struct {
         exe.addCSourceFile(sdkPath("/src/rendering/stb_truetype.c"), &[_][]const u8{
             "-std=c99",
         });
+
+        exe.addIncludeDir(sdkPath("/src/scintilla"));
+
+        if (exe.target.getCpuArch() != .wasm32) {
+            const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
+            scintilla_header.setTarget(exe.target);
+            scintilla_header.use_stage1 = exe.use_stage1;
+
+            exe.addPackage(.{
+                .name = "scintilla",
+                .source = .{ .generated = &scintilla_header.output_file },
+            });
+            exe.step.dependOn(&scintilla_header.step);
+
+            const scintilla = createScintilla(app.sdk.builder);
+            scintilla.setTarget(exe.target);
+            exe.linkLibrary(scintilla);
+        }
     }
 
     pub fn compileFor(app: *Application, platform: Platform) *AppCompilation {
@@ -246,7 +265,6 @@ pub const Application = struct {
         switch (platform) {
             .desktop => |target| {
                 const exe = app.sdk.builder.addExecutable(app.name, sdkPath("/src/main/desktop.zig"));
-
                 exe.setBuildMode(app.build_mode);
                 exe.setTarget(target);
 
@@ -254,6 +272,11 @@ pub const Application = struct {
                 app.sdk.sdl_sdk.link(exe, .dynamic);
 
                 app.prepareExe(exe, app_pkg);
+
+                // For desktop versions, we link lib-nfd
+                const libnfd = NFD.makeLib(app.sdk.builder, .ReleaseSafe, target);
+                exe.linkLibrary(libnfd);
+                exe.addPackage(NFD.getPackage("nfd"));
 
                 return app.createCompilation(.{
                     .desktop = exe,
@@ -576,4 +599,74 @@ const CacheBuilder = struct {
             name,
         });
     }
+};
+
+fn createScintilla(b: *std.build.Builder) *std.build.LibExeObjStep {
+    const lib = b.addStaticLibrary("scintilla", null);
+    lib.setBuildMode(.ReleaseSafe);
+    lib.addCSourceFiles(&scintilla_sources, &scintilla_flags);
+    lib.addIncludeDir(sdkPath("/vendor/scintilla/include"));
+    lib.addIncludeDir(sdkPath("/vendor/scintilla/lexlib"));
+    lib.addIncludeDir(sdkPath("/vendor/scintilla/src"));
+    lib.defineCMacro("SCI_LEXER", null);
+    lib.defineCMacro("GTK", null);
+    lib.defineCMacro("SCI_NAMESPACE", null);
+    lib.linkLibC();
+    lib.linkLibCpp();
+    // TODO: This is not clean, fix it!
+    lib.addCSourceFile(sdkPath("/src/scintilla/code_editor.cpp"), &.{
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+    });
+    return lib;
+}
+
+const scintilla_flags = [_][]const u8{
+    "-fno-sanitize=undefined",
+    "-std=c++17",
+};
+
+const scintilla_sources = [_][]const u8{
+    sdkPath("/vendor/scintilla/lexers/LexCPP.cxx"),
+    sdkPath("/vendor/scintilla/lexers/LexOthers.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/Accessor.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/CharacterCategory.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/CharacterSet.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/LexerBase.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/LexerModule.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/LexerNoExceptions.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/LexerSimple.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/PropSetSimple.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/StyleContext.cxx"),
+    sdkPath("/vendor/scintilla/lexlib/WordList.cxx"),
+    sdkPath("/vendor/scintilla/src/AutoComplete.cxx"),
+    sdkPath("/vendor/scintilla/src/CallTip.cxx"),
+    sdkPath("/vendor/scintilla/src/CaseConvert.cxx"),
+    sdkPath("/vendor/scintilla/src/CaseFolder.cxx"),
+    sdkPath("/vendor/scintilla/src/Catalogue.cxx"),
+    sdkPath("/vendor/scintilla/src/CellBuffer.cxx"),
+    sdkPath("/vendor/scintilla/src/CharClassify.cxx"),
+    sdkPath("/vendor/scintilla/src/ContractionState.cxx"),
+    sdkPath("/vendor/scintilla/src/Decoration.cxx"),
+    sdkPath("/vendor/scintilla/src/Document.cxx"),
+    sdkPath("/vendor/scintilla/src/EditModel.cxx"),
+    sdkPath("/vendor/scintilla/src/Editor.cxx"),
+    sdkPath("/vendor/scintilla/src/EditView.cxx"),
+    sdkPath("/vendor/scintilla/src/ExternalLexer.cxx"),
+    sdkPath("/vendor/scintilla/src/Indicator.cxx"),
+    sdkPath("/vendor/scintilla/src/KeyMap.cxx"),
+    sdkPath("/vendor/scintilla/src/LineMarker.cxx"),
+    sdkPath("/vendor/scintilla/src/MarginView.cxx"),
+    sdkPath("/vendor/scintilla/src/PerLine.cxx"),
+    sdkPath("/vendor/scintilla/src/PositionCache.cxx"),
+    sdkPath("/vendor/scintilla/src/RESearch.cxx"),
+    sdkPath("/vendor/scintilla/src/RunStyles.cxx"),
+    sdkPath("/vendor/scintilla/src/ScintillaBase.cxx"),
+    sdkPath("/vendor/scintilla/src/Selection.cxx"),
+    sdkPath("/vendor/scintilla/src/Style.cxx"),
+    sdkPath("/vendor/scintilla/src/UniConversion.cxx"),
+    sdkPath("/vendor/scintilla/src/ViewStyle.cxx"),
+    sdkPath("/vendor/scintilla/src/XPM.cxx"),
 };

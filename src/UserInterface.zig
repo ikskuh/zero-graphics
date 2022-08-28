@@ -143,6 +143,7 @@ const Widget = struct {
         panel: Panel,
         button: Button,
         text_box: TextBox,
+        code_editor: CodeEditor,
         label: Label,
         check_box: CheckBox,
         radio_button: RadioButton,
@@ -158,6 +159,9 @@ const Widget = struct {
             },
             .text_box => |*ctrl| {
                 ctrl.editor.deinit();
+            },
+            .code_editor => |*ctrl| {
+                ctrl.editor.destroy();
             },
             .label => |*ctrl| {
                 ctrl.text.deinit();
@@ -177,6 +181,7 @@ const Widget = struct {
             .panel => |ctrl| ctrl.config.hit_test_visible,
             .button => |ctrl| ctrl.config.hit_test_visible,
             .text_box => |ctrl| ctrl.config.hit_test_visible,
+            .code_editor => |ctrl| ctrl.config.hit_test_visible,
             .label => |ctrl| ctrl.config.hit_test_visible,
             .check_box => |ctrl| ctrl.config.hit_test_visible,
             .radio_button => |ctrl| ctrl.config.hit_test_visible,
@@ -240,6 +245,9 @@ const Widget = struct {
             .text_box => |*control| {
                 control.events.insert(.enter);
             },
+            .code_editor => |*control| {
+                control.editor.setFocus(true);
+            },
             else => {},
         }
     }
@@ -250,6 +258,9 @@ const Widget = struct {
         switch (widget.control) {
             .text_box => |*control| {
                 control.events.insert(.leave);
+            },
+            .code_editor => |*control| {
+                control.editor.setFocus(false);
             },
             else => {},
         }
@@ -286,6 +297,9 @@ const Widget = struct {
             enabled: bool = true,
             style: ?ButtonTheme = null,
             hit_test_visible: bool = true,
+
+            vertical_text_alignment: types.VerticalAlignment = .center,
+            horizontal_text_alignment: types.HorzizontalAlignment = .center,
         };
         text: StringBuffer,
         icon: ?*Texture,
@@ -336,6 +350,26 @@ const Widget = struct {
         scroll_offset: u15 = 0,
 
         events: std.enums.EnumSet(Event) = std.enums.EnumSet(Event){},
+
+        config: Config = .{},
+    };
+    const CodeEditor = struct {
+        const Config = struct {
+            style: ?TextBoxTheme = null,
+            hit_test_visible: bool = true,
+        };
+        const Event = enum { enter, leave, cancelled, text_changed };
+
+        editor: types.CodeEditor,
+        content_hash: StringHash = StringHash.compute(""),
+
+        events: std.enums.EnumSet(Event) = std.enums.EnumSet(Event){},
+
+        ctrl_pressed: bool = false,
+        shift_pressed: bool = false,
+        alt_pressed: bool = false,
+
+        tick_increment: u32 = 0,
 
         config: Config = .{},
     };
@@ -883,6 +917,51 @@ pub const Builder = struct {
 
         return null;
     }
+
+    pub fn codeEditor(self: Self, rectangle: Rectangle, initial_code: []const u8, config: anytype) Error!*types.CodeEditor {
+        const info = try self.initOrUpdateWidget(.code_editor, rectangle, config);
+        const code_editor: *Widget.CodeEditor = info.control;
+
+        // reset all events at the end of this
+        defer code_editor.events = std.enums.EnumSet(Widget.CodeEditor.Event){}; // clear
+
+        const display_hash = StringHash.compute(initial_code);
+
+        if (info.needs_init) {
+            info.control.* = .{
+                .editor = undefined,
+                .content_hash = display_hash,
+            };
+            try code_editor.editor.create(self.ui.renderer.?);
+            try code_editor.editor.setText(initial_code);
+
+            // Clear all notifications created through init actions
+            _ = code_editor.editor.getNotifications();
+        } else {
+
+            // // clear text box to default when ESC is pressed or the input string changes
+            // if ((code_editor.content_hash != display_hash) or code_editor.events.contains(.cancelled)) {
+            //     logger.info("updating code editor content to {s}", .{initial_code});
+            //     try code_editor.editor.setText(initial_code);
+            //     code_editor.content_hash = display_hash;
+
+            //     // Clear all notifications created through changing the text
+            //     _ = code_editor.editor.getNotifications();
+            // }
+        }
+        updateWidgetConfig(&code_editor.config, config);
+
+        code_editor.editor.setPosition(rectangle);
+
+        if (code_editor.tick_increment == 0) {
+            code_editor.editor.tick();
+            code_editor.tick_increment = 6;
+        } else {
+            code_editor.tick_increment -= 1;
+        }
+
+        return &code_editor.editor;
+    }
 };
 
 pub fn processInput(self: *UserInterface) InputProcessor {
@@ -930,6 +1009,16 @@ pub const InputProcessor = struct {
         }
 
         if (self.ui.hovered_widget) |widget| {
+            switch (widget.control) {
+                .code_editor => |*control| {
+                    control.editor.mouseMove(
+                        self.ui.pointer_position.x,
+                        self.ui.pointer_position.y,
+                    );
+                },
+                else => {},
+            }
+
             widget.sendEvent(.{ .pointer_motion = self.ui.pointer_position });
         }
     }
@@ -938,6 +1027,17 @@ pub const InputProcessor = struct {
         const clicked_widget = self.ui.widgetFromPosition(self.ui.pointer_position);
 
         if (clicked_widget) |widget| {
+            switch (widget.control) {
+                .code_editor => |*control| {
+                    control.editor.mouseDown(
+                        @intToFloat(f32, types.milliTimestamp()) / 1000.0,
+                        self.ui.pointer_position.x,
+                        self.ui.pointer_position.y,
+                    );
+                },
+                else => {},
+            }
+
             widget.sendEvent(.{ .pointer_press = self.ui.pointer_position });
         }
 
@@ -958,6 +1058,17 @@ pub const InputProcessor = struct {
                 .position = self.ui.pointer_position,
                 .pointer = pointer,
             } });
+
+            switch (widget.control) {
+                .code_editor => |*control| {
+                    control.editor.mouseUp(
+                        @intToFloat(f32, types.milliTimestamp()) / 1000.0,
+                        self.ui.pointer_position.x,
+                        self.ui.pointer_position.y,
+                    );
+                },
+                else => {},
+            }
         }
 
         const pressed_widget = self.ui.pressed_widget orelse return;
@@ -979,6 +1090,22 @@ pub const InputProcessor = struct {
     pub fn buttonDown(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
+            .code_editor => |*control| {
+                switch (button) {
+                    .ctrl_left, .ctrl_right => control.ctrl_pressed = true,
+                    .shift_left, .shift_right => control.shift_pressed = true,
+                    .alt_left, .alt_right => control.alt_pressed = true,
+                    else => {},
+                }
+
+                _ = control.editor.keyDown(
+                    button,
+                    control.shift_pressed,
+                    control.ctrl_pressed,
+                    control.alt_pressed,
+                );
+            },
+
             .text_box => |*control| switch (button) {
                 .ctrl_left => control.ctrl_pressed = true,
                 .ctrl_right => control.ctrl_pressed = true,
@@ -1015,6 +1142,13 @@ pub const InputProcessor = struct {
     pub fn buttonUp(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
+            .code_editor => |*control| switch (button) {
+                .ctrl_left, .ctrl_right => control.ctrl_pressed = false,
+                .shift_left, .shift_right => control.shift_pressed = false,
+                .alt_left, .alt_right => control.alt_pressed = false,
+                else => {},
+            },
+
             .text_box => |*control| switch (button) {
                 .ctrl_left => control.ctrl_pressed = false,
                 .ctrl_right => control.ctrl_pressed = false,
@@ -1065,9 +1199,67 @@ pub const InputProcessor = struct {
                 });
             },
 
+            .code_editor => |*control| {
+                control.editor.enterString(string);
+            },
+
             else => return, // just eat the event by default
         }
     }
+
+    pub fn inputFilter(self: InputProcessor, source: types.Input.Filter) InputFilter {
+        return InputFilter{
+            .target = self,
+            .source = source,
+        };
+    }
+
+    pub const InputFilter = struct {
+        target: InputProcessor,
+        source: types.Input.Filter,
+
+        pub fn inputFilter(self: *InputFilter) types.Input.Filter {
+            return types.Input.Filter{
+                .context = @ptrCast(*anyopaque, self),
+                .fetchFn = fetchFunc,
+            };
+        }
+
+        fn fetchFunc(ctx: *anyopaque) error{OutOfMemory}!?types.Input.Event {
+            const filter = @ptrCast(*InputFilter, @alignCast(@alignOf(InputFilter), ctx));
+            while (try filter.source.fetch()) |event| {
+                switch (event) {
+                    .pointer_motion => |pt| filter.target.setPointer(pt),
+                    .pointer_press => filter.target.pointerDown(),
+                    .pointer_release => |cursor| filter.target.pointerUp(switch (cursor) {
+                        .primary => Pointer.primary,
+                        .secondary => .secondary,
+                    }),
+
+                    .text_input => |text| {
+                        std.log.info("text_input: '{}' ({})", .{
+                            std.fmt.fmtSliceEscapeUpper(text.text), // escape special chars here
+                            text.modifiers,
+                        });
+                        filter.target.enterText(text.text) catch |e| switch (e) {
+                            error.InvalidUtf8 => @panic("invalid utf8 from key event"),
+                            error.OutOfMemory => return error.OutOfMemory,
+                        };
+                    },
+
+                    .key_down => |scancode| filter.target.buttonDown(scancode) catch |e| switch (e) {
+                        error.InvalidUtf8 => @panic("invalid utf8 from key event"),
+                        error.OutOfMemory => return error.OutOfMemory,
+                    },
+                    .key_up => |scancode| try filter.target.buttonUp(scancode),
+
+                    else => return event,
+                }
+                return event;
+            }
+            return null;
+        }
+    };
 };
 
 fn clampSub(a: u15, b: u15) u15 {
@@ -1138,13 +1330,16 @@ pub fn render(self: UserInterface) !void {
                 const text = control.text.get();
                 if (text.len > 0) {
                     const font = control.config.font orelse self.default_font;
-                    const string_size = renderer.measureString(font, control.text.get());
-                    try renderer.drawString(
+                    const color = control.config.text_color orelse style_info.text_color;
+                    try renderer.drawText(
                         font,
                         control.text.get(),
-                        widget.bounds.x + @divTrunc((@as(i16, widget.bounds.width) - string_size.width), 2),
-                        widget.bounds.y + @divTrunc((@as(i16, widget.bounds.height) - string_size.height), 2),
-                        control.config.text_color orelse style_info.text_color,
+                        widget.bounds.shrink(2),
+                        .{
+                            .color = color,
+                            .vertical_alignment = control.config.vertical_text_alignment,
+                            .horizontal_alignment = control.config.horizontal_text_alignment,
+                        },
                     );
                 }
             },
@@ -1230,6 +1425,11 @@ pub fn render(self: UserInterface) !void {
 
                 try renderer.popClipRectangle();
             },
+
+            .code_editor => |*control| {
+                control.editor.render();
+            },
+
             .label => |control| {
                 const style = control.config.style orelse self.theme.label;
 
