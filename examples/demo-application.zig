@@ -1,11 +1,13 @@
 //! This file must export the following functions:
 //! - `pub fn init(app: *Application, allocator: std.mem.Allocator) !void`
-//! - `pub fn setupGraphics(app: *Application) !void`
-//! - `pub fn resize(app: *Application, width: u15, height: u15) !void`
 //! - `pub fn update(app: *Application) !bool`
 //! - `pub fn render(app: *Application) !void`
-//! - `pub fn teardownGraphics(app: *Application) void`
 //! - `pub fn deinit(app: *Application) void`
+//!
+//! This file *can* export the following functions:
+//! - `pub fn setupGraphics(app: *Application) !void`
+//! - `pub fn resize(app: *Application, width: u15, height: u15) !void`
+//! - `pub fn teardownGraphics(app: *Application) void`
 //!
 
 const std = @import("std");
@@ -24,15 +26,15 @@ const Renderer3D = zero_graphics.Renderer3D;
 
 const Application = @This();
 
+const core = zero_graphics.CoreApplication.get;
+
 screen_width: u15,
 screen_height: u15,
-resources: ResourceManager,
 renderer: Renderer,
 texture_handle: *ResourceManager.Texture,
 pixel_pattern: *ResourceManager.Texture,
 allocator: std.mem.Allocator,
 font: *const Renderer.Font,
-input: *zero_graphics.Input,
 
 ui: zero_graphics.UserInterface,
 editor: zero_graphics.Editor,
@@ -46,44 +48,41 @@ mesh: *ResourceManager.Geometry,
 startup_time: i64,
 test_pattern: bool = false,
 
-pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphics.Input) !void {
+pub fn init(app: *Application) !void {
     app.* = Application{
-        .allocator = allocator,
+        .allocator = core().allocator,
         .screen_width = 0,
         .screen_height = 0,
-        .resources = ResourceManager.init(allocator),
         .texture_handle = undefined,
         .pixel_pattern = undefined,
         .renderer = undefined,
         .ui = undefined,
         .editor = undefined,
         .font = undefined,
-        .input = input,
 
         .renderer3d = undefined,
         .mesh = undefined,
 
         .startup_time = zero_graphics.milliTimestamp(),
     };
-    errdefer app.resources.deinit();
 
-    app.renderer = try app.resources.createRenderer2D();
+    app.renderer = try core().resources.createRenderer2D();
     errdefer app.renderer.deinit();
 
     app.ui = try zero_graphics.UserInterface.init(app.allocator, &app.renderer);
     errdefer app.ui.deinit();
-    app.texture_handle = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("ziggy.png") });
-    app.pixel_pattern = try app.resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("pixelpattern.png") });
+    app.texture_handle = try core().resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("ziggy.png") });
+    app.pixel_pattern = try core().resources.createTexture(.ui, ResourceManager.DecodeImageData{ .data = @embedFile("pixelpattern.png") });
 
     app.editor = zero_graphics.Editor.init(app.allocator);
     errdefer app.editor.deinit();
 
     app.font = try app.renderer.createFont(@embedFile("GreatVibes-Regular.ttf"), 48);
 
-    app.renderer3d = try app.resources.createRenderer3D();
+    app.renderer3d = try core().resources.createRenderer3D();
     errdefer app.renderer3d.deinit();
 
-    // app.mesh = try app.resources.createGeometry(ResourceManager.StaticMesh{
+    // app.mesh = try core().resources.createGeometry(ResourceManager.StaticMesh{
     //     .vertices = &.{
     //         .{ .x = 0, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 0, .v = 0 },
     //         .{ .x = 1, .y = 0, .z = 0, .nx = 0, .ny = 0, .nz = 0, .u = 1, .v = 0 },
@@ -103,7 +102,7 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
             return error.FileNotFound;
         }
     };
-    app.mesh = try app.resources.createGeometry(ResourceManager.Z3DGeometry(TextureLoader){
+    app.mesh = try core().resources.createGeometry(ResourceManager.Z3DGeometry(TextureLoader){
         .data = @embedFile("twocubes.z3d"),
         .loader = .{},
     });
@@ -114,36 +113,7 @@ pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphi
 pub fn deinit(app: *Application) void {
     app.editor.deinit();
     app.ui.deinit();
-    app.resources.deinit();
     app.* = undefined;
-}
-
-pub fn setupGraphics(app: *Application) !void {
-    {
-        logger.info("OpenGL Version:       {?s}", .{std.mem.span(gles.getString(gles.VERSION))});
-        logger.info("OpenGL Vendor:        {?s}", .{std.mem.span(gles.getString(gles.VENDOR))});
-        logger.info("OpenGL Renderer:      {?s}", .{std.mem.span(gles.getString(gles.RENDERER))});
-        logger.info("OpenGL GLSL:          {?s}", .{std.mem.span(gles.getString(gles.SHADING_LANGUAGE_VERSION))});
-    }
-
-    logger.info("Display density: {d:.3} DPI", .{zero_graphics.getDisplayDPI()});
-
-    // If possible, install the debug callback in debug builds
-    if (builtin.mode == .Debug) {
-        zero_graphics.gles_utils.enableDebugOutput() catch {};
-    }
-
-    try app.resources.initializeGpuData();
-}
-
-pub fn teardownGraphics(app: *Application) void {
-    app.resources.destroyGpuData();
-}
-
-pub fn resize(app: *Application, width: u15, height: u15) !void {
-    logger.info("screen resized to resolution: {}×{}", .{ width, height });
-    app.screen_width = width;
-    app.screen_height = height;
 }
 
 pub fn update(app: *Application) !bool {
@@ -151,7 +121,7 @@ pub fn update(app: *Application) !bool {
         var ui_input = app.ui.processInput();
         defer ui_input.finish();
 
-        var core_filter = app.input.filter();
+        var core_filter = core().input.filter();
 
         var ui_filter = ui_input.inputFilter(core_filter);
 
@@ -164,10 +134,7 @@ pub fn update(app: *Application) !bool {
     }
 
     {
-        var ui = app.ui.construct(.{
-            .width = app.screen_width,
-            .height = app.screen_height,
-        });
+        var ui = app.ui.construct(core().screen_size);
 
         if (try ui.checkBox(.{ .x = 100, .y = 10, .width = 36, .height = 36 }, app.gui_data.is_visible, .{})) {
             app.gui_data.is_visible = !app.gui_data.is_visible;
@@ -220,13 +187,15 @@ pub fn update(app: *Application) !bool {
             }
         }
 
-        if (try ui.codeEditor(.{ .x = 270, .y = 130, .width = 250, .height = 116 }, T.string_buffer.constSlice(), .{})) |event| {
-            switch (event) {
-                .text_changed => |string| {
-                    T.string_buffer.len = 0;
-                    try T.string_buffer.appendSlice(string);
-                },
-                else => {},
+        const editor = try ui.codeEditor(.{ .x = 270, .y = 130, .width = 250, .height = 116 }, "", .{});
+        {
+            const events = editor.getNotifications();
+
+            if (events.contains(.text_changed)) {
+                const string = try editor.getText(app.allocator);
+                defer app.allocator.free(string);
+
+                // TODO: Handle text changed here
             }
         }
 
@@ -403,8 +372,8 @@ pub fn render(app: *Application) !void {
         try renderer.fillRectangle(Rectangle{ .x = 17, .y = 17, .width = 16, .height = 16 }, .{ .r = 0x00, .g = 0x00, .b = 0xFF, .a = 0x80 });
 
         try renderer.fillRectangle(Rectangle{
-            .x = app.screen_width - 64 - 1,
-            .y = app.screen_height - 48 - 1,
+            .x = core().screen_size.width - 64 - 1,
+            .y = core().screen_size.height - 48 - 1,
             .width = 64,
             .height = 48,
         }, .{ .r = 0xFF, .g = 0xFF, .b = 0xFF, .a = 0x80 });
@@ -427,8 +396,8 @@ pub fn render(app: *Application) !void {
 
         try renderer.drawTexture(
             Rectangle{
-                .x = (app.screen_width - app.texture_handle.width) / 2,
-                .y = (app.screen_height - app.texture_handle.height) / 2,
+                .x = (core().screen_size.width - app.texture_handle.width) / 2,
+                .y = (core().screen_size.height - app.texture_handle.height) / 2,
                 .width = app.texture_handle.width,
                 .height = app.texture_handle.height,
             },
@@ -439,7 +408,7 @@ pub fn render(app: *Application) !void {
         try renderer.drawTexture(
             Rectangle{
                 .x = 16,
-                .y = app.screen_height - app.pixel_pattern.height - 16,
+                .y = core().screen_size.height - app.pixel_pattern.height - 16,
                 .width = app.pixel_pattern.width,
                 .height = app.pixel_pattern.height,
             },
@@ -450,7 +419,7 @@ pub fn render(app: *Application) !void {
         try renderer.drawPartialTexture(
             Rectangle{
                 .x = 32 + app.pixel_pattern.width,
-                .y = app.screen_height - app.pixel_pattern.height - 16,
+                .y = core().screen_size.height - app.pixel_pattern.height - 16,
                 .width = app.pixel_pattern.width / 2,
                 .height = app.pixel_pattern.height / 2,
             },
@@ -471,8 +440,8 @@ pub fn render(app: *Application) !void {
         try renderer.drawString(
             app.font,
             string,
-            (app.screen_width - string_size.width) / 2,
-            (app.screen_height + app.texture_handle.height) / 2,
+            (core().screen_size.width - string_size.width) / 2,
+            (core().screen_size.height + app.texture_handle.height) / 2,
             zero_graphics.Color{ .r = 0xF7, .g = 0xA4, .b = 0x1D },
         );
 
@@ -484,16 +453,16 @@ pub fn render(app: *Application) !void {
         if (app.test_pattern) {
             if (@mod(zero_graphics.milliTimestamp(), 1000) > 500) {
                 var i: u15 = 0;
-                while (i < app.screen_width) : (i += 1) {
-                    try app.renderer.drawLine(i, 0, i, app.screen_height - 1, if ((i & 1) == 0)
+                while (i < core().screen_size.width) : (i += 1) {
+                    try app.renderer.drawLine(i, 0, i, core().screen_size.height - 1, if ((i & 1) == 0)
                         zero_graphics.Color.white
                     else
                         zero_graphics.Color.black);
                 }
             } else {
                 var i: u15 = 0;
-                while (i < app.screen_height) : (i += 1) {
-                    try app.renderer.drawLine(0, i, app.screen_width - 1, i, if ((i & 1) == 0)
+                while (i < core().screen_size.height) : (i += 1) {
+                    try app.renderer.drawLine(0, i, core().screen_size.width - 1, i, if ((i & 1) == 0)
                         zero_graphics.Color.white
                     else
                         zero_graphics.Color.black);
@@ -505,11 +474,11 @@ pub fn render(app: *Application) !void {
         // will paint to `renderer`
         try app.ui.render();
 
-        const mouse = app.input.pointer_location;
+        const mouse = core().input.pointer_location;
 
         if (mouse.x >= 0 and mouse.y >= 0) {
-            try renderer.drawLine(0, mouse.y, app.screen_width, mouse.y, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x40 });
-            try renderer.drawLine(mouse.x, 0, mouse.x, app.screen_height, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x40 });
+            try renderer.drawLine(0, mouse.y, core().screen_size.width, mouse.y, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x40 });
+            try renderer.drawLine(mouse.x, 0, mouse.x, core().screen_size.height, .{ .r = 0xFF, .g = 0x00, .b = 0x00, .a = 0x40 });
             try renderer.drawRectangle(
                 Rectangle{
                     .x = mouse.x - 10,
@@ -527,9 +496,9 @@ pub fn render(app: *Application) !void {
 
     // OpenGL rendering
     {
-        const aspect = @intToFloat(f32, app.screen_width) / @intToFloat(f32, app.screen_height);
+        const aspect = @intToFloat(f32, core().screen_size.width) / @intToFloat(f32, core().screen_size.height);
 
-        gles.viewport(0, 0, app.screen_width, app.screen_height);
+        gles.viewport(0, 0, core().screen_size.width, core().screen_size.height);
 
         gles.clearColor(0.3, 0.3, 0.3, 1.0);
         gles.clearDepthf(1.0);
@@ -563,8 +532,8 @@ pub fn render(app: *Application) !void {
         app.renderer3d.render(view_projection_matrix.fields);
 
         renderer.render(zero_graphics.Size{
-            .width = app.screen_width,
-            .height = app.screen_height,
+            .width = core().screen_size.width,
+            .height = core().screen_size.height,
         });
     }
 
@@ -572,11 +541,11 @@ pub fn render(app: *Application) !void {
         if (take_screenshot) {
             take_screenshot = false;
 
-            var buffer = try app.allocator.alloc(u8, 4 * @as(usize, app.screen_width) * @as(usize, app.screen_height));
+            var buffer = try app.allocator.alloc(u8, 4 * @as(usize, core().screen_size.width) * @as(usize, core().screen_size.height));
             defer app.allocator.free(buffer);
 
             gles.pixelStorei(gles.PACK_ALIGNMENT, 1);
-            gles.readPixels(0, 0, app.screen_width, app.screen_height, gles.RGBA, gles.UNSIGNED_BYTE, buffer.ptr);
+            gles.readPixels(0, 0, core().screen_size.width, core().screen_size.height, gles.RGBA, gles.UNSIGNED_BYTE, buffer.ptr);
 
             var file = try std.fs.cwd().createFile("screenshot.tga", .{});
             defer file.close();
@@ -597,8 +566,8 @@ pub fn render(app: *Application) !void {
             // image spec
             try writer.writeIntLittle(u16, 0); // x origin
             try writer.writeIntLittle(u16, 0); // y origin
-            try writer.writeIntLittle(u16, app.screen_width); // width
-            try writer.writeIntLittle(u16, app.screen_height); // height
+            try writer.writeIntLittle(u16, core().screen_size.width); // width
+            try writer.writeIntLittle(u16, core().screen_size.height); // height
             try writer.writeIntLittle(u8, 32); // bits per pixel
             try writer.writeIntLittle(u8, 8); // 0…3 => alpha channel depth = 8, 4…7 => direction=bottom left
 

@@ -1,3 +1,15 @@
+//! This file must export the following functions:
+//! - `pub fn init(app: *Application, allocator: std.mem.Allocator) !void`
+//! - `pub fn update(app: *Application) !bool`
+//! - `pub fn render(app: *Application) !void`
+//! - `pub fn deinit(app: *Application) void`
+//!
+//! This file *can* export the following functions:
+//! - `pub fn setupGraphics(app: *Application) !void`
+//! - `pub fn resize(app: *Application, width: u15, height: u15) !void`
+//! - `pub fn teardownGraphics(app: *Application) void`
+//!
+
 const std = @import("std");
 const builtin = @import("builtin");
 const zero_graphics = @import("zero-graphics");
@@ -5,55 +17,24 @@ const zero_graphics = @import("zero-graphics");
 const logger = std.log.scoped(.demo);
 const gl = zero_graphics.gles;
 
+const core = zero_graphics.CoreApplication.get;
+
 const Application = @This();
 
-allocator: std.mem.Allocator,
-input: *zero_graphics.Input,
-
-pub fn init(app: *Application, allocator: std.mem.Allocator, input: *zero_graphics.Input) !void {
-    app.* = Application{
-        .allocator = allocator,
-        .input = input,
-    };
-
-    // initialize your application logic here!
+pub fn init(app: *Application) !void {
+    app.* = Application{};
+    // TODO: initialize your application logic here!
 }
 
 pub fn deinit(app: *Application) void {
-    // shut down your application here
+    // TODO: shut down your application here
     app.* = undefined;
 }
 
-pub fn setupGraphics(app: *Application) !void {
-    logger.info("OpenGL Version:       {?s}", .{std.mem.span(gl.getString(gl.VERSION))});
-    logger.info("OpenGL Vendor:        {?s}", .{std.mem.span(gl.getString(gl.VENDOR))});
-    logger.info("OpenGL Renderer:      {?s}", .{std.mem.span(gl.getString(gl.RENDERER))});
-    logger.info("OpenGL GLSL:          {?s}", .{std.mem.span(gl.getString(gl.SHADING_LANGUAGE_VERSION))});
-
-    // If possible, install the debug callback in debug builds
-    if (builtin.mode == .Debug) {
-        zero_graphics.gles_utils.enableDebugOutput() catch {};
-    }
-
-    // initialize your graphics objects here!
-    _ = app;
-}
-
-pub fn teardownGraphics(app: *Application) void {
-    // destroy your graphics objects here!
-    _ = app;
-}
-
-pub fn resize(app: *Application, width: u15, height: u15) !void {
-    // react to screen resizes here!
-    _ = app;
-    _ = width;
-    _ = height;
-}
-
 pub fn update(app: *Application) !bool {
-    // process input events here:
-    while (app.input.fetch()) |event| {
+
+    // TODO: process input events here:
+    while (core().input.fetch()) |event| {
         switch (event) {
             .quit => return false,
             .pointer_motion => {},
@@ -64,6 +45,8 @@ pub fn update(app: *Application) !bool {
             .key_up => {},
         }
     }
+
+    _ = app;
 
     return true;
 }

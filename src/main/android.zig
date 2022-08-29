@@ -3,6 +3,7 @@ const gles = @import("../gl_es_2v0.zig");
 const logger = std.log.scoped(.android);
 const zerog = @import("../zero-graphics.zig");
 const Application = @import("application");
+pub const CoreApplication = @import("../CoreApplication.zig");
 
 comptime {
     // enforce inclusion of "extern  c" implementations
@@ -61,7 +62,7 @@ pub const AndroidApp = struct {
     screen_height: f32 = undefined,
 
     app_lock: std.Thread.Mutex = std.Thread.Mutex{},
-    application: Application,
+    application: CoreApplication,
     app_ready: bool = false,
 
     zero_input: zerog.Input,

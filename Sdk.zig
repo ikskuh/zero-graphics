@@ -238,19 +238,21 @@ pub const Application = struct {
 
         exe.addIncludeDir(sdkPath("/src/scintilla"));
 
-        const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
-        scintilla_header.setTarget(exe.target);
-        scintilla_header.use_stage1 = exe.use_stage1;
+        if (exe.target.getCpuArch() != .wasm32) {
+            const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
+            scintilla_header.setTarget(exe.target);
+            scintilla_header.use_stage1 = exe.use_stage1;
 
-        exe.addPackage(.{
-            .name = "scintilla",
-            .source = .{ .generated = &scintilla_header.output_file },
-        });
-        exe.step.dependOn(&scintilla_header.step);
+            exe.addPackage(.{
+                .name = "scintilla",
+                .source = .{ .generated = &scintilla_header.output_file },
+            });
+            exe.step.dependOn(&scintilla_header.step);
 
-        const scintilla = createScintilla(app.sdk.builder);
-        scintilla.setTarget(exe.target);
-        exe.linkLibrary(scintilla);
+            const scintilla = createScintilla(app.sdk.builder);
+            scintilla.setTarget(exe.target);
+            exe.linkLibrary(scintilla);
+        }
     }
 
     pub fn compileFor(app: *Application, platform: Platform) *AppCompilation {

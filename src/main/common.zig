@@ -1,25 +1,5 @@
 const std = @import("std");
 
-// fn init(app: *Application, allocator: std.mem.Allocator, input: zero_graphics.Input) !void
-// fn setupGraphics(app: *Application) !void
-// fn resize(app: *Application, width: u15, height: u15) !void
-// fn update(app: *Application) !bool
-// fn render(app: *Application) !void
-// fn teardownGraphics(app: *Application) void
-// fn deinit(app: *Application) void
-
-pub fn verifyApplication(comptime T: type) void {
-    if (!@hasDecl(T, "init")) @compileError("Application file must export 'fn init(app: *Application, allocator: std.mem.Allocator) !void'");
-    if (!@hasDecl(T, "setupGraphics")) @compileError("Application file must export 'fn setupGraphics(app: *Application) !void'");
-    if (!@hasDecl(T, "resize")) @compileError("Application file must export 'fn resize(app: *Application, width: u15, height: u15) !void'");
-    if (!@hasDecl(T, "update")) @compileError("Application file must export 'fn update(app: *Application) !bool'");
-    if (!@hasDecl(T, "render")) @compileError("Application file must export 'fn render(app: *Application) !void'");
-    if (!@hasDecl(T, "teardownGraphics")) @compileError("Application file must export 'fn teardownGraphics(app: *Application) void'");
-    if (!@hasDecl(T, "deinit")) @compileError("Application file must export 'fn deinit(app: *Application) void'");
-
-    // TODO: Verify signatures
-}
-
 const stbttf_log = std.log.scoped(.stb_ttf);
 
 export fn zerog_renderer2d_alloc(user_data: ?*anyopaque, size: usize) ?*anyopaque {

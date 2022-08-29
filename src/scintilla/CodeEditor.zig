@@ -89,7 +89,6 @@ position: Rectangle,
 notifications: NotificationSet,
 
 pub fn create(editor: *CodeEditor, renderer: *Renderer) !void {
-    _ = default_editor_impl;
     editor.* = CodeEditor{
         .interface = default_editor_impl,
         .renderer = renderer,
@@ -97,7 +96,7 @@ pub fn create(editor: *CodeEditor, renderer: *Renderer) !void {
         .position = undefined,
         .notifications = NotificationSet{},
     };
-    editor.setPosition(Rectangle.init(Point.zero, zero_graphics.getScreenSize()));
+    editor.setPosition(Rectangle.init(Point.zero, zero_graphics.CoreApplication.get().screen_size));
 }
 
 pub fn destroy(editor: *CodeEditor) void {
@@ -218,10 +217,10 @@ export fn zero_graphics_getDisplayDpi() callconv(.C) c_int {
     return @floatToInt(c_int, zero_graphics.getDisplayDPI());
 }
 export fn zero_graphics_getWidth() callconv(.C) c_int {
-    return zero_graphics.getScreenSize().width;
+    return zero_graphics.CoreApplication.get().screen_size.width;
 }
 export fn zero_graphics_getHeight() callconv(.C) c_int {
-    return zero_graphics.getScreenSize().height;
+    return zero_graphics.CoreApplication.get().screen_size.height;
 }
 
 export fn zero_graphics_alloc(raw_allocator: ?*anyopaque, size: usize) callconv(.C) ?*anyopaque {
