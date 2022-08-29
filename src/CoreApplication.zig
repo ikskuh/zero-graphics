@@ -72,13 +72,13 @@ pub fn setupGraphics(app: *CoreApplication) !void {
     try app.resources.initializeGpuData();
 
     if (@hasDecl(Application, "setupGraphics")) {
-        try app.setupGraphics();
+        try app.application.setupGraphics();
     }
 }
 
 pub fn teardownGraphics(app: *CoreApplication) void {
     if (@hasDecl(Application, "teardownGraphics")) {
-        app.teardownGraphics();
+        app.application.teardownGraphics();
     }
     app.resources.destroyGpuData();
 }
@@ -87,7 +87,7 @@ pub fn resize(app: *CoreApplication, width: u15, height: u15) !void {
     app.screen_size = .{ .width = width, .height = height };
 
     if (@hasDecl(Application, "resize")) {
-        try app.resize(width, height);
+        try app.application.resize(width, height);
     }
 }
 
@@ -95,12 +95,12 @@ pub fn update(app: *CoreApplication) !bool {
     if (app.exit_request) {
         return false;
     }
-    return try app.update();
+    return try app.application.update();
 }
 
 pub fn render(app: *CoreApplication) !void {
     gl.viewport(0, 0, app.screen_size.width, app.screen_size.height);
-    try app.render();
+    try app.application.render();
 }
 
 // fn init(app: *Application) !void
