@@ -1434,22 +1434,12 @@ pub fn render(self: UserInterface) !void {
                 const style = control.config.style orelse self.theme.label;
 
                 const font = control.config.font orelse self.default_font;
-                const string_size = renderer.measureString(font, control.text.get());
-                try renderer.drawString(
-                    font,
-                    control.text.get(),
-                    widget.bounds.x + switch (control.config.horizontal_alignment) {
-                        .left => 0,
-                        .center => clampSub(widget.bounds.width, string_size.width) / 2,
-                        .right => clampSub(clampSub(widget.bounds.width, 4), string_size.width),
-                    },
-                    widget.bounds.y + switch (control.config.vertical_alignment) {
-                        .top => 0,
-                        .center => clampSub(widget.bounds.height, string_size.height) / 2,
-                        .bottom => clampSub(widget.bounds.height, string_size.height),
-                    },
-                    control.config.text_color orelse style.text_color,
-                );
+                const color = control.config.text_color orelse style.text_color;
+                try renderer.drawText(font, control.text.get(), widget.bounds, .{
+                    .horizontal_alignment = control.config.horizontal_alignment,
+                    .vertical_alignment = control.config.vertical_alignment,
+                    .color = color,
+                });
             },
             .check_box => |control| {
                 try renderer.drawTexture(
