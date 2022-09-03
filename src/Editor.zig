@@ -234,6 +234,7 @@ fn processEvent(self: *Editor, event: zero_graphics.Input.Event) !bool {
                         point_gizmo.y = self.drag_data.point.y + dy;
                     },
                 }
+                return true;
             }
 
             return false;
