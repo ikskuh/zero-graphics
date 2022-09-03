@@ -2,35 +2,42 @@ const std = @import("std");
 const zero_graphics = @import("zero-graphics.zig");
 
 const Rectangle = zero_graphics.Rectangle;
+const Color = zero_graphics.Color;
+const Point = zero_graphics.Point;
 const Editor = @This();
 
-pub const GizmoType = enum {
-    point,
-};
-
-pub const Gizmo = union(GizmoType) {
-    point: zero_graphics.Point,
-};
-
-const GizmoInternal = struct {
-    gizmo: Gizmo,
+const Gizmo = struct {
+    data: Data,
     changed: bool = false,
+    frame_index: u32,
+    tag: usize,
+
+    pub const Data = union(Type) {
+        point: zero_graphics.Point,
+    };
+
+    pub const Type = enum {
+        point,
+    };
 };
 
-const Queue = std.TailQueue(GizmoInternal);
+const Queue = std.TailQueue(Gizmo);
 const Node = Queue.Node;
 
 node_arena: std.heap.ArenaAllocator,
 free_gizmos: Queue = .{},
 gizmos: Queue = .{},
 
-focused: ?*GizmoInternal = null,
-hovered: ?*GizmoInternal = null,
-dragged: ?*GizmoInternal = null,
+focused: ?*Gizmo = null,
+hovered: ?*Gizmo = null,
+dragged: ?*Gizmo = null,
 drag_start: zero_graphics.Point = undefined,
+drag_data: Gizmo.Data = undefined,
 
 mouse_down: bool = false,
 mouse_pos: zero_graphics.Point = undefined,
+
+frame_index: u32 = 0,
 
 pub fn init(allocator: std.mem.Allocator) Editor {
     return Editor{
@@ -43,41 +50,106 @@ pub fn deinit(self: *Editor) void {
     self.* = undefined;
 }
 
-pub fn addGizmo(self: *Editor, initial: Gizmo) !*Gizmo {
+pub fn notifyNewCycle(self: *Editor) !void {
+    var it = self.gizmos.first;
+
+    while (it) |node| {
+        it = node.next;
+
+        if (node.data.frame_index != self.frame_index) {
+            // remove all nodes that were not touched
+            // in the last frame
+            self.gizmos.remove(node);
+
+            node.data = undefined;
+
+            self.free_gizmos.append(node);
+        }
+    }
+
+    self.frame_index +%= 1;
+}
+
+fn createGizmo(self: *Editor) !*Gizmo {
     const node = if (self.free_gizmos.popFirst()) |node|
         node
     else
         try self.node_arena.allocator().create(Node);
-    node.* = .{
-        .data = .{ .gizmo = initial },
-    };
+    node.* = .{ .data = undefined };
     self.gizmos.append(node);
-    return &node.data.gizmo;
+    return &node.data;
 }
 
-pub fn removeGizmo(self: *Editor, gizmo: *Gizmo) void {
-    const internal = @fieldParentPtr(GizmoInternal, "gizmo", gizmo);
-    const node = @fieldParentPtr(Node, "data", internal);
+const GetGizmoResult = struct {
+    gizmo: *Gizmo,
+    cached: bool,
+};
 
-    internal.* = undefined;
+fn makeTagValue(value: anytype) usize {
+    const T = @TypeOf(value);
+    return switch (@typeInfo(T)) {
+        .Pointer => @ptrToInt(value),
+        .Int => |int| if (int.signedness == .signed)
+            @bitCast(usize, @as(isize, value))
+        else
+            @as(usize, value),
 
-    self.gizmos.remove(node);
-    self.free_gizmos.append(node);
+        else => @compileError(@typeName(T) ++ " is not a possible tag type"),
+    };
 }
 
-pub fn wasModified(self: Editor, gizmo: *Gizmo) bool {
-    _ = self;
+/// Gets or creates a new gizmo based on `tag`.
+/// If the `cached` flag in the return value is set,
+/// `.data` of the gizmo is already initialized with data from
+/// the last frame, otherwise a new gizmo was created.
+fn getGizmo(self: *Editor, tag: anytype, kind: Gizmo.Type) !GetGizmoResult {
+    const tag_val = makeTagValue(tag);
 
-    const internal = @fieldParentPtr(GizmoInternal, "gizmo", gizmo);
+    var it = self.gizmos.first;
+    while (it) |node| : (it = node.next) {
+        if (node.data.tag == tag_val) {
+            // mark the gizmo to be used in this frame
+            node.data.frame_index = self.frame_index;
+            return GetGizmoResult{
+                .gizmo = &node.data,
 
-    return internal.changed;
+                // return cached only when the gizmo has the same type
+                .cached = (node.data.data == kind),
+            };
+        }
+    }
+
+    const gizmo = try self.createGizmo();
+    gizmo.* = .{
+        .tag = tag_val,
+        .frame_index = self.frame_index,
+        .changed = false,
+        .data = undefined,
+    };
+    return GetGizmoResult{
+        .gizmo = gizmo,
+        .cached = false,
+    };
 }
 
-pub fn markHandled(self: Editor, gizmo: *Gizmo) void {
-    _ = self;
+pub fn editPoint2D(self: *Editor, tag: anytype, position: Point) !?Point {
+    const ggr = try self.getGizmo(tag, .point);
 
-    const internal = @fieldParentPtr(GizmoInternal, "gizmo", gizmo);
-    internal.changed = false;
+    defer {
+        ggr.gizmo.changed = false;
+        ggr.gizmo.data.point = position;
+    }
+
+    if (ggr.cached) {
+        return if (ggr.gizmo.changed)
+            ggr.gizmo.data.point
+        else
+            return null;
+    } else {
+        // initialize
+        ggr.gizmo.data = .{ .point = position };
+        return null;
+    }
 }
 
 // pub fn update(self: *Self, input: zero_graphics.Input) !void {
@@ -89,12 +161,12 @@ pub fn markHandled(self: Editor, gizmo: *Gizmo) void {
 //     }
 // }
 
-fn handleFromPos(self: *Editor, screen_position: zero_graphics.Point) ?*GizmoInternal {
-    var hovered: ?*GizmoInternal = null;
+fn handleFromPos(self: *Editor, screen_position: zero_graphics.Point) ?*Gizmo {
+    var hovered: ?*Gizmo = null;
 
     var it = self.gizmos.first;
     while (it) |node| : (it = node.next) {
-        switch (node.data.gizmo) {
+        switch (node.data.data) {
             .point => |point| {
                 if (getEditHandleRectangle(point.x, point.y).contains(screen_position)) {
                     hovered = &node.data;
@@ -109,16 +181,17 @@ fn handleFromPos(self: *Editor, screen_position: zero_graphics.Point) ?*GizmoInt
 pub fn render(self: Editor, renderer: *zero_graphics.Renderer2D) !void {
     var it = self.gizmos.first;
     while (it) |node| : (it = node.next) {
-        switch (node.data.gizmo) {
+        switch (node.data.data) {
             .point => |point| {
                 try renderer.drawRectangle(
                     getEditHandleRectangle(point.x, point.y),
-                    if (self.hovered == @as(?*GizmoInternal, &node.data))
-                        zero_graphics.colors.xkcd.white
-                    else if (self.focused == @as(?*GizmoInternal, &node.data))
-                        zero_graphics.colors.xkcd.lime
-                    else
-                        zero_graphics.colors.xkcd.green,
+                    Color.magenta,
+                    // if (self.hovered == @as(?*Gizmo, &node.data))
+                    //     zero_graphics.colors.xkcd.white
+                    // else if (self.focused == @as(?*Gizmo, &node.data))
+                    //     zero_graphics.colors.xkcd.lime
+                    // else
+                    //     zero_graphics.colors.xkcd.green,
                 );
             },
         }
@@ -151,13 +224,14 @@ fn processEvent(self: *Editor, event: zero_graphics.Input.Event) !bool {
             if (self.dragged) |dragged| {
                 var dx = self.mouse_pos.x - self.drag_start.x;
                 var dy = self.mouse_pos.y - self.drag_start.y;
-                self.drag_start = self.mouse_pos;
 
-                dragged.changed = (dx != 0) or (dy != 0);
-                switch (dragged.gizmo) {
+                if ((dx != 0) or (dy != 0)) {
+                    dragged.changed = true;
+                }
+                switch (dragged.data) {
                     .point => |*point_gizmo| {
-                        point_gizmo.x += dx;
-                        point_gizmo.y += dy;
+                        point_gizmo.x = self.drag_data.point.x + dx;
+                        point_gizmo.y = self.drag_data.point.y + dy;
                     },
                 }
             }
@@ -167,11 +241,11 @@ fn processEvent(self: *Editor, event: zero_graphics.Input.Event) !bool {
         .pointer_press => |ev| { // MouseButton
             switch (ev) {
                 .primary => {
+                    const focused = self.handleFromPos(self.mouse_pos) orelse return false;
                     self.mouse_down = true;
                     self.drag_start = self.mouse_pos;
-                    self.focused = self.handleFromPos(self.mouse_pos);
-                    if (self.focused == null)
-                        return false;
+                    self.focused = focused;
+                    self.drag_data = focused.data;
                     return true;
                 },
                 .secondary => return false,
@@ -184,6 +258,7 @@ fn processEvent(self: *Editor, event: zero_graphics.Input.Event) !bool {
                 .primary => {
                     self.dragged = null;
                     if (self.mouse_down) {
+                        self.drag_data = undefined;
                         self.mouse_down = false;
                         return (self.focused != null);
                     }
