@@ -6,9 +6,9 @@ const zero_graphics = @import("../zero-graphics.zig");
 const logger = std.log.scoped(.zerog_gles_helper);
 
 fn QueryExtension(comptime query: []const []const u8) type {
-    var fields: [query.len]std.builtin.TypeInfo.StructField = undefined;
+    var fields: [query.len]std.builtin.Type.StructField = undefined;
     for (fields) |*fld, i| {
-        fld.* = std.builtin.TypeInfo.StructField{
+        fld.* = std.builtin.Type.StructField{
             .name = query[i],
             .field_type = bool,
             .default_value = &false,
@@ -17,10 +17,10 @@ fn QueryExtension(comptime query: []const []const u8) type {
         };
     }
     return @Type(.{
-        .Struct = std.builtin.TypeInfo.Struct{
+        .Struct = std.builtin.Type.Struct{
             .layout = .Auto,
             .fields = &fields,
-            .decls = &[_]std.builtin.TypeInfo.Declaration{},
+            .decls = &[_]std.builtin.Type.Declaration{},
             .is_tuple = false,
         },
     });
@@ -66,7 +66,6 @@ fn glesDebugProc(
     message_ptr: [*:0]const u8,
     userParam: ?*anyopaque,
 ) callconv(.C) void {
-    _ = msg_type;
     _ = userParam;
     _ = id;
     // This callback is only used when the extension is available

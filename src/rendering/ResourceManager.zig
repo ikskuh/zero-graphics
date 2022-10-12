@@ -78,7 +78,6 @@ pub fn initializeGpuData(self: *ResourceManager) !void {
 }
 
 fn destroyGpu(self: *ResourceManager, pool: anytype) void {
-    _ = self;
     var it = pool.list.first;
     while (it) |node| : (it = node.next) {
         const item = &node.data.resource;

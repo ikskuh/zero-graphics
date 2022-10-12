@@ -2,7 +2,7 @@ const std = @import("std");
 const gles = @import("../gl_es_2v0.zig");
 const logger = std.log.scoped(.android);
 const zerog = @import("../zero-graphics.zig");
-const Application = @import("application");
+pub const Application = @import("application");
 pub const CoreApplication = @import("../CoreApplication.zig");
 
 comptime {

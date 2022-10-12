@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const logger = std.log.scoped(.sdl);
 const zerog = @import("../zero-graphics.zig");
 const c = @import("sdl2");
-const Application = @import("application");
+pub const Application = @import("application");
 const app_meta = @import("application-meta");
 pub const CoreApplication = @import("../CoreApplication.zig");
 

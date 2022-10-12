@@ -248,8 +248,6 @@ export fn zero_graphics_writeLog(log_level: c_uint, msg_ptr: [*]const u8, length
 
 fn createFont(zedit: PZigEditor, font_name: [*:0]const u8, font_size: f32) callconv(.C) ?*c.ZigFont {
     const self = getEditor(zedit);
-    _ = font_name;
-    _ = font_size;
 
     log.debug("createFont(\"{s}\",{d})", .{ std.mem.sliceTo(font_name, 0), font_size });
 

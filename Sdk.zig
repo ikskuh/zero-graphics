@@ -81,7 +81,6 @@ pub fn init(builder: *std.build.Builder, init_android: bool) *Sdk {
     });
 
     if (sdk.android_sdk) |asdk| {
-        _ = asdk;
         sdk.key_store = AndroidSdk.KeyStore{
             .file = ".build_config/android.keystore",
             .alias = "android-app",
@@ -231,12 +230,12 @@ pub const Application = struct {
         }
 
         // TTF rendering library:
-        exe.addIncludeDir(sdkPath("/vendor/stb"));
+        exe.addIncludePath(sdkPath("/vendor/stb"));
         exe.addCSourceFile(sdkPath("/src/rendering/stb_truetype.c"), &[_][]const u8{
             "-std=c99",
         });
 
-        exe.addIncludeDir(sdkPath("/src/scintilla"));
+        exe.addIncludePath(sdkPath("/src/scintilla"));
 
         if (exe.target.getCpuArch() != .wasm32) {
             const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
@@ -605,9 +604,9 @@ fn createScintilla(b: *std.build.Builder) *std.build.LibExeObjStep {
     const lib = b.addStaticLibrary("scintilla", null);
     lib.setBuildMode(.ReleaseSafe);
     lib.addCSourceFiles(&scintilla_sources, &scintilla_flags);
-    lib.addIncludeDir(sdkPath("/vendor/scintilla/include"));
-    lib.addIncludeDir(sdkPath("/vendor/scintilla/lexlib"));
-    lib.addIncludeDir(sdkPath("/vendor/scintilla/src"));
+    lib.addIncludePath(sdkPath("/vendor/scintilla/include"));
+    lib.addIncludePath(sdkPath("/vendor/scintilla/lexlib"));
+    lib.addIncludePath(sdkPath("/vendor/scintilla/src"));
     lib.defineCMacro("SCI_LEXER", null);
     lib.defineCMacro("GTK", null);
     lib.defineCMacro("SCI_NAMESPACE", null);

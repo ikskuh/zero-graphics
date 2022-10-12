@@ -4,7 +4,7 @@ const logger = std.log.scoped(.wasm_backend);
 
 const gles = @import("../gl_es_2v0.zig");
 const zerog = @import("../zero-graphics.zig");
-const Application = @import("application");
+pub const Application = @import("application");
 pub const CoreApplication = @import("../CoreApplication.zig");
 
 comptime {
@@ -91,7 +91,7 @@ pub fn log(
 }
 
 /// Overwrite default panic handler
-pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
+pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     // std.log.crit("panic: {s}", .{msg});
     wasm_panic(msg.ptr, msg.len);
     unreachable;

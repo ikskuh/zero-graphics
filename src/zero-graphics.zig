@@ -4,6 +4,7 @@ pub const loadOpenGlFunction = @import("root").loadOpenGlFunction;
 pub const milliTimestamp = @import("root").milliTimestamp;
 pub const getDisplayDPI = @import("root").getDisplayDPI;
 pub const CoreApplication = @import("root").CoreApplication;
+pub const Application = @import("root").Application;
 
 // opengl docs can be found here:
 // https://www.khronos.org/registry/OpenGL-Refpages/es2.0/
