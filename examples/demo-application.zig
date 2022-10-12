@@ -606,10 +606,7 @@ const EditorData = struct {
 
     pub fn init(self: *EditorData) !void {
         const app = @fieldParentPtr(Application, "editor_data", self);
-
-        for (self.quad) |pos, i| {
-            self.gizmos[i] = try app.editor.addGizmo(.{ .point = pos });
-        }
+        _ = app;
     }
 
     pub fn update(self: *EditorData) !void {
@@ -618,10 +615,9 @@ const EditorData = struct {
             return;
         }
 
-        for (self.gizmos) |gizmo, i| {
-            if (app.editor.wasModified(gizmo)) {
-                app.editor.markHandled(gizmo);
-                self.quad[i] = gizmo.point;
+        for (self.quad) |*pt| {
+            if (try app.editor.editPoint2D(pt, pt.*)) |motion| {
+                pt.* = motion;
             }
         }
     }

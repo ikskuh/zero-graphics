@@ -128,7 +128,8 @@ pub fn setText(editor: *CodeEditor, text: []const u8) !void {
 }
 
 pub fn getText(editor: *CodeEditor, allocator: std.mem.Allocator) ![]u8 {
-    const str = c.scintilla_getText(editor.instance, &allocator);
+    var allo = allocator;
+    const str = c.scintilla_getText(editor.instance, &allo);
     const ptr = str.ptr orelse return error.OutOfMemory;
     if (str.len == 0)
         return try allocator.alloc(u8, 0); // we're allocating, as 0 len means the backend didn't allocate

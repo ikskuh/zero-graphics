@@ -6,7 +6,7 @@ const Color = zero_graphics.Color;
 const Point = zero_graphics.Point;
 const Editor = @This();
 
-const Gizmo = struct {
+pub const Gizmo = struct {
     data: Data,
     changed: bool = false,
     frame_index: u32,
