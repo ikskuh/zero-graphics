@@ -760,8 +760,11 @@ pub const Vertex = extern struct {
 /// A group of faces in a `Geometry` that shares the same texture. Each
 /// `Geometry` has at least one mesh.
 pub const Mesh = struct {
+    /// offset into the index buffer in indices
     offset: usize,
+    /// number of vertices in the mesh
     count: usize,
+    /// the texture that should be used or null if none.
     texture: ?*Texture,
 };
 
