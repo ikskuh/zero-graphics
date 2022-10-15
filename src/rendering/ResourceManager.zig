@@ -808,13 +808,17 @@ pub const Geometry = struct {
         gl.genBuffers(bufs.len, &bufs);
         errdefer gl.deleteBuffers(bufs.len, &bufs);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, bufs[0]);
-        gl.bufferData(gl.ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(Vertex) * geometry.vertices.len), geometry.vertices.ptr, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, 0);
+        if (geometry.vertices.len > 0) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, bufs[0]);
+            gl.bufferData(gl.ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(Vertex) * geometry.vertices.len), geometry.vertices.ptr, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, 0);
+        }
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufs[1]);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(u16) * geometry.indices.len), geometry.indices.ptr, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0);
+        if (geometry.indices.len > 0) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufs[1]);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, @intCast(gl.GLsizei, @sizeOf(u16) * geometry.indices.len), geometry.indices.ptr, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0);
+        }
 
         geometry.vertex_buffer = bufs[0];
         geometry.index_buffer = bufs[1];
