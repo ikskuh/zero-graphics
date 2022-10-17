@@ -169,11 +169,11 @@ fn DataSource(comptime ResourceData: type) type {
 
             const Wrapper = struct {
                 fn create(handle: ResourceDataHandle, rm: *ResourceManager) CreateResourceDataError!ResourceData {
-                    logger.debug("create {s}", .{@typeName(ActualDataType)});
+                    // logger.debug("create {s}", .{@typeName(ActualDataType)});
                     return try handle.convertTo(ActualDataType).create(rm);
                 }
                 fn destroy(handle: ResourceDataHandle, rm: *ResourceManager) void {
-                    logger.debug("destroy {s}", .{@typeName(ActualDataType)});
+                    // logger.debug("destroy {s}", .{@typeName(ActualDataType)});
                     rm.allocator.destroy(handle.convertTo(ActualDataType));
                 }
             };
@@ -755,6 +755,21 @@ pub const Vertex = extern struct {
             .v = uv[1],
         };
     }
+
+    pub fn eql(lhs: Vertex, rhs: Vertex, abs_delta: f32, normal_threshold: f32, uv_delta: f32) bool {
+        if (@fabs(lhs.x - rhs.x) >= abs_delta) return false;
+        if (@fabs(lhs.y - rhs.y) >= abs_delta) return false;
+        if (@fabs(lhs.z - rhs.z) >= abs_delta) return false;
+
+        const dot = lhs.nx * rhs.nx + lhs.ny * rhs.ny + lhs.nz * rhs.nz;
+        if (dot < normal_threshold)
+            return false;
+
+        if (@fabs(lhs.u - rhs.u) >= uv_delta) return false;
+        if (@fabs(lhs.v - rhs.v) >= uv_delta) return false;
+
+        return true;
+    }
 };
 
 /// A group of faces in a `Geometry` that shares the same texture. Each
@@ -1248,7 +1263,7 @@ pub const DecodeImageData = struct {
 
             // generic slow loader
             else => {
-                std.log.warn("loading suboptimal image with format {s}. Rgba32 or Bgra32 would be better!", .{@tagName(image.pixels)});
+                logger.warn("loading suboptimal image with format {s}. Rgba32 or Bgra32 would be better!", .{@tagName(image.pixels)});
 
                 var x: usize = 0;
                 var y: usize = if (self.flip_y) image.height - 1 else 0;
@@ -1295,7 +1310,7 @@ pub const DecodeImageData = struct {
 
         const decode_end = zero_graphics.milliTimestamp();
 
-        std.log.info("decoding png image took {} ms, with {} in zigimg and {} in decoding", .{
+        logger.info("decoding png image took {} ms, with {} in zigimg and {} in decoding", .{
             decode_end - start,
             zimg_load - start,
             decode_end - zimg_load,
