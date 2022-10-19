@@ -21,6 +21,7 @@ const Rectangle = types.Rectangle;
 const Size = types.Size;
 const Point = types.Point;
 const Mat4 = [4][4]f32;
+const Mat3 = [3][3]f32;
 
 pub const DrawError = error{OutOfMemory};
 pub const InitError = ResourceManager.CreateResourceDataError || error{ OutOfMemory, GraphicsApiFailure };
@@ -61,6 +62,7 @@ pub fn init(resources: *ResourceManager, allocator: std.mem.Allocator) InitError
         \\varying vec2 aUV;
         \\varying vec3 aNormal;
         \\uniform sampler2D uTexture;
+        \\uniform mat3 uTexTransform;
         \\const vec3 light_color_a = vec3(1.0); // vec3(0.86, 0.77, 0.38); // 0xdcc663, direct sun
         \\const vec3 light_color_b = vec3(0.5); // vec3(0.25, 0.44, 0.43); // 0x40716f, indirect
         \\void main()
@@ -71,7 +73,10 @@ pub fn init(resources: *ResourceManager, allocator: std.mem.Allocator) InitError
         \\   float light_val_a = clamp(-dot(normal, light_dir_a), 0.0, 1.0);
         \\   float light_val_b = clamp(-dot(normal, light_dir_b), 0.0, 1.0);
         \\   vec3 lighting = light_color_a * light_val_a + light_color_b * light_val_b;
-        \\   gl_FragColor = texture2D(uTexture, aUV);
+        \\
+        \\   vec2 uv = (uTexTransform * vec3(aUV, 1.0)).xy;
+        \\
+        \\   gl_FragColor = texture2D(uTexture, uv);
         \\   if(gl_FragColor.a < 0.5)
         \\     discard;
         \\   gl_FragColor.rgb *= lighting;
@@ -132,6 +137,7 @@ const Uniforms = struct {
 
     // fragment shader
     uTexture: gles.GLint,
+    uTexTransform: gles.GLint,
 };
 
 /// Resets the state of the renderer and prepares a fresh new frame.
@@ -162,24 +168,39 @@ pub fn drawGeometry(self: *Self, geometry: *Geometry, transform: Mat4) !void {
     self.resources.retainGeometry(geometry);
 }
 
-/// Draws the given `sprite` with the given world `transform`.
+/// Draws a portion `rectangle` of the given `sprite` with the given world `transform`.
 /// The sprite will be aligned on the XY axis, where X is the U axis of the
 /// texture, and Y is the V axis.
 /// The natural size of the sprite is its unscaled size in pixels. Use `transform`
 /// to scale it into the required size.
-pub fn drawSprite(self: *Self, sprite: *Texture, transform: Mat4) !void {
+pub fn drawPartialSprite(self: *Self, sprite: *Texture, rectangle: Rectangle, transform: Mat4) !void {
     const dc = try self.draw_calls.addOne();
     errdefer _ = self.draw_calls.pop(); // remove the draw call in case of error
 
     dc.* = DrawCall{ .sprite = .{
         .sprite = sprite,
         .transform = transform,
+        .rectangle = rectangle,
     } };
 
     // we need to keep the texture alive until someone calls `reset` on the renderer.
     // otherwise, we will have the problem that a temporary texture will be freed before
     // we render it.
     self.resources.retainTexture(sprite);
+}
+
+/// Draws the given `sprite` with the given world `transform`.
+/// The sprite will be aligned on the XY axis, where X is the U axis of the
+/// texture, and Y is the V axis.
+/// The natural size of the sprite is its unscaled size in pixels. Use `transform`
+/// to scale it into the required size.
+pub fn drawSprite(self: *Self, sprite: *Texture, transform: Mat4) !void {
+    try self.drawPartialSprite(sprite, Rectangle{
+        .x = 0,
+        .y = 0,
+        .width = sprite.width,
+        .height = sprite.height,
+    }, transform);
 }
 
 /// Renders the currently contained data to the screen.
@@ -204,6 +225,14 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
         switch (draw_call) {
             .geometry => |draw_geom| {
                 draw_geom.geometry.bind();
+
+                const tex_id = Mat3{
+                    .{ 1, 0, 0 },
+                    .{ 0, 1, 0 },
+                    .{ 0, 0, 1 },
+                };
+
+                gles.uniformMatrix3fv(uniforms.uTexTransform, 1, gles.FALSE, @ptrCast([*]const f32, &tex_id));
                 gles.uniformMatrix4fv(uniforms.uWorldMatrix, 1, gles.FALSE, @ptrCast([*]const f32, &draw_geom.transform));
 
                 for (draw_geom.geometry.meshes) |mesh| {
@@ -222,8 +251,8 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
             .sprite => |draw_sprite| {
                 self.sprite_quad.bind();
 
-                const w = @intToFloat(f32, draw_sprite.sprite.width);
-                const h = @intToFloat(f32, draw_sprite.sprite.height);
+                const w = @intToFloat(f32, draw_sprite.rectangle.width);
+                const h = @intToFloat(f32, draw_sprite.rectangle.height);
 
                 const scale_mat: Mat4 = .{
                     .{ w, 0, 0, 0 },
@@ -234,6 +263,18 @@ pub fn render(self: Self, viewProjectionMatrix: [4][4]f32) void {
 
                 const final_mat = matMul(scale_mat, draw_sprite.transform);
 
+                const sx = w / @intToFloat(f32, draw_sprite.sprite.width);
+                const sy = h / @intToFloat(f32, draw_sprite.sprite.height);
+                const dx = @intToFloat(f32, draw_sprite.rectangle.x) / @intToFloat(f32, draw_sprite.sprite.width);
+                const dy = @intToFloat(f32, draw_sprite.rectangle.y) / @intToFloat(f32, draw_sprite.sprite.height);
+
+                const tex_transform = Mat3{
+                    .{ sx, 0, 0 },
+                    .{ 0, sy, 0 },
+                    .{ dx, dy, 1 },
+                };
+
+                gles.uniformMatrix3fv(uniforms.uTexTransform, 1, gles.FALSE, @ptrCast([*]const f32, &tex_transform));
                 gles.uniformMatrix4fv(uniforms.uWorldMatrix, 1, gles.FALSE, @ptrCast([*]const f32, &final_mat));
                 gles.bindTexture(gles.TEXTURE_2D, draw_sprite.sprite.instance.?);
 
@@ -249,6 +290,7 @@ const DrawCall = union(enum) {
 
     const DrawSprite = struct {
         transform: Mat4,
+        rectangle: types.Rectangle,
         sprite: *Texture,
     };
 
