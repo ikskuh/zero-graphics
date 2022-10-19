@@ -184,6 +184,8 @@ pub const Application = struct {
 
     permissions: std.ArrayList([]const u8),
 
+    enable_code_editor: bool = true,
+
     pub fn addPermission(app: *Application, perm: Permission) void {
         app.permissions.append(perm.toString()) catch @panic("out of memory!");
     }
@@ -237,20 +239,22 @@ pub const Application = struct {
 
         exe.addIncludePath(sdkPath("/src/scintilla"));
 
-        if (exe.target.getCpuArch() != .wasm32) {
-            const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
-            scintilla_header.setTarget(exe.target);
-            scintilla_header.use_stage1 = exe.use_stage1;
+        if (app.enable_code_editor) {
+            if (exe.target.getCpuArch() != .wasm32) {
+                const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
+                scintilla_header.setTarget(exe.target);
+                scintilla_header.use_stage1 = exe.use_stage1;
 
-            exe.addPackage(.{
-                .name = "scintilla",
-                .source = .{ .generated = &scintilla_header.output_file },
-            });
-            exe.step.dependOn(&scintilla_header.step);
+                exe.addPackage(.{
+                    .name = "scintilla",
+                    .source = .{ .generated = &scintilla_header.output_file },
+                });
+                exe.step.dependOn(&scintilla_header.step);
 
-            const scintilla = createScintilla(app.sdk.builder);
-            scintilla.setTarget(exe.target);
-            exe.linkLibrary(scintilla);
+                const scintilla = createScintilla(app.sdk.builder);
+                scintilla.setTarget(exe.target);
+                exe.linkLibrary(scintilla);
+            }
         }
     }
 

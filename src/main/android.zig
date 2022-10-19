@@ -7,10 +7,7 @@ pub const CoreApplication = @import("../CoreApplication.zig");
 
 comptime {
     // enforce inclusion of "extern  c" implementations
-    const common = @import("common.zig");
-
-    // verify the application api
-    common.verifyApplication(Application);
+    _ = @import("common.zig");
 }
 
 pub const backend: zerog.Backend = .android;
@@ -23,9 +20,9 @@ pub const android = @import("android");
 const EGLContext = android.egl.EGLContext;
 const JNI = android.JNI;
 
-pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const anyopaque {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*align(4) const anyopaque {
     // We can "safely" convert the function name here as eglGetProcAddress is documented as `const`
-    return android.egl.c.eglGetProcAddress(function.ptr);
+    return @alignCast(4, android.egl.c.eglGetProcAddress(function.ptr));
 }
 
 pub const milliTimestamp = std.time.milliTimestamp;
