@@ -61,11 +61,11 @@ pub fn init(resources: *ResourceManager, allocator: std.mem.Allocator) InitError
         \\varying vec2 aUV;
         \\varying vec3 aNormal;
         \\uniform sampler2D uTexture;
+        \\const vec3 light_color_a = vec3(1.0); // vec3(0.86, 0.77, 0.38); // 0xdcc663, direct sun
+        \\const vec3 light_color_b = vec3(0.5); // vec3(0.25, 0.44, 0.43); // 0x40716f, indirect
         \\void main()
         \\{
         \\   vec3 normal = gl_FrontFacing ? aNormal : -aNormal;
-        \\   vec3 light_color_a = vec3(0.86, 0.77, 0.38); // 0xdcc663
-        \\   vec3 light_color_b = vec3(0.25, 0.44, 0.43); // 0x40716f
         \\   vec3 light_dir_a = normalize(vec3(-0.3, -0.4, -0.1));
         \\   vec3 light_dir_b = normalize(vec3(0.1, 1.0, 0.2));
         \\   float light_val_a = clamp(-dot(normal, light_dir_a), 0.0, 1.0);
