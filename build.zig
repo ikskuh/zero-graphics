@@ -97,6 +97,9 @@ pub fn build(b: *std.build.Builder) !void {
 
         const serve = wasm_build.run();
 
+        const build_step = b.step("build-wasm", "Builds the wasm app and installs it.");
+        build_step.dependOn(wasm_build.install_step.?);
+
         const run_step = b.step("run-wasm", "Serves the wasm app");
         run_step.dependOn(&serve.step);
     }

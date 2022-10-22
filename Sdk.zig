@@ -360,6 +360,7 @@ pub const AppCompilation = struct {
     sdk: *Sdk,
     app: *Application,
     data: Data,
+    install_step: ?*std.build.Step = null,
 
     pub fn getStep(comp: *AppCompilation) *std.build.Step {
         return switch (comp.data) {
@@ -371,7 +372,10 @@ pub const AppCompilation = struct {
 
     pub fn install(comp: *AppCompilation) void {
         switch (comp.data) {
-            .desktop => |step| step.install(),
+            .desktop => |step| {
+                step.install();
+                comp.install_step = &step.install_step.?.step;
+            },
             .web => |step| {
                 step.install();
 
@@ -394,9 +398,12 @@ pub const AppCompilation = struct {
                 install_html_page.step.dependOn(&app_html_page.step);
 
                 install_step.step.dependOn(&install_html_page.step);
+
+                comp.install_step = &install_step.step;
             },
             .android => |step| {
                 comp.sdk.builder.getInstallStep().dependOn(step.final_step);
+                comp.install_step = step.final_step;
             },
         }
     }
