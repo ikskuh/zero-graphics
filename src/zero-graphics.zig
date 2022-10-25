@@ -58,6 +58,19 @@ pub const Rectangle = struct {
     width: u15,
     height: u15,
 
+    pub fn left(r: Rectangle) i16 {
+        return r.x;
+    }
+    pub fn right(r: Rectangle) i16 {
+        return r.x + r.width - 1;
+    }
+    pub fn top(r: Rectangle) i16 {
+        return r.y;
+    }
+    pub fn bottom(r: Rectangle) i16 {
+        return r.y + r.height - 1;
+    }
+
     pub fn init(pos: Point, siz: Size) Rectangle {
         return Rectangle{
             .x = pos.x,
