@@ -187,15 +187,17 @@ pub fn update(app: *Application) !bool {
             }
         }
 
-        const editor = try ui.codeEditor(.{ .x = 270, .y = 130, .width = 250, .height = 116 }, "", .{});
-        {
-            const events = editor.getNotifications();
+        if (@hasDecl(zero_graphics, "CodeEditor")) {
+            const editor = try ui.codeEditor(.{ .x = 270, .y = 130, .width = 250, .height = 116 }, "", .{});
+            {
+                const events = editor.getNotifications();
 
-            if (events.contains(.text_changed)) {
-                const string = try editor.getText(app.allocator);
-                defer app.allocator.free(string);
+                if (events.contains(.text_changed)) {
+                    const string = try editor.getText(app.allocator);
+                    defer app.allocator.free(string);
 
-                // TODO: Handle text changed here
+                    // TODO: Handle text changed here
+                }
             }
         }
 

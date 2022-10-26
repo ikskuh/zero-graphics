@@ -6,6 +6,7 @@ const c = @import("sdl2");
 pub const Application = @import("application");
 const app_meta = @import("application-meta");
 pub const CoreApplication = @import("../CoreApplication.zig");
+pub const build_options = @import("build_options");
 
 pub const backend: zerog.Backend = .desktop;
 
@@ -158,8 +159,12 @@ pub fn main() !void {
     var input_queue = zerog.Input.init(std.heap.c_allocator);
     defer input_queue.deinit();
 
-    try zerog.CodeEditor.init();
-    defer zerog.CodeEditor.deinit();
+    if (build_options.enable_code_editor) {
+        try zerog.CodeEditor.init();
+    }
+    defer if (build_options.enable_code_editor) {
+        zerog.CodeEditor.deinit();
+    };
 
     startup_time = std.time.milliTimestamp();
 

@@ -5,3 +5,4 @@ zig-out/
 hackzig/
 .vscode/
 *.ll
+*.idsig

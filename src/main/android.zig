@@ -4,6 +4,7 @@ const logger = std.log.scoped(.android);
 const zerog = @import("../zero-graphics.zig");
 pub const Application = @import("application");
 pub const CoreApplication = @import("../CoreApplication.zig");
+pub const build_options = @import("build_options");
 
 comptime {
     // enforce inclusion of "extern  c" implementations
@@ -70,7 +71,9 @@ pub const AndroidApp = struct {
     pub fn init(allocator: std.mem.Allocator, activity: *android.ANativeActivity, stored_state: ?[]const u8) !Self {
         logger.info("AndroidApp.init({any})", .{stored_state});
 
-        try zerog.CodeEditor.init();
+        if (build_options.enable_code_editor) {
+            try zerog.CodeEditor.init();
+        }
 
         return Self{
             .allocator = allocator,
@@ -108,7 +111,9 @@ pub const AndroidApp = struct {
             android.AConfiguration_delete(config);
         }
         self.zero_input.deinit();
-        zerog.CodeEditor.deinit();
+        if (build_options.enable_code_editor) {
+            zerog.CodeEditor.deinit();
+        }
         self.* = undefined;
     }
 

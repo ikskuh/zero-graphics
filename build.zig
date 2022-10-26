@@ -91,18 +91,19 @@ pub fn build(b: *std.build.Builder) !void {
     }
 
     // Build wasm application
-    {
-        const wasm_build = app.compileFor(.web);
-        wasm_build.install();
+    // TODO: Reinclude when https://github.com/llvm/llvm-project/issues/58557 is fixed.
+    // {
+    //     const wasm_build = app.compileFor(.web);
+    //     wasm_build.install();
 
-        const serve = wasm_build.run();
+    //     const serve = wasm_build.run();
 
-        const build_step = b.step("build-wasm", "Builds the wasm app and installs it.");
-        build_step.dependOn(wasm_build.install_step.?);
+    //     const build_step = b.step("build-wasm", "Builds the wasm app and installs it.");
+    //     build_step.dependOn(wasm_build.install_step.?);
 
-        const run_step = b.step("run-wasm", "Serves the wasm app");
-        run_step.dependOn(&serve.step);
-    }
+    //     const run_step = b.step("run-wasm", "Serves the wasm app");
+    //     run_step.dependOn(&serve.step);
+    // }
 
     if (enable_android) {
         const android_build = app.compileFor(.android);

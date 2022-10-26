@@ -128,6 +128,8 @@ pub const Theme = struct {
     };
 };
 
+const has_code_editor = @hasDecl(types, "CodeEditor");
+
 const WidgetID = enum(u32) { _ };
 
 const Widget = struct {
@@ -143,7 +145,8 @@ const Widget = struct {
         panel: Panel,
         button: Button,
         text_box: TextBox,
-        code_editor: CodeEditor,
+
+        code_editor: if (has_code_editor) CodeEditor else void,
         label: Label,
         check_box: CheckBox,
         radio_button: RadioButton,
@@ -161,7 +164,8 @@ const Widget = struct {
                 ctrl.editor.deinit();
             },
             .code_editor => |*ctrl| {
-                ctrl.editor.destroy();
+                if (has_code_editor)
+                    ctrl.editor.destroy();
             },
             .label => |*ctrl| {
                 ctrl.text.deinit();
@@ -181,7 +185,7 @@ const Widget = struct {
             .panel => |ctrl| ctrl.config.hit_test_visible,
             .button => |ctrl| ctrl.config.hit_test_visible,
             .text_box => |ctrl| ctrl.config.hit_test_visible,
-            .code_editor => |ctrl| ctrl.config.hit_test_visible,
+            .code_editor => |ctrl| if (has_code_editor) ctrl.config.hit_test_visible else unreachable,
             .label => |ctrl| ctrl.config.hit_test_visible,
             .check_box => |ctrl| ctrl.config.hit_test_visible,
             .radio_button => |ctrl| ctrl.config.hit_test_visible,
@@ -246,7 +250,8 @@ const Widget = struct {
                 control.events.insert(.enter);
             },
             .code_editor => |*control| {
-                control.editor.setFocus(true);
+                if (has_code_editor)
+                    control.editor.setFocus(true);
             },
             else => {},
         }
@@ -260,7 +265,8 @@ const Widget = struct {
                 control.events.insert(.leave);
             },
             .code_editor => |*control| {
-                control.editor.setFocus(false);
+                if (has_code_editor)
+                    control.editor.setFocus(false);
             },
             else => {},
         }
@@ -918,50 +924,52 @@ pub const Builder = struct {
         return null;
     }
 
-    pub fn codeEditor(self: Self, rectangle: Rectangle, initial_code: []const u8, config: anytype) Error!*types.CodeEditor {
-        const info = try self.initOrUpdateWidget(.code_editor, rectangle, config);
-        const code_editor: *Widget.CodeEditor = info.control;
+    pub usingnamespace if (has_code_editor) struct {
+        pub fn codeEditor(self: Self, rectangle: Rectangle, initial_code: []const u8, config: anytype) Error!*types.CodeEditor {
+            const info = try self.initOrUpdateWidget(.code_editor, rectangle, config);
+            const code_editor: *Widget.CodeEditor = info.control;
 
-        // reset all events at the end of this
-        defer code_editor.events = std.enums.EnumSet(Widget.CodeEditor.Event){}; // clear
+            // reset all events at the end of this
+            defer code_editor.events = std.enums.EnumSet(Widget.CodeEditor.Event){}; // clear
 
-        const display_hash = StringHash.compute(initial_code);
+            const display_hash = StringHash.compute(initial_code);
 
-        if (info.needs_init) {
-            info.control.* = .{
-                .editor = undefined,
-                .content_hash = display_hash,
-            };
-            try code_editor.editor.create(self.ui.renderer.?);
-            try code_editor.editor.setText(initial_code);
+            if (info.needs_init) {
+                info.control.* = .{
+                    .editor = undefined,
+                    .content_hash = display_hash,
+                };
+                try code_editor.editor.create(self.ui.renderer.?);
+                try code_editor.editor.setText(initial_code);
 
-            // Clear all notifications created through init actions
-            _ = code_editor.editor.getNotifications();
-        } else {
+                // Clear all notifications created through init actions
+                _ = code_editor.editor.getNotifications();
+            } else {
 
-            // // clear text box to default when ESC is pressed or the input string changes
-            // if ((code_editor.content_hash != display_hash) or code_editor.events.contains(.cancelled)) {
-            //     logger.info("updating code editor content to {s}", .{initial_code});
-            //     try code_editor.editor.setText(initial_code);
-            //     code_editor.content_hash = display_hash;
+                // // clear text box to default when ESC is pressed or the input string changes
+                // if ((code_editor.content_hash != display_hash) or code_editor.events.contains(.cancelled)) {
+                //     logger.info("updating code editor content to {s}", .{initial_code});
+                //     try code_editor.editor.setText(initial_code);
+                //     code_editor.content_hash = display_hash;
 
-            //     // Clear all notifications created through changing the text
-            //     _ = code_editor.editor.getNotifications();
-            // }
+                //     // Clear all notifications created through changing the text
+                //     _ = code_editor.editor.getNotifications();
+                // }
+            }
+            updateWidgetConfig(&code_editor.config, config);
+
+            code_editor.editor.setPosition(rectangle);
+
+            if (code_editor.tick_increment == 0) {
+                code_editor.editor.tick();
+                code_editor.tick_increment = 6;
+            } else {
+                code_editor.tick_increment -= 1;
+            }
+
+            return &code_editor.editor;
         }
-        updateWidgetConfig(&code_editor.config, config);
-
-        code_editor.editor.setPosition(rectangle);
-
-        if (code_editor.tick_increment == 0) {
-            code_editor.editor.tick();
-            code_editor.tick_increment = 6;
-        } else {
-            code_editor.tick_increment -= 1;
-        }
-
-        return &code_editor.editor;
-    }
+    } else struct {};
 };
 
 pub fn processInput(self: *UserInterface) InputProcessor {
@@ -1011,10 +1019,12 @@ pub const InputProcessor = struct {
         if (self.ui.hovered_widget) |widget| {
             switch (widget.control) {
                 .code_editor => |*control| {
-                    control.editor.mouseMove(
-                        self.ui.pointer_position.x,
-                        self.ui.pointer_position.y,
-                    );
+                    if (has_code_editor) {
+                        control.editor.mouseMove(
+                            self.ui.pointer_position.x,
+                            self.ui.pointer_position.y,
+                        );
+                    }
                 },
                 else => {},
             }
@@ -1029,11 +1039,13 @@ pub const InputProcessor = struct {
         if (clicked_widget) |widget| {
             switch (widget.control) {
                 .code_editor => |*control| {
-                    control.editor.mouseDown(
-                        @intToFloat(f32, types.milliTimestamp()) / 1000.0,
-                        self.ui.pointer_position.x,
-                        self.ui.pointer_position.y,
-                    );
+                    if (has_code_editor) {
+                        control.editor.mouseDown(
+                            @intToFloat(f32, types.milliTimestamp()) / 1000.0,
+                            self.ui.pointer_position.x,
+                            self.ui.pointer_position.y,
+                        );
+                    }
                 },
                 else => {},
             }
@@ -1061,11 +1073,13 @@ pub const InputProcessor = struct {
 
             switch (widget.control) {
                 .code_editor => |*control| {
-                    control.editor.mouseUp(
-                        @intToFloat(f32, types.milliTimestamp()) / 1000.0,
-                        self.ui.pointer_position.x,
-                        self.ui.pointer_position.y,
-                    );
+                    if (has_code_editor) {
+                        control.editor.mouseUp(
+                            @intToFloat(f32, types.milliTimestamp()) / 1000.0,
+                            self.ui.pointer_position.x,
+                            self.ui.pointer_position.y,
+                        );
+                    }
                 },
                 else => {},
             }
@@ -1091,6 +1105,7 @@ pub const InputProcessor = struct {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
             .code_editor => |*control| {
+                if (!has_code_editor) return;
                 switch (button) {
                     .ctrl_left, .ctrl_right => control.ctrl_pressed = true,
                     .shift_left, .shift_right => control.shift_pressed = true,
@@ -1142,7 +1157,7 @@ pub const InputProcessor = struct {
     pub fn buttonUp(self: Self, button: types.Input.Scancode) !void {
         const active_widget = self.ui.focused_widget orelse return;
         switch (active_widget.control) {
-            .code_editor => |*control| switch (button) {
+            .code_editor => |*control| if (has_code_editor) switch (button) {
                 .ctrl_left, .ctrl_right => control.ctrl_pressed = false,
                 .shift_left, .shift_right => control.shift_pressed = false,
                 .alt_left, .alt_right => control.alt_pressed = false,
@@ -1200,7 +1215,8 @@ pub const InputProcessor = struct {
             },
 
             .code_editor => |*control| {
-                control.editor.enterString(string);
+                if (has_code_editor)
+                    control.editor.enterString(string);
             },
 
             else => return, // just eat the event by default
@@ -1427,7 +1443,8 @@ pub fn render(self: UserInterface) !void {
             },
 
             .code_editor => |*control| {
-                control.editor.render();
+                if (has_code_editor)
+                    control.editor.render();
             },
 
             .label => |control| {

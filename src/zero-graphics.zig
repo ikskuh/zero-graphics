@@ -18,9 +18,11 @@ pub const RendererSky = @import("rendering/RendererSky.zig");
 pub const DebugRenderer3D = @import("rendering/DebugRenderer3D.zig");
 pub const ResourceManager = @import("rendering/ResourceManager.zig");
 
-pub const CodeEditor = @import("scintilla/CodeEditor.zig");
-
 pub const Input = @import("Input.zig");
+
+pub usingnamespace if (build_options.enable_code_editor) struct {
+    pub const CodeEditor = @import("scintilla/CodeEditor.zig");
+} else struct {};
 
 pub const UserInterface = @import("UserInterface.zig");
 pub const Editor = @import("Editor.zig");
@@ -30,6 +32,8 @@ pub const Backend = union(enum) {
     wasm,
     desktop,
 };
+
+pub const build_options = @import("root").build_options;
 
 pub const backend: Backend = @import("root").backend;
 

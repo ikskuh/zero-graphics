@@ -222,7 +222,7 @@ pub const Application = struct {
         app.resolution = resolution;
     }
 
-    fn prepareExe(app: *Application, exe: *std.build.LibExeObjStep, app_pkg: std.build.Pkg) void {
+    fn prepareExe(app: *Application, exe: *std.build.LibExeObjStep, app_pkg: std.build.Pkg, platform_id: std.meta.Tag(Platform)) void {
         exe.main_pkg_path = sdkPath("/src");
 
         exe.addPackage(app_pkg);
@@ -240,7 +240,7 @@ pub const Application = struct {
         exe.addIncludePath(sdkPath("/src/scintilla"));
 
         if (app.enable_code_editor) {
-            if (exe.target.getCpuArch() != .wasm32) {
+            if (platform_id != .android and platform_id != .web) {
                 const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
                 scintilla_header.setTarget(exe.target);
                 scintilla_header.use_stage1 = exe.use_stage1;
@@ -265,16 +265,20 @@ pub const Application = struct {
             .dependencies = app.packages.items,
         });
 
+        const options = app.sdk.builder.addOptions();
+        options.addOption(bool, "enable_code_editor", app.enable_code_editor and (platform != .android and platform != .web));
+
         switch (platform) {
             .desktop => |target| {
                 const exe = app.sdk.builder.addExecutable(app.name, sdkPath("/src/main/desktop.zig"));
                 exe.setBuildMode(app.build_mode);
                 exe.setTarget(target);
+                exe.addPackage(options.getPackage("build_options"));
 
                 exe.addPackage(app.sdk.sdl_sdk.getNativePackage("sdl2"));
                 app.sdk.sdl_sdk.link(exe, .dynamic);
 
-                app.prepareExe(exe, app_pkg);
+                app.prepareExe(exe, app_pkg, platform);
 
                 // For desktop versions, we link lib-nfd
                 const libnfd = NFD.makeLib(app.sdk.builder, .ReleaseSafe, target);
@@ -294,8 +298,9 @@ pub const Application = struct {
                     .os_tag = .freestanding,
                     .abi = .musl,
                 });
+                exe.addPackage(options.getPackage("build_options"));
 
-                app.prepareExe(exe, app_pkg);
+                app.prepareExe(exe, app_pkg, platform);
 
                 return app.createCompilation(.{
                     .web = exe,
@@ -327,8 +332,8 @@ pub const Application = struct {
                 );
 
                 for (android_app.libraries) |lib| {
-                    app.prepareExe(lib, app_pkg);
-
+                    app.prepareExe(lib, app_pkg, platform);
+                    lib.addPackage(options.getPackage("build_options"));
                     lib.addPackage(android_app.getAndroidPackage("android"));
                 }
 
