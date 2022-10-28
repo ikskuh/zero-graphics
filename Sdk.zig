@@ -183,6 +183,7 @@ pub const Application = struct {
     resolution: InitialResolution = .{ .windowed = Size{ .width = 1280, .height = 720 } },
 
     permissions: std.ArrayList([]const u8),
+    android_targets: AndroidSdk.AppTargetConfig = .{},
 
     enable_code_editor: bool = true,
 
@@ -327,7 +328,7 @@ pub const Application = struct {
                         .fullscreen = true,
                     }, // app_config: AppConfig,
                     app.build_mode, // mode: std.builtin.Mode,
-                    AndroidSdk.AppTargetConfig{}, // targets: AppTargetConfig,
+                    app.android_targets, // targets: AppTargetConfig,
                     app.sdk.key_store.?, // key_store: KeyStore,
                 );
 
