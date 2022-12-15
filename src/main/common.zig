@@ -6,7 +6,7 @@ export fn zerog_renderer2d_alloc(user_data: ?*anyopaque, size: usize) ?*anyopaqu
     stbttf_log.info("alloc {} bytes with {?}", .{ size, user_data });
     const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(*std.mem.Allocator), user_data orelse @panic("unexpected NULl!")));
 
-    const buffer = allocator.allocAdvanced(u8, 16, size + 16, .exact) catch return null;
+    const buffer = allocator.alignedAlloc(u8, 16, size + 16) catch return null;
     std.mem.writeIntNative(usize, buffer[0..@sizeOf(usize)], buffer.len);
     return buffer.ptr + 16;
 }

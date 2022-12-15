@@ -150,10 +150,10 @@ const ResourceDataHandle = struct {
 pub const CreateResourceDataError = error{ OutOfMemory, InvalidFormat, IoError, FileNotFound };
 
 fn CreateResourceData(comptime ResourceData: type) type {
-    return std.meta.FnPtr(fn (ResourceDataHandle, *ResourceManager) CreateResourceDataError!ResourceData);
+    return *const fn (ResourceDataHandle, *ResourceManager) CreateResourceDataError!ResourceData;
 }
 
-const DestroyResourceData = std.meta.FnPtr(fn (ResourceDataHandle, *ResourceManager) void);
+const DestroyResourceData = *const fn (ResourceDataHandle, *ResourceManager) void;
 
 fn DataSource(comptime ResourceData: type) type {
     return struct {

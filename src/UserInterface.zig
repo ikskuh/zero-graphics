@@ -433,8 +433,8 @@ const Widget = struct {
 
         pub const Config = struct {
             hit_test_visible: bool = true,
-            draw: ?std.meta.FnPtr(fn (Custom, Rectangle, *Renderer, DrawInfo) Renderer.DrawError!void) = null,
-            process_event: ?std.meta.FnPtr(fn (Custom, Event) ?usize) = null,
+            draw: ?*const fn (Custom, Rectangle, *Renderer, DrawInfo) Renderer.DrawError!void = null,
+            process_event: ?*const fn (Custom, Event) ?usize = null,
             /// generic second user data to provide context information for the user data
             context: ?*anyopaque = null,
         };
@@ -1271,7 +1271,9 @@ pub const InputProcessor = struct {
 
                     else => return event,
                 }
-                return event;
+                if (filter.target.ui.hovered_widget == null) {
+                    return event;
+                }
             }
             return null;
         }

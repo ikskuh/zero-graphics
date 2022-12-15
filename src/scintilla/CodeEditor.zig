@@ -22,21 +22,21 @@ const c = struct {
     };
     pub const ZigColor = u32;
     pub const ZigEditorInterface = extern struct {
-        createFont: ?std.meta.FnPtr(fn (*ZigEditorInterface, [*:0]const u8, f32) callconv(.C) ?*ZigFont),
-        destroyFont: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) void),
-        getFontAscent: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) f32),
-        getFontDescent: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) f32),
-        getFontLineGap: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) f32),
-        getFontCharWidth: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont, u32) callconv(.C) f32),
-        measureStringWidth: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont, [*]const u8, usize) callconv(.C) f32),
-        measureCharPositions: ?std.meta.FnPtr(fn (*ZigEditorInterface, ?*ZigFont, [*]const u8, usize, [*]f32) callconv(.C) void),
-        drawString: ?std.meta.FnPtr(fn (*ZigEditorInterface, *const ZigRect, ?*ZigFont, ZigColor, [*]const u8, usize) callconv(.C) void),
-        drawRectangle: ?std.meta.FnPtr(fn (*ZigEditorInterface, *const ZigRect, ZigColor) callconv(.C) void),
-        fillRectangle: ?std.meta.FnPtr(fn (*ZigEditorInterface, *const ZigRect, ZigColor) callconv(.C) void),
-        setClipRect: ?std.meta.FnPtr(fn (*ZigEditorInterface, *const ZigRect) callconv(.C) void),
-        setClipboardContent: ?std.meta.FnPtr(fn (*ZigEditorInterface, [*]const u8, usize) callconv(.C) void),
-        getClipboardContent: ?std.meta.FnPtr(fn (*ZigEditorInterface, [*]u8, usize) callconv(.C) usize),
-        sendNotification: ?std.meta.FnPtr(fn (*ZigEditorInterface, notification: u32) callconv(.C) void),
+        createFont: ?*const fn (*ZigEditorInterface, [*:0]const u8, f32) callconv(.C) ?*ZigFont,
+        destroyFont: ?*const fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) void,
+        getFontAscent: ?*const fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) f32,
+        getFontDescent: ?*const fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) f32,
+        getFontLineGap: ?*const fn (*ZigEditorInterface, ?*ZigFont) callconv(.C) f32,
+        getFontCharWidth: ?*const fn (*ZigEditorInterface, ?*ZigFont, u32) callconv(.C) f32,
+        measureStringWidth: ?*const fn (*ZigEditorInterface, ?*ZigFont, [*]const u8, usize) callconv(.C) f32,
+        measureCharPositions: ?*const fn (*ZigEditorInterface, ?*ZigFont, [*]const u8, usize, [*]f32) callconv(.C) void,
+        drawString: ?*const fn (*ZigEditorInterface, *const ZigRect, ?*ZigFont, ZigColor, [*]const u8, usize) callconv(.C) void,
+        drawRectangle: ?*const fn (*ZigEditorInterface, *const ZigRect, ZigColor) callconv(.C) void,
+        fillRectangle: ?*const fn (*ZigEditorInterface, *const ZigRect, ZigColor) callconv(.C) void,
+        setClipRect: ?*const fn (*ZigEditorInterface, *const ZigRect) callconv(.C) void,
+        setClipboardContent: ?*const fn (*ZigEditorInterface, [*]const u8, usize) callconv(.C) void,
+        getClipboardContent: ?*const fn (*ZigEditorInterface, [*]u8, usize) callconv(.C) usize,
+        sendNotification: ?*const fn (*ZigEditorInterface, notification: u32) callconv(.C) void,
     };
     pub const ScintillaEditor = opaque {};
     pub const ZigString = extern struct {
@@ -127,13 +127,13 @@ pub fn setText(editor: *CodeEditor, text: []const u8) !void {
     c.scintilla_setText(editor.instance, text.ptr, text.len);
 }
 
-pub fn getText(editor: *CodeEditor, allocator: std.mem.Allocator) ![]u8 {
+pub fn getText(editor: *CodeEditor, allocator: std.mem.Allocator) ![:0]u8 {
     var allo = allocator;
     const str = c.scintilla_getText(editor.instance, &allo);
     const ptr = str.ptr orelse return error.OutOfMemory;
     if (str.len == 0)
-        return try allocator.alloc(u8, 0); // we're allocating, as 0 len means the backend didn't allocate
-    return ptr[0..str.len];
+        return try allocator.allocSentinel(u8, 1, 0); // we're allocating, as 0 len means the backend didn't allocate
+    return ptr[0..str.len :0];
 }
 
 pub fn mouseMove(editor: *CodeEditor, x: c_int, y: c_int) void {

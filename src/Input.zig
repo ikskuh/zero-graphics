@@ -434,7 +434,7 @@ pub const Filter = struct {
     pub const Error = error{OutOfMemory};
 
     context: *anyopaque,
-    fetchFn: std.meta.FnPtr(fn (ctx: *anyopaque) Error!?Event),
+    fetchFn: *const fn (ctx: *anyopaque) Error!?Event,
 
     pub fn fetch(self: Filter) Error!?Event {
         return self.fetchFn(self.context);
@@ -447,7 +447,7 @@ pub const Filter = struct {
         }
     }
 
-    pub fn GenericFilter(comptime Target: type, comptime callback: std.meta.FnPtr(fn (*Target, Event) Error!bool)) type {
+    pub fn GenericFilter(comptime Target: type, comptime callback: fn (*Target, Event) Error!bool) type {
         return struct {
             const Instance = @This();
 

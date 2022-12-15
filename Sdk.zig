@@ -244,7 +244,6 @@ pub const Application = struct {
             if (platform_id != .android and platform_id != .web) {
                 const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
                 scintilla_header.setTarget(exe.target);
-                scintilla_header.use_stage1 = exe.use_stage1;
 
                 exe.addPackage(.{
                     .name = "scintilla",

@@ -887,7 +887,7 @@ struct ScintillaEditor : public Scintilla::Editor {
       return ZigString{"", 0};
     }
 
-    char *buffer = static_cast<char *>(zero_graphics_alloc(allocator, lengthDoc));
+    char *buffer = static_cast<char *>(zero_graphics_alloc(allocator, lengthDoc + 1));
     if (buffer == nullptr) {
       return ZigString{nullptr, 0};
     }
