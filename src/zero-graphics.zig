@@ -162,6 +162,64 @@ pub const Color = extern struct {
     b: u8,
     a: u8 = 0xFF,
 
+    pub fn rgb(r: u8, g: u8, b: u8) Color {
+        return rgba(r, g, b, 0xFF);
+    }
+
+    pub fn rgba(r: u8, g: u8, b: u8, a: u8) Color {
+        return Color{ .r = r, .g = g, .b = b, .a = a };
+    }
+
+    pub fn gray(level: u8) Color {
+        return Color{ .r = level, .g = level, .b = level, .a = 0xFF };
+    }
+
+    pub fn rgb_f32(r: f32, g: f32, b: f32) Color {
+        return rgba_f32(r, g, b, 1.0);
+    }
+
+    pub fn rgba_f32(r: f32, g: f32, b: f32, a: f32) Color {
+        return Color{
+            .r = clamp_to_u8(r),
+            .g = clamp_to_u8(g),
+            .b = clamp_to_u8(b),
+            .a = clamp_to_u8(a),
+        };
+    }
+
+    pub fn gray_f32(level: f32) Color {
+        return rgb_f32(level, level, level);
+    }
+
+    fn clamp_to_u8(v: f32) u8 {
+        return @floatToInt(u8, std.math.clamp(std.math.maxInt(u8) * v, 0.0, 255.0));
+    }
+
+    pub fn redf(c: Color) f32 {
+        return @intToFloat(f32, c.r) / 255.0;
+    }
+
+    pub fn greenf(c: Color) f32 {
+        return @intToFloat(f32, c.g) / 255.0;
+    }
+
+    pub fn bluef(c: Color) f32 {
+        return @intToFloat(f32, c.b) / 255.0;
+    }
+
+    pub fn alphaf(c: Color) f32 {
+        return @intToFloat(f32, c.a) / 255.0;
+    }
+
+    pub fn brightness(c: Color) u8 {
+        return clamp_to_u8(c.brightnessf());
+    }
+
+    pub fn brightnessf(c: Color) f32 {
+        // https://en.wikipedia.org/wiki/Relative_luminance
+        return std.math.clamp(0.2126 * c.redf() + 0.7152 * c.greenf() + 0.0722 * c.bluef(), 0.0, 1.0);
+    }
+
     // Support for std.json:
 
     // pub fn jsonStringify(value: @This(), options: std.json.StringifyOptions, writer: anytype) !void {
@@ -188,10 +246,6 @@ pub const Color = extern struct {
 
     fn lerp(a: u8, b: u8, f: f32) u8 {
         return @floatToInt(u8, @intToFloat(f32, a) + f * (@intToFloat(f32, b) - @intToFloat(f32, a)));
-    }
-
-    pub fn gray(level: u8) Color {
-        return Color{ .r = level, .g = level, .b = level, .a = 0xFF };
     }
 
     pub fn withAlpha(color: Color, alpha: u8) Color {
