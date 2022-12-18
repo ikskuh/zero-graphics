@@ -103,7 +103,7 @@ A nice solution would be to make a package `widgets` that exports all possible w
 `ui.widgets`. This way, a configuration can be achieved in the build script, and arbitrary composition
 of widgets is possible, even combining several expansion packs.
 
-## Planned Standard Widgets
+## Planned Standard Controls
 
 - Label
 - Button

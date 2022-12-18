@@ -23,11 +23,6 @@
 //! hm. good thing about this design: it can be made zero-alloc except for dynamic layouts, or text input fields
 //! i guess the main thing that bugged me about UI layouting is that the layout engine has to know about the size of strings
 
-const solutions = struct {
-    //! styling via CSS?
-    //! rendering?
-};
-
 const gui = struct {
     /// A view is a "scene" that displays widgets and manages input and event processing.
     /// It can be considered a "screen" or "window".
