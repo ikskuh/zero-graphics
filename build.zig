@@ -124,11 +124,7 @@ pub fn build(b: *std.build.Builder) !void {
     }
 
     {
-        const ui_demo = sdk.createApplication("ui_demo", "examples/ui/demo.zig");
-        ui_demo.setDisplayName("Zero UI");
-        ui_demo.setPackageName("net.random_projects.zero_graphics.ui_demo");
-        ui_demo.setBuildMode(mode);
-        ui_demo.addPackage(.{
+        const zero_ui_pkg = std.build.Pkg{
             .name = "zero-ui",
             .source = .{ .path = "src/ui/core/ui.zig" },
             .dependencies = &.{
@@ -144,6 +140,17 @@ pub fn build(b: *std.build.Builder) !void {
                     },
                 },
             },
+        };
+
+        const ui_demo = sdk.createApplication("ui_demo", "examples/ui/demo.zig");
+        ui_demo.setDisplayName("Zero UI");
+        ui_demo.setPackageName("net.random_projects.zero_graphics.ui_demo");
+        ui_demo.setBuildMode(mode);
+        ui_demo.addPackage(zero_ui_pkg);
+        ui_demo.addPackage(.{
+            .name = "layout-engine",
+            .source = .{ .path = "src/ui/standard-layout/standard-layout.zig" },
+            .dependencies = &.{zero_ui_pkg},
         });
 
         const ui_demo_exe = ui_demo.compileFor(platform);

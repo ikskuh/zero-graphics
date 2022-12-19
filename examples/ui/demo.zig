@@ -14,6 +14,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const zero_graphics = @import("zero-graphics");
 const zero_ui = @import("zero-ui");
+const layout_engine = @import("layout-engine");
 
 const logger = std.log.scoped(.ui_demo);
 

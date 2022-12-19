@@ -141,63 +141,6 @@ fn layoutNodeForWidget(widget: *gui.Widget) layout_engine.Node {
     };
 }
 
-const layout_engine = struct {
-    /// A rectangle that can either be stored out-of-tree (for example in a widget)
-    /// or in-tree (in the `Bounds` value itself).
-    const Bounds = union(enum) {
-        storeage: Rectangle,
-        reference: *Rectangle,
-
-        pub fn set(bounds: *Bounds, val: Rectangle) void;
-        pub fn get(bounds: Bounds) Rectangle;
-    };
-
-    const Margins = struct {
-        left: u15,
-        right: u15,
-        top: u15,
-        bottom: u15,
-    };
-
-    const VerticalAlignment = enum { stretch, left, center, right }; // stretch expands to available space
-    const HorizontalAlignment = enum { stretch, top, middle, bottom }; // stretch expands to available space
-
-    /// A node in the layout tree, has a position and size
-    const Node = struct {
-        bounds: Bounds,
-
-        min_size: Size,
-        max_size: Size,
-
-        children: []Node,
-        layout: Layout,
-
-        margin: Margins, // outer margins
-        padding: Margins, // inner margins
-
-        vertical_alignment: VerticalAlignment, // layout inside the parent region
-        horizontal_alignment: HorizontalAlignment, // layout inside the parent region
-    };
-
-    const Layout = union(enum) {
-        basic, // all children are layed out in the bounds independent of other children
-        stack: StackLayout, // items are put side-by-side
-        dock: DockLayout, // items dock on an edge of the parent, the last item is expanded into the rest
-        flow: FlowLayout, // flow based layout (similar to CSS flex)
-        table: TableLayout, // row/column based layout
-        canvas: CanvasLayout, // absolute positioning with (x,y) offset
-    };
-
-    const StackLayout = struct {
-        direction: enum {
-            left_to_right,
-            right_to_left,
-            top_to_bottom,
-            bottom_to_top,
-        },
-    };
-};
-
 // usage example
 
 // Window {
