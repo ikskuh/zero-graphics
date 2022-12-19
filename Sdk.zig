@@ -136,6 +136,12 @@ const zero_graphics_pkg = std.build.Pkg{
     },
 };
 
+pub fn getLibraryPackage(sdk: *Sdk, name: []const u8) std.build.Pkg {
+    var pkg = zero_graphics_pkg;
+    pkg.name = name;
+    return sdk.builder.dupePkg(pkg);
+}
+
 pub fn createApplicationSource(sdk: *Sdk, name: []const u8, root_file: std.build.FileSource) *Application {
     validateName(name, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
 

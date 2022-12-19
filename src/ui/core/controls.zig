@@ -13,10 +13,10 @@ pub const ClassID: type = blk: {
             .name = decl.name,
             .value = index,
         };
-        fields = fields ++ [1]ControlClass{class};
+        fields = fields ++ [1]EnumField{class};
     }
 
-    return @Type(.{
+    break :blk @Type(.{
         .Enum = .{
             .layout = .Auto,
             .tag_type = u32,
@@ -37,7 +37,7 @@ pub const ControlClass = struct {
 
 /// The list of all available control classes.
 pub const classes = blk: {
-    var classes: []const ControlClass = &.{};
+    var class_list: []const ControlClass = &.{};
 
     for (std.meta.declarations(raw_control_list)) |decl, index| {
         const class = ControlClass{
@@ -46,13 +46,13 @@ pub const classes = blk: {
             .type = @field(raw_control_list, decl.name),
         };
 
-        classes = classes ++ [1]ControlClass{class};
+        class_list = class_list ++ [1]ControlClass{class};
     }
 
-    if (classes.len == 0)
+    if (class_list.len == 0)
         @compileError("The widget collection is empty. Is your provided widgets package correctly defined?");
 
-    break :blk classes;
+    break :blk class_list;
 };
 
 /// A union of all possible controls, will be stored inside a widget.
@@ -69,7 +69,7 @@ pub const Control: type = blk: {
         fields = fields ++ [1]UnionField{field};
     }
 
-    return @Type(.{
+    break :blk @Type(.{
         .Union = .{
             .layout = .Auto,
             .tag_type = ClassID,
@@ -86,7 +86,7 @@ pub fn className(id: ClassID) []const u8 {
             var strings: []const []const u8 = &.{};
 
             for (std.enums.values(ClassID)) |value, index| {
-                std.debug.assert(strings.len == index);
+                std.debug.assert(@enumToInt(value) == index);
                 strings = strings ++ [1][]const u8{@tagName(ClassID)};
             }
 

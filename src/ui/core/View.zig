@@ -17,7 +17,7 @@ const InputEvent = ui.InputEvent;
 
 /// The root widget of the view. If set, this widget will receive all events
 /// and should be rendered to the user.
-root: ?*Widget,
+widgets: Widget.List,
 
 /// The currently focused widget.
 focus: ?*Widget = null,

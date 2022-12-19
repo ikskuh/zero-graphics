@@ -19,3 +19,5 @@ pub const MouseButton = core_types.MouseButton;
 pub const KeyCode = core_types.KeyCode;
 
 pub const Builder = @import("Builder.zig");
+
+pub const MemoryPool = @import("MemoryPool.zig").MemoryPool;

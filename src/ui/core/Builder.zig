@@ -3,26 +3,28 @@ const ui = @import("ui.zig");
 
 const Builder = @This();
 const Widget = ui.Widget;
-
-fn MemoryPool(comptime T: type) type {}
+const MemoryPool = ui.MemoryPool;
+const List = Widget.List;
 
 pool: MemoryPool(Widget),
+stack: std.ArrayList(*List),
 
-root: ?*Widget = null,
-current: ?*Widget = null,
+top_list: List = .{},
 
 /// Starts the construction of a new widget hierarchy, will
 /// allocate all widgets inside a memory pool.
 pub fn begin(allocator: std.mem.Allocator) Builder {
-    _ = allocator;
     return Builder{
-        //
+        .pool = MemoryPool(Widget).init(allocator),
+        .stack = std.ArrayList(*List).init(allocator),
     };
 }
 
 /// Cancels the construction process and frees all memory.
 /// The builder is unusable after this.
 pub fn cancel(builder: *Builder) void {
+    builder.pool.deinit();
+    builder.stack.deinit();
     builder.* = undefined;
 }
 
@@ -35,8 +37,15 @@ const OutValue = struct {
 /// the tree and a handle to the created memory.
 /// The builder is unusable after this.
 pub fn finish(builder: *Builder) OutValue {
+    var out = OutValue{
+        .memory = builder.pool,
+        .view = ui.View{
+            .widgets = builder.top_list,
+        },
+    };
+    builder.stack.deinit();
     builder.* = undefined;
-    @panic("nope");
+    return out;
 }
 
 //////////////////////////////////////
@@ -44,32 +53,25 @@ pub fn finish(builder: *Builder) OutValue {
 /// Returns a handle to the last added widget.
 /// Asserts that a widget was already added.
 pub fn current(builder: *Builder) *Widget {
-    _ = builder;
-    unreachable;
-}
-
-/// Returns a handle to the widget we currently
-/// add children to.
-/// Asserts that we've entered a widget.
-pub fn parent(builder: *Builder) *Widget {
-    _ = builder;
-    unreachable;
+    const list = builder.insertionList();
+    return Widget.fromNode(if (list.last) |*last| last else unreachable);
 }
 
 /// Enters the current widget. The new widgets
 /// created from now on will be added to the
 /// `current` widget.
-pub fn enter(builder: *Builder) void {
-    _ = builder;
-    unreachable;
+pub fn enter(builder: *Builder) !void {
+    const list = builder.insertionList();
+    const last = Widget.fromNode(if (list.last) |last| last else unreachable);
+    try builder.stack.append(&last.children);
 }
 
 /// Leaves the `parent()` widget. The new widgets
 /// created from now on will be added as siblings
 /// to `parent()`.
+/// Asserts that the builder is currently in a child scope.
 pub fn leave(builder: *Builder) void {
-    _ = builder;
-    unreachable;
+    _ = builder.stack.pop();
 }
 
 /// Creates a new memory node, stores the passed widget
@@ -77,7 +79,20 @@ pub fn leave(builder: *Builder) void {
 /// tree level.
 /// Returns a pointer to the memoized widget.
 pub fn add(builder: *Builder, widget: Widget) !*Widget {
-    _ = builder;
-    _ = widget;
-    unreachable;
+    const storage = try builder.pool.create();
+    errdefer builder.pool.destroy(storage);
+
+    storage.* = widget;
+    builder.insertionList().append(&storage.siblings);
+
+    return storage;
+}
+
+/// Returns the current list of widgets where insertion happens.
+fn insertionList(builder: *Builder) *List {
+    const stack = builder.stack.items;
+    return if (stack.len == 0)
+        &builder.top_list
+    else
+        stack[stack.len - 1];
 }

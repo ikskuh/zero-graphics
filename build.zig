@@ -64,7 +64,7 @@ pub fn build(b: *std.build.Builder) !void {
         converter.install();
     }
 
-    const app = sdk.createApplication("demo_application", "examples/demo-application.zig");
+    const app = sdk.createApplication("demo_application", "examples/features/feature-demo.zig");
     app.setDisplayName("ZeroGraphics Demo");
     app.setPackageName("net.random_projects.zero_graphics.demo");
     app.setBuildMode(mode);
@@ -121,5 +121,33 @@ pub fn build(b: *std.build.Builder) !void {
 
         const run_step = b.step("run-app", "Runs the Android app on the default ADB target");
         run_step.dependOn(run);
+    }
+
+    {
+        const ui_demo = sdk.createApplication("ui_demo", "examples/ui/demo.zig");
+        ui_demo.setDisplayName("Zero UI");
+        ui_demo.setPackageName("net.random_projects.zero_graphics.ui_demo");
+        ui_demo.setBuildMode(mode);
+        ui_demo.addPackage(.{
+            .name = "zero-ui",
+            .source = .{ .path = "src/ui/core/ui.zig" },
+            .dependencies = &.{
+                sdk.getLibraryPackage("zero-graphics"),
+                .{
+                    .name = "controls",
+                    .source = .{ .path = "src/ui/standard-controls/standard-controls.zig" },
+                    .dependencies = &.{
+                        .{
+                            .name = "ui",
+                            .source = .{ .path = "src/ui/core/ui.zig" },
+                        },
+                    },
+                },
+            },
+        });
+
+        const ui_demo_exe = ui_demo.compileFor(platform);
+
+        ui_demo_exe.install();
     }
 }
