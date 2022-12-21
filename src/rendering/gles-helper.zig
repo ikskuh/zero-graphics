@@ -10,7 +10,7 @@ fn QueryExtension(comptime query: []const []const u8) type {
     for (fields) |*fld, i| {
         fld.* = std.builtin.Type.StructField{
             .name = query[i],
-            .field_type = bool,
+            .type = bool,
             .default_value = &false,
             .is_comptime = false,
             .alignment = @alignOf(bool),

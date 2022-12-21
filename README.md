@@ -148,6 +148,12 @@ Requires `SDL2` to be installed.
 
 A window should open with the application in fullscreen.
 
+The following environment variables can control how zero-graphics behaves:
+
+- `ZEROG_FULLSCREEN` is `y` for forced fullscreen or `n` for forced window mode.
+- `ZEROG_RESIZEABLE` is `y` for forced resizable window.
+- `ZEROG_DPI` is a number specifying the pixel density.
+
 ### Web/Wasm version
 
 Includes a teeny tiny web server for debugging.

@@ -1,4 +1,5 @@
 const std = @import("std");
+const logger = std.log.scoped(.zero_graphics_sdk);
 
 fn sdkPath(comptime suffix: []const u8) []const u8 {
     if (suffix[0] != '/') @compileError("sdkPath requires an absolute path!");
@@ -20,6 +21,15 @@ pub const Platform = union(enum) {
     web,
     android,
 };
+
+fn requiresSingleThreaded(target: std.zig.CrossTarget) bool {
+    const info = std.zig.system.NativeTargetInfo.detect(target) catch @panic("invalid");
+    if (info.target.cpu.arch == .arm) // see https://github.com/ziglang/zig/issues/6573
+        return true;
+    if (info.target.cpu.arch == .wasm32) // always
+        return true;
+    return false;
+}
 
 const pkgs = struct {
     const zigimg = std.build.Pkg{
@@ -121,10 +131,6 @@ fn validateName(name: []const u8, allowed_chars: []const u8) void {
     }
 }
 
-pub fn createApplication(sdk: *Sdk, name: []const u8, root_file: []const u8) *Application {
-    return createApplicationSource(sdk, name, .{ .path = root_file });
-}
-
 const zero_graphics_pkg = std.build.Pkg{
     .name = "zero-graphics",
     .source = .{ .path = sdkPath("/src/zero-graphics.zig") },
@@ -140,6 +146,10 @@ pub fn getLibraryPackage(sdk: *Sdk, name: []const u8) std.build.Pkg {
     var pkg = zero_graphics_pkg;
     pkg.name = name;
     return sdk.builder.dupePkg(pkg);
+}
+
+pub fn createApplication(sdk: *Sdk, name: []const u8, root_file: []const u8) *Application {
+    return createApplicationSource(sdk, name, .{ .path = root_file });
 }
 
 pub fn createApplicationSource(sdk: *Sdk, name: []const u8, root_file: std.build.FileSource) *Application {
@@ -175,6 +185,11 @@ pub const InitialResolution = union(enum) {
 
 pub const Permission = AndroidSdk.Permission;
 
+pub const Features = struct {
+    code_editor: bool,
+    file_dialogs: bool,
+};
+
 pub const Application = struct {
     sdk: *Sdk,
     packages: std.ArrayList(std.build.Pkg),
@@ -191,7 +206,12 @@ pub const Application = struct {
     permissions: std.ArrayList([]const u8),
     android_targets: AndroidSdk.AppTargetConfig = .{},
 
-    enable_code_editor: bool = true,
+    /// Set of features not necessarily present on every platform.
+    /// Enable/disable these features to increase/decrease project size.
+    features: Features = .{
+        .code_editor = true,
+        .file_dialogs = false, // not supported by default atm
+    },
 
     pub fn addPermission(app: *Application, perm: Permission) void {
         app.permissions.append(perm.toString()) catch @panic("out of memory!");
@@ -229,7 +249,7 @@ pub const Application = struct {
         app.resolution = resolution;
     }
 
-    fn prepareExe(app: *Application, exe: *std.build.LibExeObjStep, app_pkg: std.build.Pkg, platform_id: std.meta.Tag(Platform)) void {
+    fn prepareExe(app: *Application, exe: *std.build.LibExeObjStep, app_pkg: std.build.Pkg, features: Features, platform: Platform) void {
         exe.main_pkg_path = sdkPath("/src");
 
         exe.addPackage(app_pkg);
@@ -246,20 +266,33 @@ pub const Application = struct {
 
         exe.addIncludePath(sdkPath("/src/scintilla"));
 
-        if (app.enable_code_editor) {
-            if (platform_id != .android and platform_id != .web) {
-                const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
-                scintilla_header.setTarget(exe.target);
+        if (features.code_editor) {
+            const scintilla_header = app.sdk.builder.addTranslateC(.{ .path = sdkPath("/src/scintilla/code_editor.h") });
+            scintilla_header.setTarget(exe.target);
 
-                exe.addPackage(.{
-                    .name = "scintilla",
-                    .source = .{ .generated = &scintilla_header.output_file },
-                });
-                exe.step.dependOn(&scintilla_header.step);
+            exe.addPackage(.{
+                .name = "scintilla",
+                .source = .{ .generated = &scintilla_header.output_file },
+            });
+            exe.step.dependOn(&scintilla_header.step);
 
-                const scintilla = createScintilla(app.sdk.builder);
-                scintilla.setTarget(exe.target);
-                exe.linkLibrary(scintilla);
+            const scintilla = createScintilla(app.sdk.builder);
+            scintilla.setTarget(exe.target);
+            scintilla.single_threaded = requiresSingleThreaded(exe.target);
+            exe.linkLibrary(scintilla);
+        }
+
+        if (features.file_dialogs) {
+            switch (platform) {
+                .desktop => {
+
+                    // For desktop versions, we link lib-nfd
+                    const libnfd = NFD.makeLib(app.sdk.builder, .ReleaseSafe, exe.target);
+                    libnfd.single_threaded = requiresSingleThreaded(exe.target);
+                    exe.linkLibrary(libnfd);
+                    exe.addPackage(NFD.getPackage("nfd"));
+                },
+                else => @panic("file dialogs not supported on target platform."),
             }
         }
     }
@@ -271,25 +304,63 @@ pub const Application = struct {
             .dependencies = app.packages.items,
         });
 
-        const options = app.sdk.builder.addOptions();
-        options.addOption(bool, "enable_code_editor", app.enable_code_editor and (platform != .android and platform != .web));
+        const features = blk: {
+            var features = Features{
+                .code_editor = app.features.code_editor,
+                .file_dialogs = app.features.file_dialogs,
+            };
+
+            if (features.code_editor and (platform == .web or platform == .android)) {
+                features.code_editor = false;
+                logger.warn("Disabling unsupported feature 'code_editor' for platform {s}", .{@tagName(platform)});
+            }
+            if (features.file_dialogs and (platform == .web or platform == .android)) {
+                features.file_dialogs = false;
+                logger.warn("Disabling unsupported feature 'file_dialogs' for platform {s}", .{@tagName(platform)});
+            }
+
+            break :blk features;
+        };
+
+        const options = app.sdk.builder.addWriteFile("target-config.zig", blk: {
+            var list = std.ArrayList(u8).init(app.sdk.builder.allocator);
+            var writer = list.writer();
+
+            writer.writeAll(
+                \\pub const Features = struct { 
+                \\      code_editor: bool,
+                \\      file_dialogs: bool
+                \\};
+                \\
+                \\pub const features = Features {
+            ) catch unreachable;
+            writer.print("\n    .code_editor = {},", .{features.code_editor}) catch unreachable;
+            writer.print("\n    .file_dialogs = {},", .{features.file_dialogs}) catch unreachable;
+            writer.writeAll(
+                \\
+                \\};
+                \\
+            ) catch unreachable;
+
+            break :blk list.toOwnedSlice() catch @panic("oom");
+        });
+
+        const build_options = std.build.Pkg{
+            .name = "build-options",
+            .source = options.getFileSource("target-config.zig").?,
+        };
 
         switch (platform) {
             .desktop => |target| {
                 const exe = app.sdk.builder.addExecutable(app.name, sdkPath("/src/main/desktop.zig"));
                 exe.setBuildMode(app.build_mode);
                 exe.setTarget(target);
-                exe.addPackage(options.getPackage("build_options"));
-
+                exe.addPackage(build_options);
+                exe.single_threaded = requiresSingleThreaded(target);
                 exe.addPackage(app.sdk.sdl_sdk.getNativePackage("sdl2"));
                 app.sdk.sdl_sdk.link(exe, .dynamic);
 
-                app.prepareExe(exe, app_pkg, platform);
-
-                // For desktop versions, we link lib-nfd
-                const libnfd = NFD.makeLib(app.sdk.builder, .ReleaseSafe, target);
-                exe.linkLibrary(libnfd);
-                exe.addPackage(NFD.getPackage("nfd"));
+                app.prepareExe(exe, app_pkg, features, platform);
 
                 return app.createCompilation(.{
                     .desktop = exe,
@@ -304,9 +375,9 @@ pub const Application = struct {
                     .os_tag = .freestanding,
                     .abi = .musl,
                 });
-                exe.addPackage(options.getPackage("build_options"));
+                exe.addPackage(build_options);
 
-                app.prepareExe(exe, app_pkg, platform);
+                app.prepareExe(exe, app_pkg, features, platform);
 
                 return app.createCompilation(.{
                     .web = exe,
@@ -338,8 +409,8 @@ pub const Application = struct {
                 );
 
                 for (android_app.libraries) |lib| {
-                    app.prepareExe(lib, app_pkg, platform);
-                    lib.addPackage(options.getPackage("build_options"));
+                    app.prepareExe(lib, app_pkg, features, platform);
+                    lib.addPackage(build_options);
                     lib.addPackage(android_app.getAndroidPackage("android"));
                 }
 

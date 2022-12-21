@@ -18,7 +18,6 @@ pub const ClassID: type = blk: {
 
     break :blk @Type(.{
         .Enum = .{
-            .layout = .Auto,
             .tag_type = u32,
             .fields = fields,
             .decls = &.{},
@@ -63,7 +62,7 @@ pub const Control: type = blk: {
     for (classes) |class| {
         const field = UnionField{
             .name = class.name,
-            .field_type = class.type,
+            .type = class.type,
             .alignment = @alignOf(class.type),
         };
         fields = fields ++ [1]UnionField{field};
@@ -87,11 +86,47 @@ pub fn className(id: ClassID) []const u8 {
 
             for (std.enums.values(ClassID)) |value, index| {
                 std.debug.assert(@enumToInt(value) == index);
-                strings = strings ++ [1][]const u8{@tagName(ClassID)};
+                strings = strings ++ [1][]const u8{@tagName(value)};
             }
 
             break :blk strings;
         };
     };
     return T.items[@enumToInt(id)];
+}
+
+////////////////////////////////////////////
+// Common widget API:
+
+pub fn init(ctrl: *Control, allocator: std.mem.Allocator) !void {
+    switch (ctrl.*) {
+        inline else => |*c| if (@hasDecl(@TypeOf(c.*), "init"))
+            try c.init(allocator),
+    }
+}
+
+pub fn deinit(ctrl: *Control) !void {
+    switch (ctrl.*) {
+        inline else => |*c| if (@hasDecl(@TypeOf(c.*), "deinit"))
+            try c.deinit(),
+    }
+}
+
+pub fn canReceiveFocus(ctrl: *Control) bool {
+    return switch (ctrl.*) {
+        inline else => |*c| c.canReceiveFocus(),
+    };
+}
+
+////////////////////////////////////////////
+// Safety checks:
+
+comptime {
+    // ensure all controls will be instantiated, and
+    // all functions are verified, even if not referenced
+    // by any code yet.
+    for (std.meta.declarations(@This())) |decl| {
+        if (decl.is_pub)
+            _ = @field(@This(), decl.name);
+    }
 }

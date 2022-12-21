@@ -132,11 +132,11 @@ fn validateSignature(comptime Container: type, comptime symbol: []const u8, comp
 
             const func_info: std.builtin.Type.Fn = info.Fn;
 
-            if (func_info.args.len != expected_argv.len)
+            if (func_info.params.len != expected_argv.len)
                 @compileError("Argument mismatch for Application." ++ symbol);
 
             for (expected_argv) |expected, i| {
-                if (func_info.args[i].arg_type != expected)
+                if (func_info.params[i].type != expected)
                     @compileError("Type mismatch for Application." ++ symbol);
             }
         } else {

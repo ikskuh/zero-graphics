@@ -728,7 +728,7 @@ pub const Builder = struct {
             pub const Control = blk: {
                 inline for (std.meta.fields(Widget.Control)) |fld| {
                     if (std.mem.eql(u8, fld.name, @tagName(widget)))
-                        break :blk fld.field_type;
+                        break :blk fld.type;
                 }
                 @compileError("Unknown widget type:");
             };

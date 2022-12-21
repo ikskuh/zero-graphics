@@ -1,0 +1,37 @@
+Panel {
+  vertical-alignment:   center;
+  horizontal-alignment: center;
+
+  TableLayout {
+    columns: auto, 300;
+    rows:    auto, auto, auto, auto;
+
+    company_logo : Picture {
+      vertical-alignment: center;
+    }
+
+    Label {
+      text: "Username:";
+    }
+
+    username : TextBox { }
+    
+    Label {
+      text: "Password:";
+    }
+
+    password : TextBox {
+      password-box: true;
+    }
+
+    cancel_button : Button {
+      horizontal-alignment: left;
+      text: "Cancel";
+    }
+
+    login_button : Button {
+      horizontal-alignment: right;
+      text: "Login";
+    }
+  }
+}

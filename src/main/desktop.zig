@@ -6,7 +6,7 @@ const c = @import("sdl2");
 pub const Application = @import("application");
 const app_meta = @import("application-meta");
 pub const CoreApplication = @import("../CoreApplication.zig");
-pub const build_options = @import("build_options");
+pub const build_options = @import("build-options");
 
 pub const backend: zerog.Backend = .desktop;
 
@@ -159,10 +159,10 @@ pub fn main() !void {
     var input_queue = zerog.Input.init(std.heap.c_allocator);
     defer input_queue.deinit();
 
-    if (build_options.enable_code_editor) {
+    if (build_options.features.code_editor) {
         try zerog.CodeEditor.init();
     }
-    defer if (build_options.enable_code_editor) {
+    defer if (build_options.features.code_editor) {
         zerog.CodeEditor.deinit();
     };
 
@@ -537,9 +537,9 @@ fn translateSdlScancode(scancode: c.SDL_Scancode) ?zerog.Input.Scancode {
     };
 }
 
-pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?*const anyopaque {
+pub fn loadOpenGlFunction(_: void, function: [:0]const u8) ?zerog.gles.FunctionPointer {
     // logger.debug("getting entry point for '{s}'", .{function});
-    return c.SDL_GL_GetProcAddress(function.ptr);
+    return @alignCast(@typeInfo(zerog.gles.FunctionPointer).Pointer.alignment, c.SDL_GL_GetProcAddress(function.ptr));
 }
 
 fn sdlPanic() noreturn {
@@ -548,7 +548,7 @@ fn sdlPanic() noreturn {
 
 pub fn getDisplayDPI() f32 {
     // Env var always overrides the
-    if (std.process.getEnvVarOwned(std.heap.c_allocator, "DUNSTBLICK_DPI")) |env| {
+    if (std.process.getEnvVarOwned(std.heap.c_allocator, "ZEROG_DPI")) |env| {
         defer std.heap.c_allocator.free(env);
         if (std.fmt.parseFloat(f32, env)) |value| {
             return value;

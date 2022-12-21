@@ -22,13 +22,41 @@ widgets: Widget.List,
 /// The currently focused widget.
 focus: ?*Widget = null,
 
+/// Stores pending events emitted by widgets.
+event_queue: ui.RingBuffer(Event, 64) = .{},
+
 pub fn pushInput(view: *View, input: InputEvent) void {
     _ = view;
     _ = input;
 }
 
 pub fn pullEvent(view: *View) ?Event {
-    //
-    _ = view;
-    return null;
+    return view.event_queue.pull();
+}
+
+pub fn init(view: *View, allocator: std.mem.Allocator) !void {
+    try view.recursiveInit(view.widgets, allocator);
+}
+
+fn recursiveInit(view: *View, list: Widget.List, allocator: std.mem.Allocator) !void {
+    var it = Widget.Iterator.init(list, .bottom_to_top);
+    while (it.next()) |w| {
+        try w.init(allocator);
+        try view.recursiveInit(w.children);
+    }
+}
+
+/// Releases the resources allocated by `Widget.init`.
+///
+/// **NOTE:** This function should not be called manually. Use `View.init` instead!
+pub fn deinit(view: *View) void {
+    view.recursiveDeinit(view.widgets);
+}
+
+fn recursiveDeinit(view: *View, list: Widget.List) !void {
+    var it = Widget.Iterator.init(list, .bottom_to_top);
+    while (it.next()) |w| {
+        try w.deinit();
+        try view.recursiveDeinit(w.children);
+    }
 }

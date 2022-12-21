@@ -77,7 +77,6 @@ pub fn build(b: *std.build.Builder) !void {
     {
         const desktop_exe = app.compileFor(platform);
         desktop_exe.install();
-
         app_only_step.dependOn(&desktop_exe.data.desktop.install_step.?.step);
 
         const run_cmd = desktop_exe.run();

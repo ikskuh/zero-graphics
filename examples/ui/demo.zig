@@ -33,58 +33,66 @@ pub fn init(app: *Application) !void {
         logger.info("- {s}", .{@tagName(class_id)});
     }
 
+    // Construct the following ui sketch:
+    //
+    // +---------------------------------------------------------+
+    // |                                                         |
+    // |                                                         |
+    // |                                                         |
+    // |               +-------------------------+               |
+    // |               |                         |               |
+    // |               |        /^^^^^^\         |               |
+    // |               |        | Logo |         |               |
+    // |               |        \______/         |               |
+    // |               |                         |               |
+    // |               | Username: [           ] |               |
+    // |               | Password: [           ] |               |
+    // |               |                         |               |
+    // |               | [Cancel]        [Login] |               |
+    // |               |                         |               |
+    // |               +-------------------------+               |
+    // |                                                         |
+    // |                                                         |
+    // |                                                         |
+    // +---------------------------------------------------------+
+    //
+    //
     const ui_data = blk: {
         var builder = zero_ui.Builder.begin(core().allocator);
         errdefer builder.cancel();
 
-        _ = try builder.add(zero_ui.Widget{
-            .control = .{
-                .Panel = .{},
-            },
+        _ = try builder.add(.{
+            .Panel = .{},
         });
 
         {
             try builder.enter();
             defer builder.leave();
 
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .Picture = .{},
-                },
+            _ = try builder.add(.{
+                .Picture = .{},
             });
 
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .Label = .{},
-                },
+            _ = try builder.add(.{
+                .Label = .{ .text = "Username:" },
             });
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .TextBox = .{},
-                },
+            _ = try builder.add(.{
+                .TextBox = .{},
             });
 
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .Label = .{},
-                },
+            _ = try builder.add(.{
+                .Label = .{ .text = "Password:" },
             });
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .TextBox = .{},
-                },
+            _ = try builder.add(.{
+                .TextBox = .{ .password_box = true },
             });
 
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .Button = .{ .text = "Cancel" },
-                },
+            _ = try builder.add(.{
+                .Button = .{ .text = "Cancel" },
             });
 
-            _ = try builder.add(zero_ui.Widget{
-                .control = .{
-                    .Button = .{ .text = "Login" },
-                },
+            _ = try builder.add(.{
+                .Button = .{ .text = "Login" },
             });
         }
 
@@ -130,7 +138,9 @@ pub fn update(app: *Application) !bool {
             .pointer_press => {},
             .pointer_release => {},
             .text_input => {},
-            .key_down => {},
+            .key_down => |key| if (key == .escape) {
+                return false;
+            },
             .key_up => {},
         }
     }

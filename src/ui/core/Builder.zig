@@ -3,6 +3,7 @@ const ui = @import("ui.zig");
 
 const Builder = @This();
 const Widget = ui.Widget;
+const Control = ui.controls.Control;
 const MemoryPool = ui.MemoryPool;
 const List = Widget.List;
 
@@ -74,15 +75,17 @@ pub fn leave(builder: *Builder) void {
     _ = builder.stack.pop();
 }
 
-/// Creates a new memory node, stores the passed widget
-/// into it, then appends the widget to the current
+/// Creates a new memory node, stores the passed control
+/// into a new widget, then appends the widget to the current
 /// tree level.
 /// Returns a pointer to the memoized widget.
-pub fn add(builder: *Builder, widget: Widget) !*Widget {
+pub fn add(builder: *Builder, control: Control) !*Widget {
     const storage = try builder.pool.create();
     errdefer builder.pool.destroy(storage);
 
-    storage.* = widget;
+    storage.* = Widget{
+        .control = control,
+    };
     builder.insertionList().append(&storage.siblings);
 
     return storage;

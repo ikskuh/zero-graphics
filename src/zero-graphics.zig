@@ -20,7 +20,7 @@ pub const ResourceManager = @import("rendering/ResourceManager.zig");
 
 pub const Input = @import("Input.zig");
 
-pub usingnamespace if (build_options.enable_code_editor) struct {
+pub usingnamespace if (build_options.features.code_editor) struct {
     pub const CodeEditor = @import("scintilla/CodeEditor.zig");
 } else struct {};
 
@@ -44,6 +44,10 @@ pub const Point = struct {
 
     x: i16,
     y: i16,
+
+    pub fn new(x: i16, y: i16) Point {
+        return Point{ .x = x, .y = y };
+    }
 
     pub fn distance(a: Point, b: Point) u16 {
         return std.math.sqrt(distance2(a, b));
@@ -138,6 +142,10 @@ pub const Size = struct {
 
     width: u15,
     height: u15,
+
+    pub fn new(w: u15, h: u15) Size {
+        return Size{ .width = w, .height = h };
+    }
 
     pub fn isEmpty(self: Size) bool {
         return (self.width == 0) or (self.height == 0);

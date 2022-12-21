@@ -13,8 +13,8 @@ const zg = @import("zero-graphics");
 pub const Point: type = zg.Point;
 pub const Size: type = zg.Size;
 pub const Rectangle: type = zg.Rectangle;
-pub const MouseButton: type = zg.MouseButton;
-pub const KeyCode: type = zg.KeyCode;
+pub const MouseButton: type = zg.Input.MouseButton;
+pub const KeyCode: type = zg.Input.Scancode;
 
 comptime {
     std.debug.assert(@hasField(Point, "x"));
@@ -33,6 +33,6 @@ comptime {
     std.debug.assert(@hasField(KeyCode, "space"));
     std.debug.assert(@hasField(KeyCode, "return"));
 
-    std.debug.assert(@hasField(MouseButton, "left"));
-    std.debug.assert(@hasField(MouseButton, "right"));
+    std.debug.assert(@hasField(MouseButton, "primary"));
+    std.debug.assert(@hasField(MouseButton, "secondary"));
 }
