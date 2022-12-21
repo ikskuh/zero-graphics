@@ -590,7 +590,7 @@ pub fn render(self: Self, screen_size: Size) void {
         size: usize = 0,
 
         fn actualClipRect(stack: ClipStack) ?Rectangle {
-            const full_screen = Rectangle.init(Point.zero, stack.screen_size);
+            const full_screen = Rectangle.new(Point.zero, stack.screen_size);
 
             var clip_rect = full_screen;
             for (stack.rectangles[0 .. stack.size + 1]) |rect| {
@@ -626,7 +626,7 @@ pub fn render(self: Self, screen_size: Size) void {
                 gles.enable(gles.SCISSOR_TEST);
                 gles.scissor(
                     clip_rect.x,
-                    stack.screen_size.height - clip_rect.y - clip_rect.height - 1,
+                    stack.screen_size.height - clip_rect.y - clip_rect.height,
                     clip_rect.width,
                     clip_rect.height,
                 );
@@ -641,7 +641,7 @@ pub fn render(self: Self, screen_size: Size) void {
             .screen_size = screen_size,
             .rectangles = undefined,
         };
-        stack.rectangles[0] = Rectangle.init(Point.zero, screen_size);
+        stack.rectangles[0] = Rectangle.new(Point.zero, screen_size);
         defer gles.disable(gles.SCISSOR_TEST);
         for (self.draw_calls.items) |draw_call| {
             switch (draw_call) {
@@ -654,7 +654,7 @@ pub fn render(self: Self, screen_size: Size) void {
                     if (stack.size > 0) {
                         stack.size -= 1;
                     } else {
-                        stack.rectangles[0] = Rectangle.init(Point.zero, screen_size);
+                        stack.rectangles[0] = Rectangle.new(Point.zero, screen_size);
                     }
                     stack.setClipState();
                 },
@@ -663,7 +663,7 @@ pub fn render(self: Self, screen_size: Size) void {
                     stack.setClipState();
                 },
                 .clear_clip_rect => {
-                    stack.rectangles[stack.size] = Rectangle.init(Point.zero, screen_size);
+                    stack.rectangles[stack.size] = Rectangle.new(Point.zero, screen_size);
                     stack.setClipState();
                 },
 
@@ -768,10 +768,10 @@ pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
 }
 
 pub fn drawTexture(self: *Self, rectangle: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
-    return self.drawPartialTexture(rectangle, texture, Rectangle.init(Point.zero, Size{ .width = texture.width, .height = texture.height }), tint);
+    return self.drawPartialTexture(rectangle, texture, Rectangle.new(Point.zero, Size{ .width = texture.width, .height = texture.height }), tint);
 }
 pub fn drawTexturePixels(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, tint: ?Color) DrawError!void {
-    return self.drawPartialTexturePixels(real_rect, texture, Rectangle.init(Point.zero, Size{ .width = texture.width, .height = texture.height }), tint);
+    return self.drawPartialTexturePixels(real_rect, texture, Rectangle.new(Point.zero, Size{ .width = texture.width, .height = texture.height }), tint);
 }
 
 /// Copies the given texture to the screen

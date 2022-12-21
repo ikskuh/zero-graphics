@@ -99,14 +99,23 @@ pub const Iterator = struct {
 };
 
 /// Moves the widget on the screen, relative to its parent.
+/// **NOTE:** If a layout engine is used, it might override the values set here.
 pub fn setPosition(widget: *Widget, pos: ui.Point) void {
     widget.bounds.position = pos;
 }
 
 /// Resizes the widget, respecting size constraints.
+/// **NOTE:** If a layout engine is used, it might override the values set here.
 pub fn setSize(widget: *Widget, size: ui.Size) void {
     widget.bounds.size = ui.Size.new(
         std.math.clamp(size.width, widget.bounds.min_size.width, widget.bounds.max_size.width),
         std.math.clamp(size.height, widget.bounds.min_size.height, widget.bounds.max_size.height),
     );
+}
+
+/// Sets the position and size of the widget, respecting size constraints
+/// **NOTE:** If a layout engine is used, it might override the values set here.
+pub fn setBounds(widget: *Widget, rectangle: ui.Rectangle) void {
+    widget.setPosition(rectangle.position());
+    widget.setSize(rectangle.size());
 }

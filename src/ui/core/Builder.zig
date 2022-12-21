@@ -55,7 +55,7 @@ pub fn finish(builder: *Builder) OutValue {
 /// Asserts that a widget was already added.
 pub fn current(builder: *Builder) *Widget {
     const list = builder.insertionList();
-    return Widget.fromNode(if (list.last) |*last| last else unreachable);
+    return Widget.fromNode(if (list.last) |last| last else unreachable);
 }
 
 /// Enters the current widget. The new widgets

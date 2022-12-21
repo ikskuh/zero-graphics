@@ -15,6 +15,7 @@ const builtin = @import("builtin");
 const zero_graphics = @import("zero-graphics");
 const zero_ui = @import("zero-ui");
 const layout_engine = @import("layout-engine");
+const render_engine = @import("render-engine");
 
 const logger = std.log.scoped(.ui_demo);
 
@@ -25,8 +26,14 @@ const Application = @This();
 core_view: zero_ui.View = undefined,
 widget_pool: zero_ui.MemoryPool(zero_ui.Widget) = undefined,
 
+renderer2d: zero_graphics.Renderer2D,
+gui_renderer: render_engine.Renderer,
+
 pub fn init(app: *Application) !void {
-    app.* = Application{};
+    app.* = Application{
+        .renderer2d = undefined,
+        .gui_renderer = undefined,
+    };
 
     logger.info("available controls:", .{});
     for (std.enums.values(zero_ui.controls.ClassID)) |class_id| {
@@ -64,6 +71,7 @@ pub fn init(app: *Application) !void {
         _ = try builder.add(.{
             .Panel = .{},
         });
+        builder.current().setBounds(.{ .x = (480 - 318) / 2, .y = (320 - 284) / 2, .width = 318, .height = 284 });
 
         {
             try builder.enter();
@@ -72,28 +80,37 @@ pub fn init(app: *Application) !void {
             _ = try builder.add(.{
                 .Picture = .{},
             });
+            builder.current().setBounds(.{ .x = 126, .y = 13, .width = 66, .height = 67 });
 
             _ = try builder.add(.{
                 .Label = .{ .text = "Username:" },
             });
+            builder.current().setBounds(.{ .x = 41, .y = 95, .width = 79, .height = 42 });
+
             _ = try builder.add(.{
                 .TextBox = .{},
             });
+            builder.current().setBounds(.{ .x = 120, .y = 95, .width = 157, .height = 42 });
 
             _ = try builder.add(.{
                 .Label = .{ .text = "Password:" },
             });
+            builder.current().setBounds(.{ .x = 41, .y = 153, .width = 79, .height = 42 });
+
             _ = try builder.add(.{
                 .TextBox = .{ .password_box = true },
             });
+            builder.current().setBounds(.{ .x = 120, .y = 153, .width = 157, .height = 42 });
 
             _ = try builder.add(.{
                 .Button = .{ .text = "Cancel" },
             });
+            builder.current().setBounds(.{ .x = 15, .y = 208, .width = 115, .height = 31 });
 
             _ = try builder.add(.{
                 .Button = .{ .text = "Login" },
             });
+            builder.current().setBounds(.{ .x = 190, .y = 208, .width = 115, .height = 31 });
         }
 
         break :blk builder.finish();
@@ -104,9 +121,17 @@ pub fn init(app: *Application) !void {
     errdefer app.widget_pool.deinit();
 
     app.printWidgetTree();
+
+    app.renderer2d = try core().resources.createRenderer2D();
+    errdefer app.renderer2d.deinit();
+
+    app.gui_renderer = try render_engine.Renderer.init(&app.renderer2d);
+    errdefer app.gui_renderer.deinit();
 }
 
 pub fn deinit(app: *Application) void {
+    app.gui_renderer.deinit();
+    app.renderer2d.deinit();
     app.widget_pool.deinit();
     app.* = undefined;
 }
@@ -129,23 +154,36 @@ fn printWidgetTreeInner(app: *Application, list: zero_ui.Widget.List, depth: usi
 }
 
 pub fn update(app: *Application) !bool {
-
-    // TODO: process input events here:
     while (core().input.fetch()) |event| {
         switch (event) {
             .quit => return false,
-            .pointer_motion => {},
-            .pointer_press => {},
-            .pointer_release => {},
-            .text_input => {},
+            .pointer_motion => |pos| app.core_view.pushInput(.{ .mouse_motion = pos }),
+            .pointer_press => |btn| app.core_view.pushInput(.{ .mouse_button_down = btn }),
+            .pointer_release => |btn| app.core_view.pushInput(.{ .mouse_button_up = btn }),
+            .text_input => |input| app.core_view.pushInput(.{ .text_input = input.text }),
             .key_down => |key| if (key == .escape) {
                 return false;
+            } else {
+                app.core_view.pushInput(.{ .key_down = .{ .scancode = @enumToInt(key), .key = key } });
             },
-            .key_up => {},
+            .key_up => |key| app.core_view.pushInput(.{ .key_up = .{ .scancode = @enumToInt(key), .key = key } }),
+        }
+
+        while (app.core_view.pullEvent()) |ui_event| {
+            logger.info("received ui event: {}", .{ui_event});
         }
     }
 
-    _ = app;
+    app.renderer2d.reset();
+
+    try app.renderer2d.drawRectangle(.{
+        .x = 0,
+        .y = 0,
+        .width = 480,
+        .height = 320,
+    }, zero_graphics.Color.white);
+
+    try app.gui_renderer.render(app.core_view, core().screen_size);
 
     return true;
 }
@@ -153,10 +191,9 @@ pub fn update(app: *Application) !bool {
 pub fn render(app: *Application) !void {
     const gl = zero_graphics.gles;
 
-    gl.clearColor(0.3, 0.3, 0.3, 1.0);
+    gl.clearColor(0.0, 0.0, 0.5, 1.0);
     gl.clearDepthf(1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // Render your application here
-    _ = app;
+    app.renderer2d.render(core().screen_size);
 }

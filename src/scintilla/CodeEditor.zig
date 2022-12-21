@@ -96,7 +96,7 @@ pub fn create(editor: *CodeEditor, renderer: *Renderer) !void {
         .position = undefined,
         .notifications = NotificationSet{},
     };
-    editor.setPosition(Rectangle.init(Point.zero, zero_graphics.CoreApplication.get().screen_size));
+    editor.setPosition(Rectangle.new(Point.zero, zero_graphics.CoreApplication.get().screen_size));
 }
 
 pub fn destroy(editor: *CodeEditor) void {

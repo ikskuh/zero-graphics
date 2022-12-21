@@ -3,7 +3,7 @@ const std = @import("std");
 pub const loadOpenGlFunction = @import("root").loadOpenGlFunction;
 pub const milliTimestamp = @import("root").milliTimestamp;
 pub const getDisplayDPI = @import("root").getDisplayDPI;
-pub const CoreApplication = @import("root").CoreApplication;
+pub const CoreApplication = @import("CoreApplication.zig");
 pub const Application = @import("root").Application;
 
 // opengl docs can be found here:
@@ -49,6 +49,10 @@ pub const Point = struct {
         return Point{ .x = x, .y = y };
     }
 
+    pub fn add(a: Point, b: Point) Point {
+        return new(a.x + b.x, a.y + b.y);
+    }
+
     pub fn distance(a: Point, b: Point) u16 {
         return std.math.sqrt(distance2(a, b));
     }
@@ -79,7 +83,7 @@ pub const Rectangle = struct {
         return r.y + r.height - 1;
     }
 
-    pub fn init(pos: Point, siz: Size) Rectangle {
+    pub fn new(pos: Point, siz: Size) Rectangle {
         return Rectangle{
             .x = pos.x,
             .y = pos.y,
@@ -96,7 +100,7 @@ pub const Rectangle = struct {
     }
 
     pub fn position(self: Rectangle) Point {
-        return Point{ .x = self.y, .y = self.y };
+        return Point{ .x = self.x, .y = self.y };
     }
 
     pub fn size(self: Rectangle) Size {

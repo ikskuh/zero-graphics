@@ -123,11 +123,12 @@ pub fn build(b: *std.build.Builder) !void {
     }
 
     {
+        const zero_g_pkg = sdk.getLibraryPackage("zero-graphics");
         const zero_ui_pkg = std.build.Pkg{
             .name = "zero-ui",
             .source = .{ .path = "src/ui/core/ui.zig" },
             .dependencies = &.{
-                sdk.getLibraryPackage("zero-graphics"),
+                zero_g_pkg,
                 .{
                     .name = "controls",
                     .source = .{ .path = "src/ui/standard-controls/standard-controls.zig" },
@@ -150,6 +151,11 @@ pub fn build(b: *std.build.Builder) !void {
             .name = "layout-engine",
             .source = .{ .path = "src/ui/standard-layout/standard-layout.zig" },
             .dependencies = &.{zero_ui_pkg},
+        });
+        ui_demo.addPackage(.{
+            .name = "render-engine",
+            .source = .{ .path = "src/ui/standard-renderer/standard-renderer.zig" },
+            .dependencies = &.{ zero_ui_pkg, zero_g_pkg },
         });
 
         const ui_demo_exe = ui_demo.compileFor(platform);

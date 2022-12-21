@@ -5,7 +5,7 @@ const logger = std.log.scoped(.wasm_backend);
 const gles = @import("../gl_es_2v0.zig");
 const zerog = @import("../zero-graphics.zig");
 pub const Application = @import("application");
-pub const CoreApplication = @import("../CoreApplication.zig");
+pub const CoreApplication = zerog.CoreApplication;
 pub const build_options = @import("build-options");
 
 comptime {

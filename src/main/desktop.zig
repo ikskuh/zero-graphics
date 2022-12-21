@@ -5,7 +5,7 @@ const zerog = @import("../zero-graphics.zig");
 const c = @import("sdl2");
 pub const Application = @import("application");
 const app_meta = @import("application-meta");
-pub const CoreApplication = @import("../CoreApplication.zig");
+pub const CoreApplication = zerog.CoreApplication;
 pub const build_options = @import("build-options");
 
 pub const backend: zerog.Backend = .desktop;
