@@ -119,7 +119,7 @@ pub fn init(app: *Application) !void {
             builder.current().setBounds(.{ .x = 41, .y = 153, .width = 75, .height = 42 });
 
             _ = try builder.add(.{
-                .TextBox = .{ .flags = .{ .password = true } },
+                .TextBox = .{},
             });
             builder.current().setBounds(.{ .x = 120, .y = 153, .width = 157, .height = 42 });
 
@@ -140,6 +140,8 @@ pub fn init(app: *Application) !void {
     app.core_view = ui_data.view;
     app.widget_pool = ui_data.memory;
     errdefer app.widget_pool.deinit();
+
+    try app.core_view.init(core().allocator);
 }
 
 pub fn deinit(app: *Application) void {

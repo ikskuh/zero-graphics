@@ -54,10 +54,6 @@ pub const Renderer = struct {
         renderer.* = undefined;
     }
 
-    pub fn render(renderer: *Renderer, view: View, screen_size: Size) !void {
-        try renderer.renderWidgetList(view, Rectangle.new(Point.zero, screen_size), view.widgets);
-    }
-
     pub fn createFont(renderer: *Renderer, font_data: []const u8, font_size: u15) !ui.Font {
         const inner = try renderer.graphics.createFont(font_data, font_size);
         errdefer renderer.graphics.destroyFont(inner);
@@ -112,14 +108,31 @@ pub const Renderer = struct {
         renderer.image_pool.destroy(img);
     }
 
-    fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List) error{OutOfMemory}!void {
-        var it = Widget.Iterator.init(list, .bottom_to_top);
-        while (it.next()) |widget| {
-            try renderer.renderWidget(view, target_area, widget);
+    const FocusInfo = struct {
+        widget: *Widget,
+        area: Rectangle,
+    };
+
+    pub fn render(renderer: *Renderer, view: View, screen_size: Size) !void {
+        var focus_info: ?FocusInfo = null;
+        try renderer.renderWidgetList(view, Rectangle.new(Point.zero, screen_size), view.widgets, &focus_info);
+
+        if (focus_info) |focus| {
+            try renderer.graphics.drawRectangle(
+                focus.area.grow(2),
+                Color.red,
+            );
         }
     }
 
-    fn renderWidget(renderer: *Renderer, view: View, target_area: Rectangle, widget: *Widget) error{OutOfMemory}!void {
+    fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List, focus_info: *?FocusInfo) error{OutOfMemory}!void {
+        var it = Widget.Iterator.init(list, .bottom_to_top);
+        while (it.next()) |widget| {
+            try renderer.renderWidget(view, target_area, widget, focus_info);
+        }
+    }
+
+    fn renderWidget(renderer: *Renderer, view: View, target_area: Rectangle, widget: *Widget, focus_info: *?FocusInfo) error{OutOfMemory}!void {
         if (widget.visibility != .visible)
             return;
 
@@ -129,12 +142,19 @@ pub const Renderer = struct {
         const size = widget.bounds.size;
         const area = Rectangle.new(position, size);
 
+        if (widget == view.focus) {
+            focus_info.* = FocusInfo{
+                .widget = widget,
+                .area = area,
+            };
+        }
+
         try g.pushClipRectangle(area);
         defer g.popClipRectangle() catch {};
 
         try renderer.renderControl(area, widget.control);
 
-        try renderer.renderWidgetList(view, area, widget.children);
+        try renderer.renderWidgetList(view, area, widget.children, focus_info);
     }
 
     fn renderControl(renderer: *Renderer, target_area: Rectangle, control: Control) error{OutOfMemory}!void {
@@ -277,6 +297,14 @@ pub const Renderer = struct {
                         t.area_light,
                     );
                 }
+
+                try g.drawString(
+                    Font.from(text_box.font orelse renderer.default_font).inner,
+                    text_box.getText(),
+                    b.x + 2,
+                    b.y + 2,
+                    t.text,
+                );
             },
 
             .Picture => |pic| if (pic.image) |image| {

@@ -137,6 +137,16 @@ pub fn build(b: *std.build.Builder) !void {
                             .name = "ui",
                             .source = .{ .path = "src/ui/core/ui.zig" },
                         },
+                        .{
+                            .name = "TextEditor",
+                            .source = .{ .path = "vendor/text-editor/src/TextEditor.zig" },
+                            .dependencies = &.{
+                                .{
+                                    .name = "ziglyph",
+                                    .source = .{ .path = "vendor/ziglyph/src/ziglyph.zig" },
+                                },
+                            },
+                        },
                     },
                 },
             },
@@ -157,6 +167,8 @@ pub fn build(b: *std.build.Builder) !void {
             .source = .{ .path = "src/ui/standard-renderer/standard-renderer.zig" },
             .dependencies = &.{ zero_ui_pkg, zero_g_pkg },
         });
+
+        ui_demo.setInitialResolution(.{ .windowed = .{ .width = 480, .height = 320 } });
 
         const ui_demo_exe = ui_demo.compileFor(platform);
 

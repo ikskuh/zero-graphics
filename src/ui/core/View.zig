@@ -47,6 +47,10 @@ pub fn pushInput(view: *View, input: InputEvent) void {
             const clicked = view.widgetFromPosition(view.mouse_position);
             if (clicked) |widget| {
                 if (view.clicked_widgets.get(button) == widget) {
+                    if (widget.canReceiveFocus()) {
+                        view.focus = widget;
+                    }
+
                     std.log.err("handle clicked for widget {s}", .{@tagName(widget.control)});
                 }
             }
@@ -59,14 +63,33 @@ pub fn pushInput(view: *View, input: InputEvent) void {
                 _ = widget;
             }
         },
-        .key_down => {
-            //
+        .key_down => |key_info| {
+            if (view.focus) |focused_widget| {
+                if (focused_widget.sendInput(view, input) == .ignore)
+                    return;
+            }
+
+            switch (key_info.key) {
+                .tab => {
+                    // TODO: Move focus
+                },
+                .space, .@"return", .keypad_enter => {
+                    // TODO: Send click
+                },
+                else => {},
+            }
         },
         .key_up => {
-            //
+            if (view.focus) |focused_widget| {
+                if (focused_widget.sendInput(view, input) == .ignore)
+                    return;
+            }
         },
         .text_input => {
-            //
+            if (view.focus) |focused_widget| {
+                if (focused_widget.sendInput(view, input) == .ignore)
+                    return;
+            }
         },
     }
 }
@@ -110,7 +133,7 @@ fn recursiveInit(view: *View, list: Widget.List, allocator: std.mem.Allocator) !
     var it = Widget.Iterator.init(list, .bottom_to_top);
     while (it.next()) |w| {
         try w.init(allocator);
-        try view.recursiveInit(w.children);
+        try view.recursiveInit(w.children, allocator);
     }
 }
 

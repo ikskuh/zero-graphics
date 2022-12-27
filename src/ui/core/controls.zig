@@ -3,6 +3,9 @@ const ui = @import("ui.zig");
 
 const raw_control_list = @import("controls");
 
+/// Exports all types as regular symbols.
+pub const all = raw_control_list;
+
 /// This is an enumeration of all available classes.
 pub const ClassID: type = blk: {
     const EnumField = std.builtin.Type.EnumField;
@@ -105,10 +108,10 @@ pub fn init(ctrl: *Control, allocator: std.mem.Allocator) !void {
     }
 }
 
-pub fn deinit(ctrl: *Control) !void {
+pub fn deinit(ctrl: *Control) void {
     switch (ctrl.*) {
         inline else => |*c| if (@hasDecl(@TypeOf(c.*), "deinit"))
-            try c.deinit(),
+            c.deinit(),
     }
 }
 
@@ -122,6 +125,17 @@ pub fn isHitTestVisible(ctrl: *Control) bool {
     return switch (ctrl.*) {
         inline else => |*c| c.isHitTestVisible(),
     };
+}
+
+pub fn sendInput(ctrl: *Control, widget: *ui.Widget, view: *ui.View, event: ui.InputEvent) ui.Widget.InputHandling {
+    switch (ctrl.*) {
+        inline else => |*c| {
+            const T = @TypeOf(c.*);
+            if (@hasDecl(T, "sendInput"))
+                return c.sendInput(widget, view, event);
+            return .process;
+        },
+    }
 }
 
 ////////////////////////////////////////////

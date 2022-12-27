@@ -2,6 +2,8 @@ const std = @import("std");
 const ui = @import("ui.zig");
 
 const Widget = @This();
+const InputEvent = ui.InputEvent;
+const View = ui.View;
 
 pub const List = std.TailQueue(void);
 pub const Node = List.Node;
@@ -73,6 +75,24 @@ pub fn canReceiveFocus(widget: *Widget) bool {
 /// Returns true when this widget can be focused with the mouse or keyboard (by using the Tab key).
 pub fn isHitTestVisible(widget: *Widget) bool {
     return widget.hit_test_visible and ui.controls.isHitTestVisible(&widget.control);
+}
+
+pub const InputHandling = enum {
+    /// The ui system should ignore the event, it was already handled
+    /// by a previous part of the event chain.
+    ignore,
+
+    /// The ui system should process the event, it might already be
+    /// handled by previous parts of the event chain, but the event
+    /// was not swallowed.
+    process,
+};
+
+pub fn sendInput(widget: *Widget, view: *View, event: ui.InputEvent) InputHandling {
+    if (ui.controls.sendInput(&widget.control, widget, view, event) == .ignore)
+        return .ignore;
+
+    return .process;
 }
 
 pub const IterationDirection = enum {
