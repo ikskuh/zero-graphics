@@ -567,22 +567,22 @@ pub fn setRenderer(self: *UserInterface, new_renderer: ?*Renderer) !void {
             .radiobutton_checked = undefined,
         };
 
-        icons.checkbox_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+        icons.checkbox_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodeImageData{
             .data = @embedFile("ui-data/checkbox-marked.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.checkbox_checked);
 
-        icons.checkbox_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+        icons.checkbox_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodeImageData{
             .data = @embedFile("ui-data/checkbox-blank.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.checkbox_unchecked);
 
-        icons.radiobutton_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+        icons.radiobutton_checked = try renderer.resources.createTexture(.ui, ResourceManager.DecodeImageData{
             .data = @embedFile("ui-data/radiobox-marked.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.radiobutton_checked);
 
-        icons.radiobutton_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodePng{
+        icons.radiobutton_unchecked = try renderer.resources.createTexture(.ui, ResourceManager.DecodeImageData{
             .data = @embedFile("ui-data/radiobox-blank.png"),
         });
         errdefer renderer.resources.destroyTexture(icons.radiobutton_unchecked);

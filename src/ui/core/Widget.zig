@@ -70,6 +70,11 @@ pub fn canReceiveFocus(widget: *Widget) bool {
     return widget.can_receive_focus and ui.controls.canReceiveFocus(&widget.control);
 }
 
+/// Returns true when this widget can be focused with the mouse or keyboard (by using the Tab key).
+pub fn isHitTestVisible(widget: *Widget) bool {
+    return widget.hit_test_visible and ui.controls.isHitTestVisible(&widget.control);
+}
+
 pub const IterationDirection = enum {
     bottom_to_top,
     top_to_bottom,
@@ -113,9 +118,15 @@ pub fn setSize(widget: *Widget, size: ui.Size) void {
     );
 }
 
-/// Sets the position and size of the widget, respecting size constraints
+/// Sets the position and size of the widget, respecting size constraints.
+/// The rectangles position is relative to its parent.
 /// **NOTE:** If a layout engine is used, it might override the values set here.
 pub fn setBounds(widget: *Widget, rectangle: ui.Rectangle) void {
     widget.setPosition(rectangle.position());
     widget.setSize(rectangle.size());
+}
+
+/// Returns the rectangle this widget occupies in its parent.
+pub fn getBounds(widget: Widget) ui.Rectangle {
+    return ui.Rectangle.new(widget.bounds.position, widget.bounds.size);
 }

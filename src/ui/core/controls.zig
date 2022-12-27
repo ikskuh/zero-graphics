@@ -118,6 +118,12 @@ pub fn canReceiveFocus(ctrl: *Control) bool {
     };
 }
 
+pub fn isHitTestVisible(ctrl: *Control) bool {
+    return switch (ctrl.*) {
+        inline else => |*c| c.isHitTestVisible(),
+    };
+}
+
 ////////////////////////////////////////////
 // Safety checks:
 

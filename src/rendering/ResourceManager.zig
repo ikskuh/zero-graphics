@@ -1211,7 +1211,7 @@ pub const RawRgbaTexture = struct {
     }
 };
 
-pub const DecodePng = DecodeImageData; // Deprecated!
+pub const DecodePng = @compileError("DecodePng is deprecated, use DecodeImageData instead!");
 
 pub const DecodeImageData = struct {
     data: []const u8,

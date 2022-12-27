@@ -10,11 +10,15 @@
 const std = @import("std");
 const zg = @import("zero-graphics");
 
+pub const Color: type = zg.Color;
 pub const Point: type = zg.Point;
 pub const Size: type = zg.Size;
 pub const Rectangle: type = zg.Rectangle;
 pub const MouseButton: type = zg.Input.MouseButton;
 pub const KeyCode: type = zg.Input.Scancode;
+
+pub const VerticalAlignment: type = zg.VerticalAlignment;
+pub const HorizontalAlignment: type = zg.HorzizontalAlignment;
 
 comptime {
     std.debug.assert(@hasField(Point, "x"));
@@ -35,4 +39,12 @@ comptime {
 
     std.debug.assert(@hasField(MouseButton, "primary"));
     std.debug.assert(@hasField(MouseButton, "secondary"));
+
+    std.debug.assert(@hasField(VerticalAlignment, "top"));
+    std.debug.assert(@hasField(VerticalAlignment, "center"));
+    std.debug.assert(@hasField(VerticalAlignment, "bottom"));
+
+    std.debug.assert(@hasField(HorizontalAlignment, "left"));
+    std.debug.assert(@hasField(HorizontalAlignment, "center"));
+    std.debug.assert(@hasField(HorizontalAlignment, "right"));
 }

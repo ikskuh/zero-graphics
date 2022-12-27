@@ -40,6 +40,17 @@ pub fn init(app: *Application) !void {
         logger.info("- {s}", .{@tagName(class_id)});
     }
 
+    app.printWidgetTree();
+
+    app.renderer2d = try core().resources.createRenderer2D();
+    errdefer app.renderer2d.deinit();
+
+    app.gui_renderer = try render_engine.Renderer.init(&app.renderer2d);
+    errdefer app.gui_renderer.deinit();
+
+    const app_logo = try app.gui_renderer.createImage(@embedFile("logo.png"));
+    errdefer app.gui_renderer.destroyImage(app_logo);
+
     // Construct the following ui sketch:
     //
     // +---------------------------------------------------------+
@@ -78,14 +89,20 @@ pub fn init(app: *Application) !void {
             defer builder.leave();
 
             _ = try builder.add(.{
-                .Picture = .{},
+                .Picture = .{
+                    .image = app_logo,
+                },
             });
             builder.current().setBounds(.{ .x = 126, .y = 13, .width = 66, .height = 67 });
 
             _ = try builder.add(.{
-                .Label = .{ .text = "Username:" },
+                .Label = .{
+                    .text = "Username:",
+                    .vertical_alignment = .center,
+                    .horizontal_alignment = .right,
+                },
             });
-            builder.current().setBounds(.{ .x = 41, .y = 95, .width = 79, .height = 42 });
+            builder.current().setBounds(.{ .x = 41, .y = 95, .width = 75, .height = 42 });
 
             _ = try builder.add(.{
                 .TextBox = .{},
@@ -93,12 +110,16 @@ pub fn init(app: *Application) !void {
             builder.current().setBounds(.{ .x = 120, .y = 95, .width = 157, .height = 42 });
 
             _ = try builder.add(.{
-                .Label = .{ .text = "Password:" },
+                .Label = .{
+                    .text = "Password:",
+                    .vertical_alignment = .center,
+                    .horizontal_alignment = .right,
+                },
             });
-            builder.current().setBounds(.{ .x = 41, .y = 153, .width = 79, .height = 42 });
+            builder.current().setBounds(.{ .x = 41, .y = 153, .width = 75, .height = 42 });
 
             _ = try builder.add(.{
-                .TextBox = .{ .password_box = true },
+                .TextBox = .{ .flags = .{ .password = true } },
             });
             builder.current().setBounds(.{ .x = 120, .y = 153, .width = 157, .height = 42 });
 
@@ -119,14 +140,6 @@ pub fn init(app: *Application) !void {
     app.core_view = ui_data.view;
     app.widget_pool = ui_data.memory;
     errdefer app.widget_pool.deinit();
-
-    app.printWidgetTree();
-
-    app.renderer2d = try core().resources.createRenderer2D();
-    errdefer app.renderer2d.deinit();
-
-    app.gui_renderer = try render_engine.Renderer.init(&app.renderer2d);
-    errdefer app.gui_renderer.deinit();
 }
 
 pub fn deinit(app: *Application) void {

@@ -14,6 +14,11 @@ const View = @This();
 const Widget = ui.Widget;
 const Event = ui.Event;
 const InputEvent = ui.InputEvent;
+const Point = ui.Point;
+const MouseButton = ui.MouseButton;
+
+/// The last known position of the mouse.
+mouse_position: Point = Point.new(std.math.minInt(i16), std.math.minInt(i16)),
 
 /// The root widget of the view. If set, this widget will receive all events
 /// and should be rendered to the user.
@@ -25,9 +30,72 @@ focus: ?*Widget = null,
 /// Stores pending events emitted by widgets.
 event_queue: ui.RingBuffer(Event, 64) = .{},
 
+/// The currently clicked widget per mouse button
+clicked_widgets: std.enums.EnumArray(MouseButton, ?*Widget) = std.enums.EnumArray(MouseButton, ?*Widget).initFill(null),
+
 pub fn pushInput(view: *View, input: InputEvent) void {
-    _ = view;
-    _ = input;
+    switch (input) {
+        .mouse_button_down => |button| {
+            const clicked = view.widgetFromPosition(view.mouse_position);
+            view.clicked_widgets.set(button, clicked);
+            if (clicked) |widget| {
+                // handle mouse down
+                _ = widget;
+            }
+        },
+        .mouse_button_up => |button| {
+            const clicked = view.widgetFromPosition(view.mouse_position);
+            if (clicked) |widget| {
+                if (view.clicked_widgets.get(button) == widget) {
+                    std.log.err("handle clicked for widget {s}", .{@tagName(widget.control)});
+                }
+            }
+            view.clicked_widgets.set(button, null);
+        },
+        .mouse_motion => |position| {
+            view.mouse_position = position;
+            if (view.widgetFromPosition(view.mouse_position)) |widget| {
+                //
+                _ = widget;
+            }
+        },
+        .key_down => {
+            //
+        },
+        .key_up => {
+            //
+        },
+        .text_input => {
+            //
+        },
+    }
+}
+
+fn widgetFromPosition(view: *View, point: Point) ?*Widget {
+    return view.recursiveWidgetFromPosition(view.widgets, point);
+}
+
+fn recursiveWidgetFromPosition(view: *View, list: Widget.List, point: Point) ?*Widget {
+    var iter = Widget.Iterator.init(list, .top_to_bottom);
+    while (iter.next()) |widget| {
+        if (!widget.isHitTestVisible())
+            continue;
+
+        const bounds = widget.getBounds();
+        if (!bounds.contains(point))
+            continue;
+
+        const client_point = Point.new(
+            point.x - bounds.x,
+            point.y - bounds.y,
+        );
+
+        if (view.recursiveWidgetFromPosition(widget.children, client_point)) |child|
+            return child;
+
+        return widget;
+    }
+    return null;
 }
 
 pub fn pullEvent(view: *View) ?Event {

@@ -96,9 +96,9 @@ pub fn init(app: *Application) !void {
         pub fn load(self: @This(), rm: *ResourceManager, file_name: []const u8) !*ResourceManager.Texture {
             _ = self;
             if (std.mem.eql(u8, file_name, "metal-01.png"))
-                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .data = @embedFile("data/metal-01.png") });
+                return try rm.createTexture(.@"3d", ResourceManager.DecodeImageData{ .data = @embedFile("data/metal-01.png") });
             if (std.mem.eql(u8, file_name, "metal-02.png"))
-                return try rm.createTexture(.@"3d", ResourceManager.DecodePng{ .data = @embedFile("data/metal-02.png") });
+                return try rm.createTexture(.@"3d", ResourceManager.DecodeImageData{ .data = @embedFile("data/metal-02.png") });
             return error.FileNotFound;
         }
     };
