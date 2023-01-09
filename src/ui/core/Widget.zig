@@ -1,6 +1,6 @@
 const std = @import("std");
 const ui = @import("ui.zig");
-const logger = std.log.scoped(.ui_widget);
+const logger = std.log.scoped(.@"ui.widget");
 
 const Widget = @This();
 const InputEvent = ui.InputEvent;

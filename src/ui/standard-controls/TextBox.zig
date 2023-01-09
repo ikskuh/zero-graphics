@@ -55,10 +55,6 @@ pub fn getCursor(ctrl: TextBox) usize {
 }
 
 pub fn sendInput(ctrl: *TextBox, widget: *ui.Widget, view: *ui.View, input: ui.Widget.Event) ui.Widget.InputHandling {
-
-    // TODO: Compute modifiers
-
-    //
     _ = widget;
     _ = view;
 

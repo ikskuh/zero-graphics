@@ -26,6 +26,18 @@ pub const Event = struct {
     pub const Data = union(enum) {
         none,
     };
+
+    pub fn format(self: Event, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+        _ = fmt;
+        _ = options;
+        try writer.print("Event{{ .sender = {s}(0x{X}), .data = {?}, .handler = (id={}, data={?} }}", .{
+            @tagName(self.sender.control),
+            @ptrToInt(self.sender),
+            self.data,
+            self.handler.id,
+            self.handler.user_data,
+        });
+    }
 };
 
 pub const EventHandler = struct {

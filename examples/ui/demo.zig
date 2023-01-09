@@ -29,6 +29,12 @@ widget_pool: zero_ui.MemoryPool(zero_ui.Widget) = undefined,
 renderer2d: zero_graphics.Renderer2D,
 gui_renderer: render_engine.Renderer,
 
+const events = struct {
+    pub const close_app = 0;
+    pub const login = 1;
+    pub const cancel = 2;
+};
+
 pub fn init(app: *Application) !void {
     app.* = Application{
         .renderer2d = undefined,
@@ -83,7 +89,9 @@ pub fn init(app: *Application) !void {
         errdefer builder.cancel();
 
         _ = try builder.add(.{
-            .Button = .{ .text = "X" },
+            .Button = .{ .text = "X", .on_click = .{
+                .id = events.close_app,
+            } },
         });
         builder.current().setBounds(.{ .x = 10, .y = 10, .width = 30, .height = 30 });
 
@@ -132,12 +140,16 @@ pub fn init(app: *Application) !void {
             builder.current().setBounds(.{ .x = 120, .y = 153, .width = 157, .height = 42 });
 
             _ = try builder.add(.{
-                .Button = .{ .text = "Cancel" },
+                .Button = .{ .text = "Cancel", .on_click = .{
+                    .id = events.cancel,
+                } },
             });
             builder.current().setBounds(.{ .x = 15, .y = 208, .width = 115, .height = 31 });
 
             _ = try builder.add(.{
-                .Button = .{ .text = "Login" },
+                .Button = .{ .text = "Login", .on_click = .{
+                    .id = events.login,
+                } },
             });
             builder.current().setBounds(.{ .x = 190, .y = 208, .width = 115, .height = 31 });
         }
@@ -196,6 +208,13 @@ pub fn update(app: *Application) !bool {
 
         while (app.core_view.pullEvent()) |ui_event| {
             logger.info("received ui event: {}", .{ui_event});
+            switch (ui_event.handler.id) {
+                events.close_app => std.log.info("ui event: close_app", .{}),
+                events.login => std.log.info("ui event: login", .{}),
+                events.cancel => std.log.info("ui event: cancel", .{}),
+
+                else => std.log.warn("unknown event id: {}", .{ui_event.handler.id}),
+            }
         }
     }
 

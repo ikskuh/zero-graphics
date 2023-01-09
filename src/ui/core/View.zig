@@ -9,6 +9,7 @@
 
 const std = @import("std");
 const ui = @import("ui.zig");
+const logger = std.log.scoped(.@"ui.view");
 
 const View = @This();
 const Widget = ui.Widget;
@@ -148,6 +149,13 @@ fn recursiveWidgetFromPosition(view: *View, list: Widget.List, point: Point) ?*W
 
 pub fn pullEvent(view: *View) ?Event {
     return view.event_queue.pull();
+}
+
+pub fn pushEvent(view: *View, event: Event) void {
+    if (view.event_queue.full()) {
+        logger.warn("ui event queue full, dropping event...", .{});
+    }
+    view.event_queue.push(event);
 }
 
 pub fn init(view: *View, allocator: std.mem.Allocator) !void {
