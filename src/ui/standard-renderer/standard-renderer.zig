@@ -113,26 +113,42 @@ pub const Renderer = struct {
         area: Rectangle,
     };
 
-    pub fn render(renderer: *Renderer, view: View, screen_size: Size) !void {
-        var focus_info: ?FocusInfo = null;
-        try renderer.renderWidgetList(view, Rectangle.new(Point.zero, screen_size), view.widgets, &focus_info);
+    const RenderInfo = struct {
+        focus: ?FocusInfo = null,
+        hover: ?FocusInfo = null,
+    };
 
-        if (focus_info) |focus| {
+    pub fn render(renderer: *Renderer, view: View, screen_size: Size) !void {
+        var info = RenderInfo{};
+
+        try renderer.renderWidgetList(view, Rectangle.new(Point.zero, screen_size), view.widgets, &info);
+
+        if (info.focus) |focus| {
             try renderer.graphics.drawRectangle(
                 focus.area.grow(2),
                 Color.red,
             );
         }
-    }
 
-    fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List, focus_info: *?FocusInfo) error{OutOfMemory}!void {
-        var it = Widget.Iterator.init(list, .bottom_to_top);
-        while (it.next()) |widget| {
-            try renderer.renderWidget(view, target_area, widget, focus_info);
+        if (@import("builtin").mode == .Debug) {
+            // In debug builds, we show the currently hovered widget as well
+            if (info.hover) |hover| {
+                try renderer.graphics.drawRectangle(
+                    hover.area.grow(3),
+                    Color.magenta,
+                );
+            }
         }
     }
 
-    fn renderWidget(renderer: *Renderer, view: View, target_area: Rectangle, widget: *Widget, focus_info: *?FocusInfo) error{OutOfMemory}!void {
+    fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List, render_info: *RenderInfo) error{OutOfMemory}!void {
+        var it = Widget.Iterator.init(list, .bottom_to_top);
+        while (it.next()) |widget| {
+            try renderer.renderWidget(view, target_area, widget, render_info);
+        }
+    }
+
+    fn renderWidget(renderer: *Renderer, view: View, target_area: Rectangle, widget: *Widget, render_info: *RenderInfo) error{OutOfMemory}!void {
         if (widget.visibility != .visible)
             return;
 
@@ -143,7 +159,13 @@ pub const Renderer = struct {
         const area = Rectangle.new(position, size);
 
         if (widget == view.focus) {
-            focus_info.* = FocusInfo{
+            render_info.focus = FocusInfo{
+                .widget = widget,
+                .area = area,
+            };
+        }
+        if (widget == view.hovered_widget) {
+            render_info.hover = FocusInfo{
                 .widget = widget,
                 .area = area,
             };
@@ -152,12 +174,12 @@ pub const Renderer = struct {
         try g.pushClipRectangle(area);
         defer g.popClipRectangle() catch {};
 
-        try renderer.renderControl(area, widget.control);
+        try renderer.renderControl(area, widget.control, (widget == view.focus));
 
-        try renderer.renderWidgetList(view, area, widget.children, focus_info);
+        try renderer.renderWidgetList(view, area, widget.children, render_info);
     }
 
-    fn renderControl(renderer: *Renderer, target_area: Rectangle, control: Control) error{OutOfMemory}!void {
+    fn renderControl(renderer: *Renderer, target_area: Rectangle, control: Control, has_focus: bool) error{OutOfMemory}!void {
         const g = renderer.graphics;
         const t = renderer.theme;
 
@@ -298,13 +320,47 @@ pub const Renderer = struct {
                     );
                 }
 
+                const font = Font.from(text_box.font orelse renderer.default_font);
+                const text = text_box.getText();
+                const line_height = font.inner.getLineHeight();
+
+                const dy = (b.height -| line_height) / 2;
+
                 try g.drawString(
-                    Font.from(text_box.font orelse renderer.default_font).inner,
-                    text_box.getText(),
+                    font.inner,
+                    text,
                     b.x + 2,
-                    b.y + 2,
+                    b.y + dy,
                     t.text,
                 );
+
+                if (has_focus) {
+                    const timestamp = @bitCast(u64, std.time.milliTimestamp() +% std.math.minInt(i64));
+                    if ((timestamp % t.blink_interval) >= t.blink_interval / 2) {
+                        const cursor_position = text_box.getCursor();
+
+                        var iter = std.unicode.Utf8View.initUnchecked(text).iterator();
+                        var end_pos: usize = 0;
+                        var count: usize = 0;
+                        while (iter.nextCodepointSlice()) |cps| : (count += 1) {
+                            if (count == cursor_position)
+                                break;
+                            end_pos +|= cps.len;
+                        }
+
+                        const substring = text[0..end_pos];
+
+                        const rect = font.graphics.measureString(font.inner, substring);
+
+                        try g.drawLine(
+                            b.x + 2 + rect.width,
+                            b.y + dy,
+                            b.x + 2 + rect.width,
+                            b.y + dy + line_height,
+                            t.text_cursor,
+                        );
+                    }
+                }
             },
 
             .Picture => |pic| if (pic.image) |image| {
@@ -374,6 +430,8 @@ pub const Theme = struct {
     focus: Color, // color of the dithered focus border
     text_cursor: Color, // color of the text cursor
 
+    blink_interval: u32, // cursor blink interval in milliseconds
+
     pub const default = Theme{
         .window = Color.rgb(0xde, 0xee, 0xd6),
         .area = Color.rgb(0x75, 0x71, 0x61),
@@ -383,6 +441,7 @@ pub const Theme = struct {
         .text = Color.rgb(0x14, 0x0c, 0x1c),
         .focus = Color.rgb(0x44, 0x24, 0x34),
         .text_cursor = Color.rgb(0x30, 0x34, 0x6d),
+        .blink_interval = 1000,
     };
 };
 

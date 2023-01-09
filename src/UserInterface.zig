@@ -1263,11 +1263,11 @@ pub const InputProcessor = struct {
                         };
                     },
 
-                    .key_down => |scancode| filter.target.buttonDown(scancode) catch |e| switch (e) {
+                    .key_down => |key| filter.target.buttonDown(key.scancode) catch |e| switch (e) {
                         error.InvalidUtf8 => @panic("invalid utf8 from key event"),
                         error.OutOfMemory => return error.OutOfMemory,
                     },
-                    .key_up => |scancode| try filter.target.buttonUp(scancode),
+                    .key_up => |key| try filter.target.buttonUp(key.scancode),
 
                     else => return event,
                 }

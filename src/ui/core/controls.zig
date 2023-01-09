@@ -127,7 +127,7 @@ pub fn isHitTestVisible(ctrl: *Control) bool {
     };
 }
 
-pub fn sendInput(ctrl: *Control, widget: *ui.Widget, view: *ui.View, event: ui.InputEvent) ui.Widget.InputHandling {
+pub fn sendInput(ctrl: *Control, widget: *ui.Widget, view: *ui.View, event: ui.Widget.Event) ui.Widget.InputHandling {
     switch (ctrl.*) {
         inline else => |*c| {
             const T = @TypeOf(c.*);

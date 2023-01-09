@@ -1,5 +1,6 @@
 const std = @import("std");
 const ui = @import("ui.zig");
+const logger = std.log.scoped(.ui_widget);
 
 const Widget = @This();
 const InputEvent = ui.InputEvent;
@@ -15,6 +16,11 @@ siblings: Node = .{ .data = {} },
 /// The list of children this node has. Is stored bottom-to-top, so the first
 /// item in the list is the bottom-most, the last item is the top-most.
 children: List = .{},
+
+/// Pointer to the parent widget, if any.
+/// All non-top-level widgets have a parent widget that is lazily updated by the UI
+/// when its needed.
+parent: ?*Widget = null,
 
 /// The actual behaviour of the widget. This defines how the control is rendered
 /// and reacts to input.
@@ -50,6 +56,11 @@ visibility: ui.Visibility = .visible,
 /// Converts a `node` from a widget list back into a `Widget`.
 pub fn fromNode(node: *Node) *Widget {
     return @fieldParentPtr(Widget, "siblings", node);
+}
+
+/// Converts an optional `node` from a widget list back into an optional `Widget`.
+pub fn fromOptNode(node: ?*Node) ?*Widget {
+    return if (node) |n| fromNode(n) else null;
 }
 
 /// Initializes the widget and its control. Will allocate dynamic resources
@@ -88,7 +99,28 @@ pub const InputHandling = enum {
     process,
 };
 
-pub fn sendInput(widget: *Widget, view: *View, event: ui.InputEvent) InputHandling {
+pub const Event = union(enum) {
+    // mouse events:
+    mouse_enter, // mouse entered the widget area
+    mouse_leave, // mouse left the widget area
+    mouse_button_down: ui.MouseButton, // mouse button was pressed
+    mouse_button_up: ui.MouseButton, // mouse button was released
+    mouse_motion: ui.Point, // mouse moved to a different position
+
+    // keyboard events:
+    key_down: ui.input.KeyInfo, // a key was pressed
+    key_up: ui.input.KeyInfo, // a key was released
+    text_input: []const u8, // some text was entered
+
+    // meta events:
+    enter, // widget gets focus
+    leave, // widget looses focus
+    click, // user clicked the widget with mouse, touch or pressed space or return
+};
+
+pub fn sendInput(widget: *Widget, view: *View, event: Event) InputHandling {
+    logger.debug("{s} received event {s}", .{ @tagName(widget.control), @tagName(event) });
+
     if (ui.controls.sendInput(&widget.control, widget, view, event) == .ignore)
         return .ignore;
 

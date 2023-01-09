@@ -20,6 +20,8 @@ pub const KeyCode: type = zg.Input.Scancode;
 pub const VerticalAlignment: type = zg.VerticalAlignment;
 pub const HorizontalAlignment: type = zg.HorzizontalAlignment;
 
+pub const KeyModifiers: type = zg.Input.Modifiers;
+
 comptime {
     std.debug.assert(@hasField(Point, "x"));
     std.debug.assert(@hasField(Point, "y"));
@@ -47,4 +49,9 @@ comptime {
     std.debug.assert(@hasField(HorizontalAlignment, "left"));
     std.debug.assert(@hasField(HorizontalAlignment, "center"));
     std.debug.assert(@hasField(HorizontalAlignment, "right"));
+
+    std.debug.assert(@hasField(KeyModifiers, "ctrl"));
+    std.debug.assert(@hasField(KeyModifiers, "alt"));
+    std.debug.assert(@hasField(KeyModifiers, "shift"));
+    std.debug.assert(@hasField(KeyModifiers, "gui"));
 }

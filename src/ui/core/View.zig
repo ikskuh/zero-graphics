@@ -27,11 +27,25 @@ widgets: Widget.List,
 /// The currently focused widget.
 focus: ?*Widget = null,
 
+/// The widget that currently is hovered by the mouse.
+hovered_widget: ?*Widget = null,
+
 /// Stores pending events emitted by widgets.
 event_queue: ui.RingBuffer(Event, 64) = .{},
 
 /// The currently clicked widget per mouse button
 clicked_widgets: std.enums.EnumArray(MouseButton, ?*Widget) = std.enums.EnumArray(MouseButton, ?*Widget).initFill(null),
+
+fn inputToWidgetEvent(input: InputEvent) Widget.Event {
+    return switch (input) {
+        .mouse_button_down => |v| .{ .mouse_button_down = v },
+        .mouse_button_up => |v| .{ .mouse_button_up = v },
+        .mouse_motion => |v| .{ .mouse_motion = v },
+        .key_down => |v| .{ .key_down = v },
+        .key_up => |v| .{ .key_up = v },
+        .text_input => |v| .{ .text_input = v },
+    };
+}
 
 pub fn pushInput(view: *View, input: InputEvent) void {
     switch (input) {
@@ -39,55 +53,66 @@ pub fn pushInput(view: *View, input: InputEvent) void {
             const clicked = view.widgetFromPosition(view.mouse_position);
             view.clicked_widgets.set(button, clicked);
             if (clicked) |widget| {
-                // handle mouse down
-                _ = widget;
+                _ = widget.sendInput(view, inputToWidgetEvent(input));
             }
         },
+
         .mouse_button_up => |button| {
             const clicked = view.widgetFromPosition(view.mouse_position);
             if (clicked) |widget| {
-                if (view.clicked_widgets.get(button) == widget) {
-                    if (widget.canReceiveFocus()) {
-                        view.focus = widget;
-                    }
+                _ = widget.sendInput(view, inputToWidgetEvent(input));
 
-                    std.log.err("handle clicked for widget {s}", .{@tagName(widget.control)});
+                if (button == .primary and view.clicked_widgets.get(button) == widget) {
+                    if (widget.canReceiveFocus()) {
+                        view.setFocus(widget);
+                    }
+                    _ = widget.sendInput(view, .click);
                 }
             }
             view.clicked_widgets.set(button, null);
         },
         .mouse_motion => |position| {
             view.mouse_position = position;
-            if (view.widgetFromPosition(view.mouse_position)) |widget| {
-                //
-                _ = widget;
+
+            const hovered_widget = view.widgetFromPosition(view.mouse_position);
+
+            if (hovered_widget != view.hovered_widget) {
+                if (view.hovered_widget) |old| _ = old.sendInput(view, .mouse_leave);
+                view.hovered_widget = hovered_widget;
+                if (view.hovered_widget) |new| _ = new.sendInput(view, .mouse_enter);
+            }
+
+            if (hovered_widget) |widget| {
+                // TODO: Translate coordinates to "local"
+                _ = widget.sendInput(view, inputToWidgetEvent(input));
             }
         },
         .key_down => |key_info| {
             if (view.focus) |focused_widget| {
-                if (focused_widget.sendInput(view, input) == .ignore)
+                if (focused_widget.sendInput(view, inputToWidgetEvent(input)) == .ignore)
                     return;
             }
 
             switch (key_info.key) {
                 .tab => {
-                    // TODO: Move focus
+                    view.moveFocus(if (key_info.modifiers.shift) .previous else .next);
                 },
                 .space, .@"return", .keypad_enter => {
-                    // TODO: Send click
+                    if (view.focus) |focused|
+                        _ = focused.sendInput(view, .click);
                 },
                 else => {},
             }
         },
         .key_up => {
             if (view.focus) |focused_widget| {
-                if (focused_widget.sendInput(view, input) == .ignore)
+                if (focused_widget.sendInput(view, inputToWidgetEvent(input)) == .ignore)
                     return;
             }
         },
         .text_input => {
             if (view.focus) |focused_widget| {
-                if (focused_widget.sendInput(view, input) == .ignore)
+                if (focused_widget.sendInput(view, inputToWidgetEvent(input)) == .ignore)
                     return;
             }
         },
@@ -150,4 +175,79 @@ fn recursiveDeinit(view: *View, list: Widget.List) !void {
         try w.deinit();
         try view.recursiveDeinit(w.children);
     }
+}
+
+fn updateParents(view: *View) void {
+    view.updateParentsRecursive(view.widgets, null);
+}
+
+fn updateParentsRecursive(view: *View, list: Widget.List, parent: ?*Widget) void {
+    var it = Widget.Iterator.init(list, .bottom_to_top);
+    while (it.next()) |w| {
+        w.parent = parent;
+        view.updateParentsRecursive(w.children, w);
+    }
+}
+
+const FocusSearchDir = enum { next, previous };
+
+pub fn moveFocus(view: *View, dir: FocusSearchDir) void {
+    view.setFocus(view.searchFocusWidget(view.focus, dir));
+}
+
+pub fn setFocus(view: *View, new_focus: ?*Widget) void {
+    if (new_focus != view.focus) {
+        if (view.focus) |old| _ = old.sendInput(view, .leave);
+        view.focus = new_focus;
+        if (view.focus) |new| _ = new.sendInput(view, .enter);
+    }
+}
+
+fn searchFocusWidget(view: *View, widget: ?*Widget, dir: FocusSearchDir) ?*Widget {
+    var iter = widget;
+
+    while (true) {
+        var next = view.searchFocusWidgetInner(iter, dir) orelse return null;
+        if (next == widget)
+            return widget;
+        if (next.canReceiveFocus())
+            return next;
+        // Search forward
+        iter = next;
+    }
+}
+
+fn searchFocusWidgetInner(view: *View, widget: ?*Widget, dir: FocusSearchDir) ?*Widget {
+    view.updateParents();
+
+    if (widget) |w| {
+        return switch (dir) {
+            .next => if (w.children.first) |child|
+                Widget.fromNode(child)
+            else if (w.siblings.next) |next|
+                Widget.fromNode(next)
+            else
+                Widget.fromOptNode(view.widgets.first),
+
+            .previous => if (w.siblings.prev) |prev|
+                Widget.fromNode(prev)
+            else if (w.parent) |parent|
+                parent
+            else
+                Widget.fromOptNode(findLastChild(view.widgets.last)),
+        };
+    } else {
+        // search first or last widget
+        return switch (dir) {
+            .next => Widget.fromOptNode(view.widgets.first),
+            .previous => Widget.fromOptNode(findLastChild(view.widgets.last)),
+        };
+    }
+}
+
+fn findLastChild(widget: ?*Widget.Node) ?*Widget.Node {
+    const w = Widget.fromNode(widget orelse return null);
+    if (w.children.len > 0)
+        return findLastChild(w.children.last);
+    return widget;
 }

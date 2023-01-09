@@ -13,7 +13,7 @@ pub const Modifiers = struct {
     shift: bool = false,
     ctrl: bool = false,
     alt: bool = false,
-    super: bool = false,
+    gui: bool = false,
 };
 
 pub const Event = union(enum) {
@@ -23,13 +23,18 @@ pub const Event = union(enum) {
     pointer_release: MouseButton,
     text_input: TextInput,
 
-    key_down: Scancode,
-    key_up: Scancode,
+    key_down: KeyEvent,
+    key_up: KeyEvent,
 
     pub const TextInput = struct {
         text: []const u8,
         modifiers: Modifiers,
     };
+};
+
+pub const KeyEvent = struct {
+    scancode: Scancode,
+    modifiers: Modifiers,
 };
 
 pub const Scancode = enum(u16) {
@@ -321,24 +326,20 @@ pub fn fetch(self: *Self) ?Event {
         self.free_queue.append(node);
     }
     self.current_event = self.event_queue.popFirst();
-    const event = if (self.current_event) |node|
+    return if (self.current_event) |node|
         node.data
     else
         null;
-    if (event) |ev| {
-        switch (ev) {
-            // auto-update keyboard state
-            .key_down => |k| self.keyboard_state.set(k, true),
-            .key_up => |k| self.keyboard_state.set(k, false),
-            .pointer_press => |b| self.mouse_state.set(b, true),
-            .pointer_release => |b| self.mouse_state.set(b, false),
+}
 
-            // auto-update via motion events
-            .pointer_motion => |pos| self.pointer_location = pos,
-            else => {},
-        }
-    }
-    return event;
+pub fn getKeyboardModifiers(self: Self) Modifiers {
+    const keys = &self.keyboard_state;
+    return Modifiers{
+        .shift = keys.get(.shift_left) or keys.get(.shift_right),
+        .alt = keys.get(.alt_left) or keys.get(.alt_right),
+        .ctrl = keys.get(.ctrl_left) or keys.get(.ctrl_right),
+        .gui = keys.get(.gui_left) or keys.get(.gui_right),
+    };
 }
 
 fn poolString(self: *Self, str: []const u8) ![]const u8 {
@@ -353,6 +354,10 @@ fn poolString(self: *Self, str: []const u8) ![]const u8 {
     return dupe;
 }
 
+/// Pushes an event into the event queue.
+/// If `event` is either `key_down`, `key_up` or `text_input`, you can set the
+/// `modifiers` field to `undefined` as this is computed by the Input system
+/// itself.
 pub fn pushEvent(self: *Self, event: Event) !void {
     const node = if (self.free_queue.popFirst()) |n|
         n
@@ -360,18 +365,34 @@ pub fn pushEvent(self: *Self, event: Event) !void {
         try self.arena.allocator().create(EventNode);
     errdefer self.free_queue.append(node);
 
-    node.* = .{
-        .data = switch (event) {
-            .text_input => |ti| Event{
-                // text input strings are pushed into the string pool
-                .text_input = Event.TextInput{
-                    .text = try self.poolString(ti.text),
-                    .modifiers = ti.modifiers,
-                },
-            },
-            else => event,
+    node.* = .{ .data = event };
+
+    switch (node.data) {
+        // auto-update keyboard state
+        .key_down => |*ki| {
+            self.keyboard_state.set(ki.scancode, true);
+            ki.modifiers = self.getKeyboardModifiers();
         },
-    };
+        .key_up => |*ki| {
+            self.keyboard_state.set(ki.scancode, false);
+            ki.modifiers = self.getKeyboardModifiers();
+        },
+
+        .pointer_press => |b| self.mouse_state.set(b, true),
+        .pointer_release => |b| self.mouse_state.set(b, false),
+
+        // auto-update via motion events
+        .pointer_motion => |pos| self.pointer_location = pos,
+
+        .text_input => |*ti| {
+            // text input strings are pushed into the string pool
+            ti.text = try self.poolString(ti.text);
+            ti.modifiers = self.getKeyboardModifiers();
+        },
+
+        .quit => {},
+    }
+
     self.event_queue.append(node);
 }
 

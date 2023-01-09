@@ -255,12 +255,12 @@ pub fn main() !void {
                     }
 
                     if (translateSdlScancode(event.key.keysym.scancode)) |scancode| {
-                        try input_queue.pushEvent(.{ .key_down = scancode });
+                        try input_queue.pushEvent(.{ .key_down = .{ .scancode = scancode, .modifiers = undefined } });
                     }
                 },
                 c.SDL_KEYUP => {
                     if (translateSdlScancode(event.key.keysym.scancode)) |scancode| {
-                        try input_queue.pushEvent(.{ .key_up = scancode });
+                        try input_queue.pushEvent(.{ .key_up = .{ .scancode = scancode, .modifiers = undefined } });
                     }
                 },
                 c.SDL_MOUSEBUTTONUP => {
@@ -271,15 +271,9 @@ pub fn main() !void {
                     }
                 },
                 c.SDL_TEXTINPUT => {
-                    const keys = c.SDL_GetKeyboardState(null);
                     try input_queue.pushEvent(.{ .text_input = .{
                         .text = std.mem.sliceTo(&event.text.text, 0),
-                        .modifiers = .{
-                            .shift = (keys[c.SDL_SCANCODE_LSHIFT] != 0) or (keys[c.SDL_SCANCODE_RSHIFT] != 0),
-                            .alt = (keys[c.SDL_SCANCODE_LALT] != 0) or (keys[c.SDL_SCANCODE_RALT] != 0),
-                            .ctrl = (keys[c.SDL_SCANCODE_LCTRL] != 0) or (keys[c.SDL_SCANCODE_RCTRL] != 0),
-                            .super = (keys[c.SDL_SCANCODE_LGUI] != 0) or (keys[c.SDL_SCANCODE_RGUI] != 0),
-                        },
+                        .modifiers = undefined,
                     } });
                 },
                 c.SDL_WINDOWEVENT => {

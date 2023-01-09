@@ -16,7 +16,8 @@ pub const InputEvent = union(enum) {
     text_input: []const u8,
 };
 
-const KeyInfo = struct {
+pub const KeyInfo = struct {
     scancode: u16,
     key: KeyCode,
+    modifiers: ui.KeyModifiers,
 };

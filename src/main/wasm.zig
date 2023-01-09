@@ -71,25 +71,27 @@ pub fn getDisplayDPI() f32 {
     return 96.0;
 }
 
-/// Overwrite default log handler
-pub fn log(
-    comptime message_level: std.log.Level,
-    comptime scope: @Type(.EnumLiteral),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    const level_txt = switch (message_level) {
-        .err => "error",
-        .warn => "warning",
-        .info => "info",
-        .debug => "debug",
-    };
-    const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+pub const std_options = struct {
+    /// Overwrite default log handler
+    pub fn logFn(
+        comptime message_level: std.log.Level,
+        comptime scope: @Type(.EnumLiteral),
+        comptime format: []const u8,
+        args: anytype,
+    ) void {
+        const level_txt = switch (message_level) {
+            .err => "error",
+            .warn => "warning",
+            .info => "info",
+            .debug => "debug",
+        };
+        const prefix2 = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
-    (LogWriter{ .context = {} }).print(level_txt ++ prefix2 ++ format ++ "\n", args) catch return;
+        (LogWriter{ .context = {} }).print(level_txt ++ prefix2 ++ format ++ "\n", args) catch return;
 
-    wasm_log_flush();
-}
+        wasm_log_flush();
+    }
+};
 
 /// Overwrite default panic handler
 pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
@@ -406,13 +408,13 @@ fn translateJsScancode(js_scancode: u32) ?zerog.Input.Scancode {
 
 export fn app_input_sendKeyDown(js_scancode: u32) void {
     if (translateJsScancode(js_scancode)) |scancode| {
-        input_handler.pushEvent(.{ .key_down = scancode }) catch |err| logInputError(err);
+        input_handler.pushEvent(.{ .key_down = .{ .scancode = scancode, .modifiers = undefined } }) catch |err| logInputError(err);
     }
 }
 
 export fn app_input_sendKeyUp(js_scancode: u32) void {
     if (translateJsScancode(js_scancode)) |scancode| {
-        input_handler.pushEvent(.{ .key_up = scancode }) catch |err| logInputError(err);
+        input_handler.pushEvent(.{ .key_up = .{ .scancode = scancode, .modifiers = undefined } }) catch |err| logInputError(err);
     }
 }
 
@@ -430,7 +432,7 @@ export fn app_input_sendTextInput(codepoint: u32, shift: bool, alt: bool, ctrl: 
             .shift = shift,
             .alt = alt,
             .ctrl = ctrl,
-            .super = super,
+            .gui = super,
         },
     } }) catch |err| logInputError(err);
 }

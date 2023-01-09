@@ -22,6 +22,7 @@ pub const MouseButton = core_types.MouseButton;
 pub const KeyCode = core_types.KeyCode;
 pub const VerticalAlignment = core_types.VerticalAlignment;
 pub const HorizontalAlignment = core_types.HorizontalAlignment;
+pub const KeyModifiers = core_types.KeyModifiers;
 
 pub const Builder = @import("Builder.zig");
 

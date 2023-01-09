@@ -75,9 +75,17 @@ pub fn init(app: *Application) !void {
     // +---------------------------------------------------------+
     //
     //
+
+    var password_box: *zero_ui.Widget = undefined;
+
     const ui_data = blk: {
         var builder = zero_ui.Builder.begin(core().allocator);
         errdefer builder.cancel();
+
+        _ = try builder.add(.{
+            .Button = .{ .text = "X" },
+        });
+        builder.current().setBounds(.{ .x = 10, .y = 10, .width = 30, .height = 30 });
 
         _ = try builder.add(.{
             .Panel = .{},
@@ -118,7 +126,7 @@ pub fn init(app: *Application) !void {
             });
             builder.current().setBounds(.{ .x = 41, .y = 153, .width = 75, .height = 42 });
 
-            _ = try builder.add(.{
+            password_box = try builder.add(.{
                 .TextBox = .{},
             });
             builder.current().setBounds(.{ .x = 120, .y = 153, .width = 157, .height = 42 });
@@ -142,6 +150,8 @@ pub fn init(app: *Application) !void {
     errdefer app.widget_pool.deinit();
 
     try app.core_view.init(core().allocator);
+
+    try password_box.control.TextBox.setText("****");
 }
 
 pub fn deinit(app: *Application) void {
@@ -176,12 +186,12 @@ pub fn update(app: *Application) !bool {
             .pointer_press => |btn| app.core_view.pushInput(.{ .mouse_button_down = btn }),
             .pointer_release => |btn| app.core_view.pushInput(.{ .mouse_button_up = btn }),
             .text_input => |input| app.core_view.pushInput(.{ .text_input = input.text }),
-            .key_down => |key| if (key == .escape) {
+            .key_down => |key| if (key.scancode == .escape) {
                 return false;
             } else {
-                app.core_view.pushInput(.{ .key_down = .{ .scancode = @enumToInt(key), .key = key } });
+                app.core_view.pushInput(.{ .key_down = .{ .scancode = @enumToInt(key.scancode), .key = key.scancode, .modifiers = key.modifiers } });
             },
-            .key_up => |key| app.core_view.pushInput(.{ .key_up = .{ .scancode = @enumToInt(key), .key = key } }),
+            .key_up => |key| app.core_view.pushInput(.{ .key_up = .{ .scancode = @enumToInt(key.scancode), .key = key.scancode, .modifiers = key.modifiers } }),
         }
 
         while (app.core_view.pullEvent()) |ui_event| {
