@@ -64,11 +64,15 @@ pub fn pushInput(view: *View, input: InputEvent) void {
                 _ = widget.sendInput(view, inputToWidgetEvent(input));
 
                 if (button == .primary and view.clicked_widgets.get(button) == widget) {
-                    if (widget.canReceiveFocus()) {
-                        view.setFocus(widget);
-                    }
+                    view.setFocus(if (widget.canReceiveFocus())
+                        widget
+                    else
+                        null);
+
                     _ = widget.sendInput(view, .click);
                 }
+            } else {
+                view.setFocus(null);
             }
             view.clicked_widgets.set(button, null);
         },
@@ -158,8 +162,11 @@ pub fn pushEvent(view: *View, event: Event) void {
     view.event_queue.push(event);
 }
 
+/// Initializes all widgets, sets their `parent` and `absolute_bounds` fields.
 pub fn init(view: *View, allocator: std.mem.Allocator) !void {
     try view.recursiveInit(view.widgets, allocator);
+    view.updateAbsolutePositions();
+    view.updateParents();
 }
 
 fn recursiveInit(view: *View, list: Widget.List, allocator: std.mem.Allocator) !void {
@@ -171,8 +178,6 @@ fn recursiveInit(view: *View, list: Widget.List, allocator: std.mem.Allocator) !
 }
 
 /// Releases the resources allocated by `Widget.init`.
-///
-/// **NOTE:** This function should not be called manually. Use `View.init` instead!
 pub fn deinit(view: *View) void {
     view.recursiveDeinit(view.widgets);
 }
@@ -258,4 +263,24 @@ fn findLastChild(widget: ?*Widget.Node) ?*Widget.Node {
     if (w.children.len > 0)
         return findLastChild(w.children.last);
     return widget;
+}
+
+/// Updates `Widget.absolute_bounds` for all widgets in the tree.
+/// Call when adding widgets or changing any widgets position.
+pub fn updateAbsolutePositions(view: *View) void {
+    view.updateAbsolutePositionInner(view.widgets, ui.Point.zero);
+}
+
+fn updateAbsolutePositionInner(view: *View, list: Widget.List, offset: ui.Point) void {
+    var it = Widget.Iterator.init(list, .bottom_to_top);
+    while (it.next()) |widget| {
+        const pos = ui.Point.new(
+            widget.bounds.position.x + offset.x,
+            widget.bounds.position.y + offset.y,
+        );
+
+        widget.absolute_bounds = ui.Rectangle.new(pos, widget.bounds.size);
+
+        view.updateAbsolutePositionInner(widget.children, pos);
+    }
 }

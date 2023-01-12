@@ -1,3 +1,8 @@
+//!
+//! The button is a UI primitive that the user can click.
+//! A click usually triggers actions like *saving a file* or *sending a message*.
+//!
+
 const std = @import("std");
 const ui = @import("ui");
 

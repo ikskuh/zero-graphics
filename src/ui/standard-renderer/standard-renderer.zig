@@ -113,42 +113,35 @@ pub const Renderer = struct {
         area: Rectangle,
     };
 
-    const RenderInfo = struct {
-        focus: ?FocusInfo = null,
-        hover: ?FocusInfo = null,
-    };
-
     pub fn render(renderer: *Renderer, view: View, screen_size: Size) !void {
-        var info = RenderInfo{};
+        try renderer.renderWidgetList(view, Rectangle.new(Point.zero, screen_size), view.widgets);
 
-        try renderer.renderWidgetList(view, Rectangle.new(Point.zero, screen_size), view.widgets, &info);
-
-        if (info.focus) |focus| {
+        if (view.focus) |focus| {
             try renderer.graphics.drawRectangle(
-                focus.area.grow(2),
+                focus.absolute_bounds.grow(2),
                 Color.red,
             );
         }
 
         if (@import("builtin").mode == .Debug) {
             // In debug builds, we show the currently hovered widget as well
-            if (info.hover) |hover| {
+            if (view.hovered_widget) |hover| {
                 try renderer.graphics.drawRectangle(
-                    hover.area.grow(3),
+                    hover.absolute_bounds.grow(3),
                     Color.magenta,
                 );
             }
         }
     }
 
-    fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List, render_info: *RenderInfo) error{OutOfMemory}!void {
+    fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List) error{OutOfMemory}!void {
         var it = Widget.Iterator.init(list, .bottom_to_top);
         while (it.next()) |widget| {
-            try renderer.renderWidget(view, target_area, widget, render_info);
+            try renderer.renderWidget(view, target_area, widget);
         }
     }
 
-    fn renderWidget(renderer: *Renderer, view: View, target_area: Rectangle, widget: *Widget, render_info: *RenderInfo) error{OutOfMemory}!void {
+    fn renderWidget(renderer: *Renderer, view: View, target_area: Rectangle, widget: *Widget) error{OutOfMemory}!void {
         if (widget.visibility != .visible)
             return;
 
@@ -158,25 +151,12 @@ pub const Renderer = struct {
         const size = widget.bounds.size;
         const area = Rectangle.new(position, size);
 
-        if (widget == view.focus) {
-            render_info.focus = FocusInfo{
-                .widget = widget,
-                .area = area,
-            };
-        }
-        if (widget == view.hovered_widget) {
-            render_info.hover = FocusInfo{
-                .widget = widget,
-                .area = area,
-            };
-        }
-
         try g.pushClipRectangle(area);
         defer g.popClipRectangle() catch {};
 
         try renderer.renderControl(area, widget.control, (widget == view.focus));
 
-        try renderer.renderWidgetList(view, area, widget.children, render_info);
+        try renderer.renderWidgetList(view, area, widget.children);
     }
 
     fn renderControl(renderer: *Renderer, target_area: Rectangle, control: Control, has_focus: bool) error{OutOfMemory}!void {

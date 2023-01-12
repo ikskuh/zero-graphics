@@ -1,3 +1,8 @@
+//!
+//! A label is a simple control that shows a text on the user interface.
+//! It doesn't have much interaction besides rendering.
+//!
+
 const ui = @import("ui");
 
 font: ?ui.Font = null,

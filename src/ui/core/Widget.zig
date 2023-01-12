@@ -34,6 +34,10 @@ bounds: ui.LayoutedRectangle = .{
     .size = ui.Size.new(32, 32),
 },
 
+/// Absolute rectangle on the screen for the widget. Will only be updated by
+/// calling `View.updateAbsolutePositions`.
+absolute_bounds: ui.Rectangle = undefined,
+
 /// If a widget is enabled, it is able to receive events from the user. Otherwise,
 /// it might be rendered disabled.
 enabled: bool = true,
@@ -73,7 +77,7 @@ pub fn init(widget: *Widget, allocator: std.mem.Allocator) !void {
 
 /// Releases the resources allocated by `Widget.init`.
 ///
-/// **NOTE:** This function should not be called manually. Use `View.init` instead!
+/// **NOTE:** This function should not be called manually. Use `View.deinit` instead!
 pub fn deinit(widget: *Widget) void {
     ui.controls.deinit(&widget.control);
 }
