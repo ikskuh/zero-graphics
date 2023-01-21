@@ -1,6 +1,17 @@
 const std = @import("std");
 const zg = @import("../zero-graphics.zig");
 
+/// Implements the ear clipping algorithm to triangulate arbitrary N-gons.
+/// - `Vertex` is the type of the vertices of the polygons.
+/// - `vertexPosition` converts a vertex into a 2D position.
+/// - The `Writer` type is similar to `std.io.Writer` which will receive the generated triangles.
+///
+/// `Writer` needs to have a function `fn(Writer, [3]Vertex) !void` and will be stored in the ear
+/// clipping implementation.
+///
+/// The structure will allocate some temporary memory with a size limit of the largest polygon
+/// triangulated.
+///
 pub fn EarClipper(
     comptime Vertex: type,
     comptime vertexPosition: fn (Vertex) [2]f32,
@@ -25,15 +36,18 @@ pub fn EarClipper(
         }
 
         /// Appends a polygon to the current triangle soup.
+        /// All triangles of that polygon will be emitted into the writer passed to `.init()`.
         pub fn appendPolygon(self: *Self, vertices: []const Vertex) !void {
+            std.debug.assert(vertices.len >= 3);
+
             try self.temp_vertices.resize(vertices.len);
             std.mem.copy(Vertex, self.temp_vertices.items, vertices);
 
-            if (windingOrder(vertices) == .cw) {
+            if (windingOrder(self.temp_vertices.items) == .cw) {
                 std.mem.reverse(Vertex, self.temp_vertices.items);
             }
 
-            std.debug.assert(windingOrder(vertices) == .ccw);
+            std.debug.assert(windingOrder(self.temp_vertices.items) == .ccw);
 
             try self.flush();
         }
@@ -101,16 +115,52 @@ pub fn EarClipper(
             };
         }
 
+        fn sign(p1: [2]f32, p2: [2]f32, p3: [2]f32) f32 {
+            return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
+        }
+
+        fn pointInTriangle(pt: [2]f32, v1: [2]f32, v2: [2]f32, v3: [2]f32) bool {
+            const d1 = sign(pt, v1, v2);
+            const d2 = sign(pt, v2, v3);
+            const d3 = sign(pt, v3, v1);
+
+            const has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0);
+            const has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0);
+
+            return !(has_neg and has_pos);
+        }
+
         fn findOneEar(self: Self) ?usize {
-            std.debug.assert(self.temp_vertices.items.len >= 3);
-            for (self.temp_vertices.items) |_, i| {
-                if (self.convexity(i) != .convex)
+            const temp_vertices = self.temp_vertices.items;
+
+            std.debug.assert(temp_vertices.len >= 3);
+            search_loop: for (temp_vertices) |_, index| {
+                const lo_bounds = index -| 1;
+                const hi_bounds = index + 2;
+
+                const p0 = vertexPosition(temp_vertices[self.leftOf(index)]);
+                const p1 = vertexPosition(temp_vertices[index]);
+                const p2 = vertexPosition(temp_vertices[self.rightOf(index)]);
+
+                // only accept ears in the right winding order
+                if (cross2D(sub(p1, p0), sub(p2, p0)) > 0) {
                     continue;
-                if (self.convexity(self.leftOf(i)) != .convex)
-                    continue;
-                if (self.convexity(self.rightOf(i)) != .convex)
-                    continue;
-                return i;
+                }
+
+                // and that contain no other vertices
+                var i: usize = 0;
+                while (i < lo_bounds) : (i += 1) {
+                    if (pointInTriangle(vertexPosition(temp_vertices[i]), p0, p1, p2))
+                        continue :search_loop;
+                }
+
+                i = hi_bounds;
+                while (i < temp_vertices.len) : (i += 1) {
+                    if (pointInTriangle(vertexPosition(temp_vertices[i]), p0, p1, p2))
+                        continue :search_loop;
+                }
+
+                return index;
             }
             return null;
         }
@@ -120,14 +170,7 @@ pub fn EarClipper(
             const left = self.temp_vertices.items[self.leftOf(i)];
             const right = self.temp_vertices.items[self.rightOf(i)];
 
-            // const p0 = vertexPosition(vert);
-            // const p1 = vertexPosition(left);
-            // const p2 = vertexPosition(right);
-
-            // only push triangles out with the right winding order.
-            // if (cross2D(sub(p1, p0), sub(p2, p0)) > 0) {
             try self.target_vertices.emit(.{ left, vert, right });
-            // }
         }
 
         fn flush(self: *Self) !void {
