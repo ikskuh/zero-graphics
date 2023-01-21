@@ -123,15 +123,15 @@ pub const Renderer = struct {
             );
         }
 
-        if (@import("builtin").mode == .Debug) {
-            // In debug builds, we show the currently hovered widget as well
-            if (view.hovered_widget) |hover| {
-                try renderer.graphics.drawRectangle(
-                    hover.absolute_bounds.grow(3),
-                    Color.magenta,
-                );
-            }
-        }
+        // if (@import("builtin").mode == .Debug) {
+        //     // In debug builds, we show the currently hovered widget as well
+        //     if (view.hovered_widget) |hover| {
+        //         try renderer.graphics.drawRectangle(
+        //             hover.absolute_bounds.grow(3),
+        //             Color.magenta,
+        //         );
+        //     }
+        // }
     }
 
     fn renderWidgetList(renderer: *Renderer, view: View, target_area: Rectangle, list: Widget.List) error{OutOfMemory}!void {

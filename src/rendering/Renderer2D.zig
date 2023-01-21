@@ -905,6 +905,22 @@ pub fn drawLinePixels(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Co
     });
 }
 
+/// Draws a single pixel wide line from (`x0`,`y0`) to (`x1`,`y1`)
+pub fn drawTriangle(self: *Self, tris: [3]Point, color: Color) DrawError!void {
+    return self.drawTrianglePixels(
+        .{ self.scalePoint(tris[0]), self.scalePoint(tris[1]), self.scalePoint(tris[2]) },
+        color,
+    );
+}
+
+pub fn drawTrianglePixels(self: *Self, tris: [3]Point, color: Color) DrawError!void {
+    var verts: [3]Vertex = undefined;
+    for (verts) |*vert, i| {
+        vert.* = Vertex.init(tris[i].x, tris[i].y, color);
+    }
+    try self.appendTriangles(null, &[_][3]Vertex{verts});
+}
+
 pub fn pushClipRectangle(self: *Self, rectangle: Rectangle) !void {
     const draw_call = try self.draw_calls.addOne();
     draw_call.* = DrawCall{

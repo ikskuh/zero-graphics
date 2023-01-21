@@ -39,6 +39,10 @@ pub const backend: Backend = @import("root").backend;
 
 pub const WebSocket = @import("root").WebSocket;
 
+pub const tools = struct {
+    pub const EarClipper = @import("tools/ear-clipper.zig").EarClipper;
+};
+
 pub const Point = struct {
     pub const zero = Point{ .x = 0, .y = 0 };
 
