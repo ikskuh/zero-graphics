@@ -310,11 +310,11 @@ pub const Application = struct {
                 .file_dialogs = app.features.file_dialogs,
             };
 
-            if (features.code_editor and (platform == .web or platform == .android or platform == .desktop)) {
+            if (features.code_editor and (platform == .android or platform == .desktop)) {
                 features.code_editor = false;
                 logger.warn("Disabling unsupported feature 'code_editor' for platform {s}", .{@tagName(platform)});
             }
-            if (features.file_dialogs and (platform == .web or platform == .android or platform == .desktop)) {
+            if (features.file_dialogs and (platform == .android or platform == .desktop)) {
                 features.file_dialogs = false;
                 logger.warn("Disabling unsupported feature 'file_dialogs' for platform {s}", .{@tagName(platform)});
             }
