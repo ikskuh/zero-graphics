@@ -1282,9 +1282,13 @@ createWebGlModule(canvas_element, getInstance, stop_fn) {
       throw 'uniformMatrix2fv not implemented yet'
     }
     ,
-        uniformMatrix3fv() {
-      // extern fn uniformMatrix3fv (_location: GLint, _count: GLsizei, _transpose: GLboolean, _value: [*c]const GLfloat) void;
-      throw 'uniformMatrix3fv not implemented yet'
+        uniformMatrix3fv(location_id, data_len, transpose, data_ptr) {
+      const floats = new Float32Array(
+          getMemory().buffer,
+          data_ptr,
+          data_len * 12 
+      )
+      gl.uniformMatrix3fv(glUniformLocations[location_id], transpose, floats)
     }
     ,
         validateProgram() {
