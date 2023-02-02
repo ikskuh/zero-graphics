@@ -31,11 +31,6 @@ pub fn build(b: *std.build.Builder) !void {
     // Build wasm application
     {
         const wasm_build = app.compileFor(.web);
-        switch (wasm_build.data) {
-            .web => |step| {
-                step.rdynamic = true;
-            }, else => {},
-        }
         wasm_build.install();
     }
 
