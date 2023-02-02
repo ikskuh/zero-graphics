@@ -376,7 +376,7 @@ pub const Application = struct {
                     .abi = .musl,
                 });
                 exe.addPackage(build_options);
-
+                exe.rdynamic = true;
                 app.prepareExe(exe, app_pkg, features, platform);
 
                 return app.createCompilation(.{
@@ -494,7 +494,6 @@ pub const AppCompilation = struct {
         return switch (comp.data) {
             .desktop => |step| step.run(),
             .web => |step| blk: {
-                step.rdynamic = true;
                 step.install();
 
                 const serve = comp.sdk.dummy_server.run();
