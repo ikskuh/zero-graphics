@@ -1232,9 +1232,13 @@ createWebGlModule(canvas_element, getInstance, stop_fn) {
       throw 'uniform2f not implemented yet'
     }
     ,
-        uniform2fv() {
-      // extern fn uniform2fv (_location: GLint, _count: GLsizei, _value: [*c]const GLfloat) void;
-      throw 'uniform2fv not implemented yet'
+        uniform2fv(location_id, count, data_ptr) {
+        const floats = new Float32Array(
+          getMemory().buffer,
+          data_ptr,
+          count * 2
+      )
+      gl.uniform2fv(glUniformLocations[location_id], floats);
     }
     ,
         uniform2iv() {
