@@ -691,9 +691,27 @@ pub fn render(self: Self, screen_size: Size) void {
     }
 }
 
+fn cmpRotation(rot_radians_a:?f32, rot_about_a:?Point, rot_radians_b:?f32, rot_about_b:?Point) bool {
+    const rotationThreshold = 0.05;
+
+    // all null
+    if (rot_radians_a == null and rot_radians_b == null and rot_about_a == null and rot_about_b == null) {
+        return true;
+    }
+
+    // only some null
+    if (rot_radians_a == null or rot_radians_b == null or rot_about_a == null or rot_about_b == null) {
+        return false;
+    }
+
+    const rot_about_same = rot_about_a.?.x == rot_about_b.?.x and rot_about_a.?.y == rot_about_b.?.y;
+    const rot_radians_same = std.math.approxEqAbs(f32, rot_radians_a.?, rot_radians_b.?, rotationThreshold);
+    return rot_about_same and rot_radians_same;
+}
+
 /// Appends a set of triangles to the renderer with the given `texture`.
 pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex, rot_radians:?f32, rot_about:?Point) DrawError!void {
-    const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture or (!std.meta.eql(self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.rot_radians, rot_radians)) or (!std.meta.eql(self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.rot_about, rot_about))
+    const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture or !cmpRotation(self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.rot_radians, self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.rot_about, rot_radians, rot_about)
     ) blk: {
         const dc = try self.draw_calls.addOne();
         dc.* = DrawCall{
