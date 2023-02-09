@@ -39,6 +39,8 @@ const vertex_attributes = .{
 const Uniforms = struct {
     uScreenSize: gles.GLint,
     uTexture: gles.GLint,
+    rotateAngle: gles.GLint,
+    rotateAbout: gles.GLint,
 };
 
 shader_program: *ResourceManager.Shader,
@@ -669,6 +671,12 @@ pub fn render(self: Self, screen_size: Size) void {
 
                 .draw_vertices => |vertices| {
                     const tex_handle = vertices.texture orelse self.white_texture;
+                    const rot_radians = vertices.rot_radians orelse 0;
+                    const rot_about = vertices.rot_about orelse Point{.x=0,.y=0};
+
+                    gles.uniform1f(uniforms.rotateAngle, rot_radians);
+                    const rotateAbout:[2]f32 = .{@intToFloat(f32, rot_about.x), @intToFloat(f32, rot_about.y)};
+                    gles.uniform2fv(uniforms.rotateAbout, 1, @ptrCast([*]const f32, &rotateAbout));
 
                     gles.bindTexture(gles.TEXTURE_2D, tex_handle.instance orelse 0);
 
@@ -684,13 +692,15 @@ pub fn render(self: Self, screen_size: Size) void {
 }
 
 /// Appends a set of triangles to the renderer with the given `texture`.
-pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex) DrawError!void {
+pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex, rot_radians:?f32, rot_about:?Point) DrawError!void {
     const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture) blk: {
         const dc = try self.draw_calls.addOne();
         dc.* = DrawCall{
             .draw_vertices = DrawVertices{
                 .texture = texture,
                 .offset = self.vertices.items.len,
+                .rot_radians = rot_radians,
+                .rot_about = rot_about,
                 .count = 0,
             },
         };
@@ -735,7 +745,7 @@ pub fn fillQuadPixels(self: *Self, real_corners: [4]Point, color: Color) DrawErr
     try self.appendTriangles(null, &[_][3]Vertex{
         .{ p0, p1, p2 },
         .{ p1, p3, p2 },
-    });
+    }, null, null);
 }
 
 /// Appends a filled, untextured quad.
@@ -755,7 +765,7 @@ pub fn fillRectanglePixels(self: *Self, real_rect: Rectangle, color: Color) Draw
     try self.appendTriangles(null, &[_][3]Vertex{
         .{ tl, br, tr },
         .{ br, tl, bl },
-    });
+    }, null, null);
 }
 
 pub fn setPixel(self: *Self, x: i16, y: i16, color: Color) DrawError!void {
@@ -779,7 +789,15 @@ pub fn drawPartialTexture(self: *Self, rectangle: Rectangle, texture: *ResourceM
     return self.drawPartialTexturePixels(self.scaleRectangle(rectangle), texture, source_rect, tint);
 }
 
+pub fn drawPartialTextureRot(self: *Self, rectangle: Rectangle, texture: *ResourceManager.Texture, source_rect: Rectangle, tint: ?Color, rot_radians: f32, rot_about: Point) DrawError!void {
+    return self.drawPartialTexturePixelsRot(self.scaleRectangle(rectangle), texture, source_rect, tint, rot_radians, rot_about);
+}
+
 pub fn drawPartialTexturePixels(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, source_rect: Rectangle, tint: ?Color) DrawError!void {
+    return self.drawPartialTexturePixelsRot(real_rect, texture, source_rect, tint, null, null);
+}
+
+pub fn drawPartialTexturePixelsRot(self: *Self, real_rect: Rectangle, texture: *ResourceManager.Texture, source_rect: Rectangle, tint: ?Color, rot_radians: ?f32, rot_about: ?Point) DrawError!void {
     if (real_rect.size().isEmpty())
         return;
 
@@ -808,7 +826,7 @@ pub fn drawPartialTexturePixels(self: *Self, real_rect: Rectangle, texture: *Res
     try self.appendTriangles(texture, &[_][3]Vertex{
         .{ tl, br, tr },
         .{ br, tl, bl },
-    });
+    }, rot_radians, rot_about);
 }
 
 /// Appends a rectangle with a 1 pixel wide outline
@@ -838,7 +856,7 @@ pub fn drawRectanglePixels(self: *Self, real_rect: Rectangle, color: Color) Draw
         // left
         .{ bl.offset(1, -1), tl.offset(-1, -1), bl.offset(-1, 1) },
         .{ bl.offset(1, 1), tl.offset(1, 1), tl.offset(-1, -1) },
-    });
+    }, null, null);
 }
 
 pub fn drawCircle(self: *Self, x: i16, y: i16, radius: u15, color: Color) DrawError!void {
@@ -902,7 +920,7 @@ pub fn drawLinePixels(self: *Self, x0: i16, y0: i16, x1: i16, y1: i16, color: Co
             p1.offset(ox_x, ox_y).offset(oy_x, oy_y),
             p0.offset(-ox_x, -ox_y).offset(oy_x, oy_y),
         },
-    });
+    }, null, null);
 }
 
 /// Draws a single pixel wide line from (`x0`,`y0`) to (`x1`,`y1`)
@@ -918,7 +936,7 @@ pub fn drawTrianglePixels(self: *Self, tris: [3]Point, color: Color) DrawError!v
     for (verts) |*vert, i| {
         vert.* = Vertex.init(tris[i].x, tris[i].y, color);
     }
-    try self.appendTriangles(null, &[_][3]Vertex{verts});
+    try self.appendTriangles(null, &[_][3]Vertex{verts}, null, null);
 }
 
 pub fn pushClipRectangle(self: *Self, rectangle: Rectangle) !void {
@@ -1001,6 +1019,8 @@ const DrawVertices = struct {
     offset: usize,
     count: usize,
     texture: ?*ResourceManager.Texture,
+    rot_radians: ?f32,
+    rot_about: ?Point,
 };
 
 pub const Font = struct {
@@ -1076,12 +1096,20 @@ const vertexSource =
     \\attribute vec2 vPosition;
     \\attribute vec4 vColor;
     \\attribute vec2 vUV;
+    \\uniform vec2 rotateAbout;
+    \\uniform float rotateAngle;
     \\uniform ivec2 uScreenSize;
     \\varying vec4 fColor;
     \\varying vec2 fUV;
+    \\vec2 rotate(vec2 pt, float angle, vec2 about)
+    \\{
+    \\    float x = about.x + (pt.x - about.x) * cos(angle) - (pt.y - about.y) * sin(angle);
+    \\    float y = about.y + (pt.x - about.x) * sin(angle) + (pt.y - about.y) * cos(angle);
+    \\    return vec2(x, y);
+    \\}
     \\void main()
     \\{
-    \\   vec2 virtual_position = (vPosition + 0.5) / vec2(uScreenSize);
+    \\   vec2 virtual_position = (rotate(vPosition, rotateAngle, rotateAbout) + 0.5) / vec2(uScreenSize);
     \\   gl_Position = vec4(2.0 * virtual_position.x - 1.0, 1.0 - 2.0 * virtual_position.y, 0.0, 1.0);
     \\   fColor = vColor;
     \\   fUV = vUV;
