@@ -693,7 +693,8 @@ pub fn render(self: Self, screen_size: Size) void {
 
 /// Appends a set of triangles to the renderer with the given `texture`.
 pub fn appendTriangles(self: *Self, texture: ?*ResourceManager.Texture, triangles: []const [3]Vertex, rot_radians:?f32, rot_about:?Point) DrawError!void {
-    const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture) blk: {
+    const draw_call = if (self.draw_calls.items.len == 0 or self.draw_calls.items[self.draw_calls.items.len - 1] != .draw_vertices or self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.texture != texture or (!std.meta.eql(self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.rot_radians, rot_radians)) or (!std.meta.eql(self.draw_calls.items[self.draw_calls.items.len - 1].draw_vertices.rot_about, rot_about))
+    ) blk: {
         const dc = try self.draw_calls.addOne();
         dc.* = DrawCall{
             .draw_vertices = DrawVertices{
